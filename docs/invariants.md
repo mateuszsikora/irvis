@@ -1,0 +1,58 @@
+# Invariants
+
+Numbered domain rules, each enforced by the tests listed under it. Cite a rule by number ("invariant 4"). A number is never reused; a rule that stops holding is struck through with the reason. How to add one: [documentation guide](guides/documentation.md#invariants).
+
+irvis has no product code yet, so the only domain is the documentation contract.
+
+- **1.** A changed path that a rule owns fails the check unless some changed path matches that rule's documentation regex.
+  - `tests/test_check_docs.py::RuleTests::test_owned_path_without_doc_fails`
+  - `tests/test_check_docs.py::RuleTests::test_owned_path_with_doc_passes`
+- **2.** Commits since the merge base, staged changes, unstaged changes and untracked files all count, on both the source and the documentation side.
+  - `tests/test_check_docs.py::RuleTests::test_untracked_source_counts`
+  - `tests/test_check_docs.py::RuleTests::test_untracked_doc_counts`
+  - `tests/test_check_docs.py::RuleTests::test_staged_doc_counts`
+  - `tests/test_check_docs.py::RuleTests::test_unstaged_doc_counts`
+  - `tests/test_check_docs.py::RuleTests::test_staged_source_counts`
+  - `tests/test_check_docs.py::RuleTests::test_unstaged_source_counts`
+- **3.** Deleting or moving an owned file needs the same documentation as editing it.
+  - `tests/test_check_docs.py::RuleTests::test_deletion_needs_doc`
+  - `tests/test_check_docs.py::RuleTests::test_rename_needs_doc`
+- **4.** Changes under `tests/` and the other paths in `EXCLUDE` never need documentation.
+  - `tests/test_check_docs.py::RuleTests::test_tests_only_change_passes`
+  - `tests/test_check_docs.py::RuleTests::test_every_exclusion_needs_no_doc`
+  - `tests/test_check_docs.py::CarveOutTests::test_pr_template_needs_no_doc`
+  - `tests/test_check_docs.py::CarveOutTests::test_agent_tooling_needs_no_doc`
+- **5.** A file whose diff changes only versions needs no documentation; any other change in the same file does, and a filter that raises fails the check.
+  - `tests/test_check_docs.py::BumpFilterTests::test_bump_only_passes`
+  - `tests/test_check_docs.py::BumpFilterTests::test_bump_with_other_change_fails`
+  - `tests/test_check_docs.py::BumpFilterTests::test_changed_action_name_is_not_a_bump`
+  - `tests/test_check_docs.py::BumpFilterTests::test_moved_uses_line_is_not_a_bump`
+  - `tests/test_check_docs.py::BumpFilterTests::test_crashing_filter_fails`
+- **6.** A path that no other rule owns needs a feature document that is new since the merge base; an edited document, or one git detects as a rename, does not count. Deleting such a path needs nothing.
+  - `tests/test_check_docs.py::CatchAllTests::test_unowned_path_needs_new_feature_doc`
+  - `tests/test_check_docs.py::CatchAllTests::test_new_feature_doc_satisfies_catch_all`
+  - `tests/test_check_docs.py::CatchAllTests::test_moved_doc_is_not_new`
+  - `tests/test_check_docs.py::CatchAllTests::test_new_script_is_caught`
+  - `tests/test_check_docs.py::CatchAllTests::test_deleting_unowned_path_needs_no_new_doc`
+- **7.** The base is `--base`, else `origin/main`, else `main`; without one, or without a merge base, the check exits 2 and never compares with another branch.
+  - `tests/test_check_docs.py::BaseTests::test_no_base_exits_2`
+  - `tests/test_check_docs.py::BaseTests::test_no_merge_base_exits_2`
+  - `tests/test_check_docs.py::BaseTests::test_missing_base_ref_exits_2`
+  - `tests/test_check_docs.py::BaseTests::test_base_option`
+  - `tests/test_check_docs.py::BaseTests::test_origin_main_before_main`
+- **8.** `SKIP_DOCS_CHECK=1` skips the check only when `CI` is unset.
+  - `tests/test_check_docs.py::SkipTests::test_skip_works_locally`
+  - `tests/test_check_docs.py::SkipTests::test_skip_ignored_in_ci`
+- **9.** The ownership-map and exclusions tables in `docs/features/README.md` equal `RULES` and `EXCLUDE`.
+  - `tests/test_check_docs.py::IntegrityTests::test_map_row_differs_fails`
+  - `tests/test_check_docs.py::IntegrityTests::test_map_row_missing_fails`
+  - `tests/test_check_docs.py::IntegrityTests::test_map_row_extra_fails`
+  - `tests/test_check_docs.py::IntegrityTests::test_exclusion_differs_fails`
+- **10.** `docs/decisions/README.md` equals the output of `scripts/decisions-index.py`.
+  - `tests/test_check_docs.py::IntegrityTests::test_stale_decisions_index_fails`
+  - `tests/test_decisions_index.py::IndexTests::test_stale_index_fails_check`
+- **11.** This repository passes its own integrity checks.
+  - `tests/test_check_docs.py::RealRepositoryTests::test_integrity_of_this_repository`
+- **12.** Every test id in this file names an existing test, with the method in the named class.
+  - `tests/test_check_docs.py::IntegrityTests::test_invariant_with_missing_test_fails`
+  - `tests/test_check_docs.py::IntegrityTests::test_invariant_with_test_under_wrong_class_fails`

@@ -1,0 +1,45 @@
+# What runs here and why: docs/guides/development.md#ci
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    name: Documentation contract
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The check diffs against the merge base; a shallow clone has none.
+          fetch-depth: 0
+      - name: Documentation contract
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: make docs-check BASE="origin/$BASE_REF"
+
+  integrity:
+    name: Documentation integrity
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Documentation integrity
+        run: make docs-check ARGS=--integrity-only
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Unit tests
+        run: make test
