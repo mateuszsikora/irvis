@@ -1,7 +1,7 @@
 ---
 name: create-pr
 description: Open a pull request in the irvis repository (mateuszsikora/irvis), or rewrite the title and description of an existing one, following its CONTRIBUTING.md (Conventional Commits, <type>/<slug> branches, squash merge, no AI attribution). Use when asked to open, create or ship a PR, push work for review, or fix an existing PR's title or description in this repository. Prefer it over generic PR, commit or commit-push-PR skills here.
-allowed-tools: Bash(git status:*), Bash(git fetch:*), Bash(git log:*), Bash(git diff:*), Bash(git show:*), Bash(git rev-parse:*), Bash(git rev-list:*), Bash(git merge-base:*), Bash(git merge-tree:*), Bash(git ls-remote:*), Bash(git ls-files:*), Bash(git check-ignore:*), Bash(git add:*), Bash(git commit:*), Bash(gh auth status:*), Bash(gh repo view:*), Bash(gh pr list:*), Bash(gh pr view:*), Bash(gh pr create:*), Bash(gh pr edit:*), Bash(gh issue list:*), Bash(gh issue view:*), Bash(gh label list:*), Bash(mktemp:*), Bash(test:*), Bash(readlink:*), Bash(basename:*), Read, Grep, Glob
+allowed-tools: Bash(git status:*), Bash(git fetch:*), Bash(git log:*), Bash(git diff:*), Bash(git show:*), Bash(git rev-parse:*), Bash(git rev-list:*), Bash(git merge-base:*), Bash(git merge-tree:*), Bash(git ls-remote:*), Bash(git ls-files:*), Bash(git check-ignore:*), Bash(git add:*), Bash(git commit:*), Bash(gh auth status:*), Bash(gh repo view:*), Bash(gh pr list:*), Bash(gh pr view:*), Bash(gh pr create:*), Bash(gh pr edit:*), Bash(gh issue list:*), Bash(gh issue view:*), Bash(gh label list:*), Bash(mktemp:*), Bash(test:*), Bash(readlink:*), Bash(basename:*), Bash(make docs-check), Bash(make test), Read, Grep, Glob
 ---
 
 # create-pr (irvis)
@@ -10,9 +10,9 @@ Opens a pull request in `mateuszsikora/irvis`, or updates the title and descript
 
 This skill is shared by Claude Code and Codex: the file lives in `.agents/skills/create-pr/` (Codex) and `.claude/skills/create-pr` is a symlink to it (Claude Code). "Ask the user" means whatever question mechanism the running agent has; after asking, stop and wait for the answer.
 
-`CONTRIBUTING.md` is the source of truth. This skill and `AGENTS.md` restate it; if they disagree, follow `CONTRIBUTING.md` and tell the user about the mismatch. A rule change goes into all three files that state it.
+`CONTRIBUTING.md` is the source of truth. This skill and `AGENTS.md` restate it; if they disagree, follow `CONTRIBUTING.md` and tell the user about the mismatch. A rule change goes into all three files that state it. The same holds for the documentation contract: where this skill disagrees with `docs/guides/documentation.md` or `docs/features/README.md`, the skill is wrong.
 
-**Permissions.** In Claude Code, `allowed-tools` pre-approves read-only commands and the normal commit/PR path: `git add`, `git commit` (which includes `--amend`; step 6 uses it only on an unpushed last commit), `gh pr create` and `gh pr edit`. Prefix rules match more than the skill allows: `git add:*` also matches `git add -A`, which step 6 forbids, so the instructions in this file, not the permissions, are the safeguard. Everything else asks for permission on purpose, including `git branch -m`, `git switch`, `git rebase`, `git push`, `gh api`, `gh pr ready`, the skill check, and writing the message, title and body files (`cat` is deliberately not pre-approved, because `cat > <file>` would then write any file without asking; read files with the file-reading tool). Codex ignores `allowed-tools` and uses its own approval settings.
+**Permissions.** In Claude Code, `allowed-tools` pre-approves read-only commands and the normal commit/PR path: `git add`, `git commit` (which includes `--amend`; step 6 uses it only on an unpushed last commit), `gh pr create`, `gh pr edit`, and the two checks `make docs-check` and `make test`, as exact commands. They only read the repository (apart from Python bytecode caches that git ignores). With make variables (`BASE=`, `ARGS=`, `PYTHON=`) they ask, because `PYTHON=` puts any command into the recipe; do not pass `PYTHON=` without the user's agreement. Prefix rules match more than the skill allows: `git add:*` also matches `git add -A`, which step 6 forbids, so the instructions in this file, not the permissions, are the safeguard. Everything else asks for permission on purpose, including `git branch -m`, `git switch`, `git rebase`, `git push`, `gh api`, `gh pr ready`, the skill check, and writing the message, title and body files (`cat` is deliberately not pre-approved, because `cat > <file>` would then write any file without asking; read files with the file-reading tool). Codex ignores `allowed-tools` and uses its own approval settings.
 
 The skill takes no arguments. Work out everything from the conversation, the branch, its commits and the issue tracker. Ask the user only for what none of those can tell (for example why an approach was chosen, if that was never discussed), and batch those questions into one message.
 
@@ -26,6 +26,7 @@ The skill takes no arguments. Work out everything from the conversation, the bra
   - in both cases GitHub appends ` (#N)` to the subject. The 72-character limit applies to the header as written (commit subject, PR title), not to the suffix; a header that goes past 72 only because of ` (#N)` is accepted.
 
   So every commit message on the branch ends up in `main`'s history and every one must follow the rules in step 6. A `wip` commit is not harmless.
+- **Documentation contract.** Every behaviour change carries its documentation in the same PR (`AGENTS.md`, section "Documentation contract"). `make docs-check` must pass before pushing (step 3). If `main` is merged into the branch (only with the user's agreement), run `make docs-check` again **after** the merge, never only before: the merge changes what the branch changed.
 - **Never:** push to `main`; force-push, rebase onto `main` or merge `main` without the user's agreement; create labels; create issues or ask the user to create one; invent an issue number; claim a check passes unless it ran in this session.
 
 ## 1. Preflight
@@ -95,10 +96,11 @@ Run the checks for every part the change touches (including uncommitted changes 
 
 | Change touches | Run | Expected |
 | --- | --- | --- |
+| anything (run it after committing, before pushing) | `make docs-check` | `docs-check: <N> changed files since origin/main (<sha>), each with the documentation it needs` (`1 changed file` when N is 1), exit code 0 |
+| `scripts/**`, `tests/**` or the `Makefile` | `make test` | last line `OK` |
 | `.agents/skills/**` or `.claude/skills/**` | the skill check below | exactly `ok: N skill(s)` |
 | a rule in `CONTRIBUTING.md`, `AGENTS.md` or a skill | read the rule in each of the three files that states it | all say the same thing |
 | tooling added (build, linter, tests, CI) | confirm the PR adds its command to the verification table in `CONTRIBUTING.md` and in this step | rows present in both |
-| anything else | nothing: no automated checks exist yet | Verification says "no automated checks exist for this part" |
 
 Skill check: run it from the repository root exactly as written. The `sh <<'EOF'` wrapper makes the result independent of the agent's shell (zsh aborts on an empty glob, bash does not).
 
@@ -126,6 +128,8 @@ git ls-files -s .claude/skills | awk '$1!="120000"{print "committed as a copy, n
 EOF
 ```
 
+If `make docs-check` fails, it names the document to update after each `✗`. Update that document so it says what is now true (read the code; do not invent), commit it with the change, and run the check again. Never set `SKIP_DOCS_CHECK=1` to get past it; CI ignores it anyway.
+
 Traps in this repository:
 
 - An empty glob makes a naive `sh`/bash loop do nothing and exit 0; the check prints `no skills found` instead. Run outside the `sh` wrapper, zsh stops with `no matches found` instead. Silence, or any output other than `ok: N skill(s)`, is a failure, not a pass.
@@ -140,7 +144,7 @@ Traps in this repository:
 
 The PR is **incomplete** if any of these holds:
 
-- a check from step 3 fails or was not run;
+- a check from step 3 fails or was not run, including `make docs-check`;
 - the change relies on a TODO/FIXME, a skipped test or a stub;
 - the branch has `wip`, `fixup!`, `squash!` or "address review" commits that were not folded in;
 - the description would say `Closes #N` but the issue is only partly done (switch to `Refs`, or the PR is incomplete if the user wants it to close the issue);
@@ -176,7 +180,7 @@ Uncommitted changes that belong to this work are committed before pushing. Messa
 - `BREAKING CHANGE: ...` (if any), then `Closes #N` or `Refs #N`, as the last lines;
 - no attribution lines (global rules).
 
-**Staging.** Stage files by name: `git add -- <path> ...`. Never `git add -A`, `git add .` or `git commit -a`. `.gitignore` covers the usual local files, but it is not the only safeguard: never stage `.context/`, `.claude/settings.local.json`, `.claude/worktrees/`, `.env*` (except `.env.example`), keys or credentials, build output (`dist/`, `build/`, `node_modules/`, `*.log`), `.DS_Store`, or changes unrelated to this PR. `.agents/skills/` and `.claude/skills/` are tracked content and are staged normally. Check with `git diff --cached --name-only` before committing.
+**Staging.** Stage files by name: `git add -- <path> ...`. Never `git add -A`, `git add .` or `git commit -a`. `.gitignore` covers the usual local files, but it is not the only safeguard: never stage `.context/`, `.claude/settings.local.json`, `.claude/worktrees/`, `.env*` (except `.env.example`), keys or credentials, build output (`dist/`, `build/`, `node_modules/`, `__pycache__/`, `*.log`), `.DS_Store`, or changes unrelated to this PR. `.agents/skills/` and `.claude/skills/` are tracked content and are staged normally. Check with `git diff --cached --name-only` before committing.
 
 **Writing the message.** Write it to `$TMP/msg` (with the file-writing tool or a quoted heredoc, `cat > "$TMP/msg" <<'EOF'`), then `git commit -F "$TMP/msg"`. Never pass multi-line messages through `-m`.
 
@@ -226,6 +230,7 @@ Never push to `main`. Never force-push without the user's agreement; with it, us
 - **Opening paragraph(s):** outcome first (what the project can do or does differently now, and why), then `Closes #N` or `Refs #N` on its own line.
 - **Changes:** grouped by meaning, not a list of files.
 - **Decisions:** one bullet per choice: **the choice in bold**, the alternative that was rejected, and why. Taken from the conversation; ask if the why was never discussed and is not obvious.
+- **Documentation:** the section from the template. Tick only what holds: the `make docs-check` box only if it passed in this session after the latest merge of `main`; name the documents that now say what is true, or say why the change has no behaviour to document.
 - **Verification:** the exact commands from step 3 and their results, with numbers (`ok: 1 skill(s)`, test counts, timings). State what was not verified and why.
 - **Notes:** out of scope (with issue numbers), follow-ups, merge-time instructions (step 6). For a draft, first what is missing before it can be ready.
 
@@ -238,6 +243,7 @@ Delete empty sections and every template comment. Style: specific and checkable 
 - [ ] Every commit on the branch follows step 6 (it will all reach `main`).
 - [ ] Someone who did not see the conversation understands what changed and why.
 - [ ] Every verification claim was run in this session; what was not run is stated.
+- [ ] `make docs-check` passed after the last commit (and after the last merge of `main`); every behaviour change has its documentation, and the Documentation section says which.
 - [ ] `Closes` only for a fully done issue, otherwise `Refs`; no invented issue.
 - [ ] Rule changes are in every file that states the rule (`CONTRIBUTING.md`, `AGENTS.md`, the skill); new tooling has rows in both verification tables.
 - [ ] No attribution lines in the commits or the PR.

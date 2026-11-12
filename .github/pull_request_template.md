@@ -13,6 +13,15 @@ Delete every section that stays empty and every comment in this template before 
 
 <!-- **The choice made**: the alternative that was rejected, and why. -->
 
+## Documentation
+
+<!-- Tick what holds; for the last two, say which documents or why none. See docs/guides/documentation.md. -->
+
+- [ ] `make docs-check` passes on this branch, after the latest merge of the base branch
+- [ ] The documents this changes say what is now true: …
+- [ ] Removed behaviour is removed from the documentation too
+- [ ] No behaviour changes, so no documentation: …
+
 ## Verification
 
 <!-- Exact commands run and their results (numbers, counts). Say what was not verified. -->

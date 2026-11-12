@@ -1,0 +1,135 @@
+# Decisions: documentation contract
+
+Why the documentation system and its check work the way they do. How to add a decision: [documentation guide](../guides/documentation.md#decisions).
+
+## Documentation is written by hand and the script only enforces it
+
+Status: decided
+
+The documents say what the code does for a user, why it is shaped as it is, and what fails how. That needs judgement about what matters to a reader, which code does not hold. The script's job is narrower: make sure nobody forgets to update the document. It works out which document is due from the paths that changed, and it checks that the documentation hangs together (links, anchors, index, map).
+
+**Rejected:** generating reference documentation from docstrings or code, because generated text restates the code and does not say what a user sees or why a choice was made. That is the part that goes stale.
+
+## The check uses only the Python standard library
+
+Status: decided
+
+`scripts/check-docs.py` and `scripts/decisions-index.py` run with the system `python3` and need no virtual environment, lock file or install step. Contributors and CI runners can run them on a fresh clone, and the check cannot break because a dependency changed.
+
+**Rejected:** a Markdown parser library (for example `markdown-it-py`) for headings and links, because it needs an install step in every environment, and the subset of CommonMark the check needs (fences, ATX and setext headings, inline links) fits in about a hundred lines.
+
+**Rejected:** a shell script, because the GitHub slug rules, multiset comparison and table parsing are hard to get right in POSIX shell and differ between GNU and BSD tools.
+
+## The check runs in CI, not as a git hook
+
+Status: decided
+
+The check looks at the whole branch against its merge base. A pull request may land code in one commit and its documentation in the next; that is fine as long as both are in the pull request.
+
+**Rejected:** a pre-commit hook, because it would block the code-only commit, and people would learn to skip it with `--no-verify`.
+
+## The ownership check runs on pull requests and the integrity check also on main
+
+Status: decided
+
+The ownership check needs a base branch (`github.base_ref`) to diff against, which only a pull request has, so the "Documentation contract" job runs on pull requests only. The integrity checks need no base. A pull request's run checks the merge with the base as it was when the run started, and GitHub does not rerun it when the base moves, so two pull requests that pass alone can break `main` together (one renames a heading, the other links to it). The "Documentation integrity" job runs `--integrity-only` on every push to `main`, so the break shows up on the commit that caused it, not on the next unrelated pull request.
+
+**Rejected:** the full check on pushes to `main`, because a squash commit has no meaningful base to diff against. **Rejected:** no run on `main`, for the reason above.
+
+## SKIP_DOCS_CHECK is ignored in CI
+
+Status: decided
+
+The variable exists so that `make docs-check` does not get in the way of work in progress on a laptop. If it worked in CI, setting it in a workflow would switch the contract off for everyone without anyone noticing. The script prints that it ignored the variable, so nobody wonders why the skip had no effect.
+
+**Rejected:** honouring the skip everywhere, because then the check proves nothing. **Rejected:** a skip marker in the commit message or pull request body, because it is an off switch in the same place as the change it is meant to check.
+
+## Rules match directories minus carve-outs, not lists of files
+
+Status: decided
+
+A rule like C2 owns all of `.github/` except the pull request template. A new workflow is then owned from its first line, and nobody has to remember to add it to a list. Files are listed by name only where a directory has several owners, as in `scripts/`.
+
+**Rejected:** one rule per file, because every new file would start unowned until someone noticed.
+
+## The catch-all rule covers the whole repository until there is a package
+
+Status: decided
+
+A catch-all rule usually covers the main package. irvis has no package yet, and nobody knows where the first product code will live. F0 therefore owns every path that no other rule owns and that `EXCLUDE` does not list, anywhere in the tree, and asks for a new feature document. When a package appears, its own `F<n>` rules take over its paths. F0 skips deleted paths: removing code that no rule owns leaves no document to update, and asking for a new one would contradict "removing behaviour removes its documentation".
+
+**Rejected:** scoping F0 to a guessed directory such as `src/` or `irvis/`, because code put anywhere else would be owned by nothing. **Rejected:** accepting an edit to an existing feature document, because a blank line would satisfy it.
+
+## Version-only bumps need no documentation
+
+Status: decided
+
+Bumping an Action from `@v6` to `@v7` changes nothing a document describes. Without a filter, every such change would need a meaningless document edit, which teaches people to make meaningless document edits. The filter is strict: every changed line must match the file's pattern, and each removed line must be replaced in place by a line that differs only in the version. A bump mixed with any other change, or a `uses:` line moved to another job, still needs documentation. If the filter raises, the check fails instead of passing.
+
+**Rejected:** comparing the multisets of removed and added lines, because a moved step looks like a bump that way.
+
+**Rejected:** ignoring workflow files entirely, because a changed step, trigger or timeout is a real change to CI. **Rejected:** filtering pins that the documentation states, such as a toolchain version, because then the document would go stale with the bump.
+
+## Test files are left out of the source side
+
+Status: decided
+
+Tests describe behaviour; they do not change it. A pull request that only adds tests has no document to update. Test files still count on the documentation side, and a test that enforces a domain rule is listed in `docs/invariants.md`. All of `tests/` is left out, test data and helpers included. Python keeps tests in separate files, so no inline tests had to be moved.
+
+**Rejected:** treating tests as source owned by their feature's rule, because every new test would need a document edit that says nothing new.
+
+## The decisions index is generated
+
+Status: decided
+
+Agents read `docs/decisions/README.md` to find out cheaply whether a question was already settled. A hand-kept index goes stale, and a stale index answers "no such decision" for one that exists, which is worse than no index. `scripts/decisions-index.py` writes it from the headings and `Status:` lines, and the check fails while it is stale.
+
+**Rejected:** a hand-kept index, for the reason above. **Rejected:** no index, because reading every decision file in full costs an agent much more context than one table.
+
+## Integrity checks run on the whole tree every time
+
+Status: decided
+
+Renaming a heading or a file breaks links in documents that did not change. Checking only changed files would miss exactly those. The whole tree is small: the integrity checks take well under a second on it (about 35 ms when they were added).
+
+**Rejected:** checking only the changed Markdown files, because of the renamed-target case above.
+
+## The documentation check is not a required status check yet
+
+Status: postponed
+
+The CI job should be a required check, but the plan does not allow it: `gh api repos/mateuszsikora/irvis/branches/main/protection` and `.../rulesets` return HTTP 403 ("Upgrade to GitHub Pro or make this repository public to enable this feature") for this private repository on the free plan. The job runs on every pull request, and [CONTRIBUTING.md](../../CONTRIBUTING.md#verification) makes a red job a blocker by rule. Make it required, with the job name "Documentation contract", once the plan or the repository's visibility allows it.
+
+**Rejected:** a workaround that fails the merge by other means (a bot, a scheduled job), because it adds moving parts for what one repository setting will do.
+
+## Tests use unittest from the standard library
+
+Status: decided
+
+`unittest` runs with the system `python3` like the scripts themselves, so `make test` needs no virtual environment or dependency manifest in a repository that has no Python project otherwise.
+
+**Rejected:** pytest, because it would add the first dependency, a manifest and an install step to CI only for the test runner.
+
+## CLAUDE.md is a symlink to AGENTS.md
+
+Status: decided
+
+Every agent reads the same file: Codex reads `AGENTS.md`, Claude Code reads `CLAUDE.md`, and the symlink makes them the same bytes. Before this change `CLAUDE.md` held `@AGENTS.md`, an import that only Claude Code understands.
+
+**Rejected:** keeping the `@AGENTS.md` import, because other tools that read `CLAUDE.md` would see one line instead of the instructions.
+
+## No path-scoped rule file for agents
+
+Status: decided
+
+An extra rule file (for example in `.claude/rules/`) could restate the "You changed / You must also update" table when an agent edits a source file. `AGENTS.md` is loaded at the start of every session and already holds the table, and every restatement is one more copy that can go stale without the check noticing.
+
+**Rejected:** `.claude/rules/docs-contract.md` with `paths:` front matter, for the reasons above. Revisit if agents are seen to miss the table in `AGENTS.md`.
+
+## The documentation check is documented as a feature
+
+Status: decided
+
+The check is the only code in the repository, it has users (everyone who opens a pull request), messages and exit codes, which is what feature documents are for. Its user and technical documents hold the details; the documentation guide explains how to write documents and links to them for how the check works.
+
+**Rejected:** describing the check only in the documentation guide, because the guide would then mix writing advice with a full list of failure messages, and the catch-all rule would have no example of the feature-document pair.

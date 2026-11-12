@@ -1,6 +1,6 @@
 # Contributing to irvis
 
-This file is the source of truth for how changes reach `main`. `AGENTS.md` and the agent skill in `.agents/skills/create-pr/SKILL.md` restate these rules; where they disagree, this file wins. A rule change goes into every one of these files that states the rule, in the same pull request.
+This file is the source of truth for how changes reach `main`. `AGENTS.md` and the agent skill in `.agents/skills/create-pr/SKILL.md` restate these rules; where they disagree, this file wins. How to write documentation is in [docs/guides/documentation.md](docs/guides/documentation.md); where a skill disagrees with a document under `docs/`, the document wins. A rule change goes into every one of these files that states the rule, in the same pull request.
 
 ## Language
 
@@ -55,7 +55,7 @@ Tool-generated names (for example `<username>/<random-words>` from Conductor) ar
 ## Pull requests
 
 - **Title:** the same format and length limit as a commit header. For a one-commit PR the title equals the commit subject. It says what changes for the project, not which files were edited.
-- **Description:** fill `.github/pull_request_template.md`. Outcome first, then `Closes #N` / `Refs #N`; then Changes (grouped by meaning), Decisions (choice, rejected alternative, why), Verification (exact commands and results, and what was not verified), Notes. Delete empty sections and template comments. No hard wrapping, no emoji.
+- **Description:** fill `.github/pull_request_template.md`. Outcome first, then `Closes #N` / `Refs #N`; then Changes (grouped by meaning), Decisions (choice, rejected alternative, why), Documentation (the checkboxes, see [Documentation](#documentation)), Verification (exact commands and results, and what was not verified), Notes. Delete empty sections and template comments. No hard wrapping, no emoji.
 - **Issues:** link the issue the PR works on. `Closes` only if the PR completes everything the issue asks for; otherwise `Refs`.
 - **Draft vs ready:** open as draft when anything is missing: a check failing or not run, TODO/FIXME or skipped tests the change relies on, wip/fixup commits, `Closes` on a partially done issue, a rule changed in only some of the files that state it, tooling added without its verification rows, open questions. Otherwise open it ready for review.
 - **Labels:** only existing labels; new labels are not created as part of a PR.
@@ -67,15 +67,27 @@ Tool-generated names (for example `<username>/<random-words>` from Conductor) ar
   | `docs` | `documentation` |
   | other types | none |
 
+## Documentation
+
+Every commit and pull request that changes behaviour lands its documentation in the same change, and removing behaviour removes its documentation. The ownership map in [docs/features/README.md](docs/features/README.md#ownership-map) says which document each path needs; `make docs-check` enforces it, and CI runs it on every pull request.
+
+- Run `make docs-check` before pushing, and run it again **after** merging the base branch into yours: the merge changes what the branch changed.
+- Fill the Documentation section of the pull request template.
+- **Review:** a behaviour change without its documentation is a Major finding. The check only proves that a document changed, so review also checks that what the document says is true of the code.
+- Before deciding something, read [docs/decisions/README.md](docs/decisions/README.md).
+
 ## Verification
 
 Run the checks for every part of the repository the change touches, and read their output, not only the exit code.
 
 | Change touches | Run | Expected output |
 | --- | --- | --- |
+| anything | `make docs-check` | `docs-check: <N> changed files since origin/main (<sha>), each with the documentation it needs` (`1 changed file` when N is 1), exit code 0 |
+| `scripts/**`, `tests/**` or the `Makefile` | `make test` | last line `OK` |
 | `.agents/skills/**` or `.claude/skills/**` | the skill check from `.agents/skills/create-pr/SKILL.md`, step 3 | `ok: N skill(s)` and nothing else |
 | a rule in this file, `AGENTS.md` or a skill | compare the rule in `CONTRIBUTING.md`, `AGENTS.md` and every skill that restates it | all say the same thing |
-| anything else | no automated checks exist yet | say so in the PR's Verification section |
+
+CI runs `make docs-check` and `make test` on every pull request, and the integrity checks and `make test` on every push to `main` ([docs/guides/development.md](docs/guides/development.md#ci)). A failing CI job blocks the merge by this rule, even though GitHub does not enforce it (see Repository settings).
 
 Whoever adds tooling (a build, linter, test runner, CI workflow) adds its command to this table, and to the verification table in the `create-pr` skill, in the same PR.
 
@@ -91,7 +103,7 @@ Edit the file under `.agents/skills/` only. The symlink must be relative (exactl
 
 ## Local files
 
-`.gitignore` excludes agent scratch space and local settings (`.context/`, `.claude/settings.local.json`, `.claude/worktrees/`), `.env*` files other than `.env.example`, and `.DS_Store`. Stage files by name anyway, and check `git diff --cached --name-only` before committing.
+`.gitignore` excludes agent scratch space and local settings (`.context/`, `.claude/settings.local.json`, `.claude/worktrees/`), `.env*` files other than `.env.example`, `.DS_Store`, and Python bytecode (`__pycache__/`, `*.pyc`). Stage files by name anyway, and check `git diff --cached --name-only` before committing.
 
 ## Repository settings
 
@@ -101,4 +113,4 @@ The rules above assume these GitHub settings, which live outside the repository 
 gh api repos/mateuszsikora/irvis --jq '{allow_squash_merge, allow_merge_commit, allow_rebase_merge, delete_branch_on_merge, squash_merge_commit_title, squash_merge_commit_message}'
 ```
 
-If GitHub still allows merge commits or rebase merges, the rule still holds: use "Squash and merge". The `create-pr` skill reports any difference. Branch protection is not available on the current plan, so nothing on GitHub enforces the rules in this file; contributors and agents do.
+If GitHub still allows merge commits or rebase merges, the rule still holds: use "Squash and merge". The `create-pr` skill reports any difference. Branch protection and rulesets are not available on the current plan, so GitHub cannot require the CI checks to pass or enforce the rules in this file; contributors and agents do.
