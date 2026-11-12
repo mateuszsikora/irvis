@@ -1,0 +1,11 @@
+# Agent scratch space and local agent settings
+.context/
+.claude/settings.local.json
+.claude/worktrees/
+
+# Secrets
+.env*
+!.env.example
+
+# OS files
+.DS_Store
