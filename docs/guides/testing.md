@@ -36,6 +36,7 @@ Most tests need nothing beyond `npm ci`. The documentation check's tests need mo
 | --- | --- | --- |
 | `tools/docs-check/test/rules.test.ts`, `bumps.test.ts`, `integrity.test.ts`, `paths.test.ts` | git 2.32 or later and `node` on `PATH`, a writable temporary directory | `test/repo.ts` copies this repository's working tree, tracked and untracked files that git does not ignore, into a temporary repository with one commit on `main` and a branch `feature`, and runs the copied `tools/docs-check/src/check-docs.ts` there. Uncommitted changes in your checkout are part of the copy, so a broken document in your working tree fails `this repository::integrity of this repository` and may fail other tests too. |
 | `tools/docs-check/test/decisions-index.test.ts` | a writable temporary directory | Plain files, no git. |
+| `tools/docs-check/test/eslint.test.ts` | `npm ci` | Lints snippets with the repository's ESLint configuration. |
 
 `test/repo.ts` runs git with `GIT_CONFIG_GLOBAL=/dev/null` and `GIT_CONFIG_NOSYSTEM=1`, a fixed author and committer, and without `CI`, `SKIP_DOCS_CHECK` and the other `GIT_*` variables. Your git configuration (signing, hooks, default branch) and a `CI` variable in your shell do not affect the results. These tests take most of the run time (about 20 seconds), because each builds a git repository and runs `node`; Vitest runs the test files in parallel.
 

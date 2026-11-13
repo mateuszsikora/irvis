@@ -25,11 +25,15 @@ import { type Output, parseArgs, processOutput } from './cli.ts';
 import { headings } from './markdown.ts';
 import { DIGIT, SPACE, readText, repr, sorted, splitLines, strip } from './text.ts';
 
-/** File stem in docs/decisions/ -> section title in the index, in index order. */
-export const DOMAINS: Readonly<Record<string, string>> = {
-  docs: 'Documentation contract',
-  architecture: 'Architecture',
-};
+/** [file stem in docs/decisions/, section title in the index], in index order. */
+export type Domains = readonly (readonly [stem: string, title: string])[];
+
+// A list, not an object: Object.entries puts keys that look like integers
+// (a stem such as "2027") before the others, whatever the order written here.
+export const DOMAINS: Domains = [
+  ['docs', 'Documentation contract'],
+  ['architecture', 'Architecture'],
+];
 
 export const DECISIONS_DIR = 'docs/decisions';
 export const INDEX_NAME = 'README.md';
@@ -92,10 +96,7 @@ function isFile(path: string): boolean {
 }
 
 /** The index text, and the errors found in the decision files. */
-export function render(
-  root: string,
-  domains: Readonly<Record<string, string>> = DOMAINS,
-): [string, string[]] {
+export function render(root: string, domains: Domains = DOMAINS): [string, string[]] {
   const out = [
     '# Decisions index',
     '',
@@ -107,10 +108,16 @@ export function render(
       '[documentation guide](../guides/documentation.md#decisions).',
   ];
   const errors: string[] = [];
-  for (const [stem, title] of Object.entries(domains)) {
+  for (const [stem, title] of domains) {
     const path = join(root, DECISIONS_DIR, `${stem}.md`);
     if (!isFile(path)) continue;
-    const [decisions, errs] = parseDecisions(readText(path) ?? '', `${DECISIONS_DIR}/${stem}.md`);
+    const text = readText(path);
+    if (text === null) {
+      // Rendering it as empty would drop its decisions from the index without a word.
+      errors.push(`${DECISIONS_DIR}/${stem}.md is not valid UTF-8`);
+      continue;
+    }
+    const [decisions, errs] = parseDecisions(text, `${DECISIONS_DIR}/${stem}.md`);
     errors.push(...errs);
     out.push('', `## ${title}`, '');
     if (!decisions.length) {
@@ -129,7 +136,7 @@ export function render(
 }
 
 /** Problems that make the index wrong; empty when it is up to date. */
-export function check(root: string, domains: Readonly<Record<string, string>> = DOMAINS): string[] {
+export function check(root: string, domains: Domains = DOMAINS): string[] {
   const problems: string[] = [];
   const ddir = join(root, DECISIONS_DIR);
   let present = new Set<string>();
@@ -142,10 +149,11 @@ export function check(root: string, domains: Readonly<Record<string, string>> = 
   } catch {
     // no directory: every listed domain is missing
   }
-  for (const stem of sorted([...present].filter((s) => !Object.hasOwn(domains, s)))) {
+  const listed = new Set(domains.map(([stem]) => stem));
+  for (const stem of sorted([...present].filter((s) => !listed.has(s)))) {
     problems.push(`${DECISIONS_DIR}/${stem}.md is not listed in DOMAINS in ${GENERATOR}`);
   }
-  for (const stem of Object.keys(domains)) {
+  for (const [stem] of domains) {
     if (!present.has(stem)) {
       problems.push(
         `DOMAINS in ${GENERATOR} lists '${stem}', but ${DECISIONS_DIR}/${stem}.md does not exist`,
@@ -165,7 +173,7 @@ export function check(root: string, domains: Readonly<Record<string, string>> = 
 export interface MainOptions {
   /** Repository root; by default the one this file is in. */
   root?: string;
-  domains?: Readonly<Record<string, string>>;
+  domains?: Domains;
   write?: (text: string) => void;
 }
 

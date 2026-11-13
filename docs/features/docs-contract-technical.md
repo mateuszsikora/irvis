@@ -4,7 +4,7 @@ For whoever changes `tools/docs-check/`, the workspace that holds the documentat
 
 ## Data flow
 
-The workspace is TypeScript that Node 26 runs directly with type stripping. Its modules import only Node built-ins and each other, so it runs on a fresh clone without `npm ci` ([decision](../decisions/docs.md#the-check-uses-only-node-built-ins-and-runs-with-node-type-stripping)).
+The workspace is TypeScript that Node 26 runs directly with type stripping. Its modules import only Node built-ins and each other, so it runs on a fresh clone without `npm ci`; ESLint rejects any other import in `src/` outside the tests (see [Configuration](#configuration)) ([decision](../decisions/docs.md#the-check-uses-only-node-built-ins-and-runs-with-node-type-stripping)).
 
 | Module | Holds |
 | --- | --- |
@@ -151,11 +151,13 @@ The npm scripts that call these files are listed in the [development guide](../g
 | --- | --- | --- | --- |
 | `SKIP_DOCS_CHECK` | unset | `check-docs.ts`, `main` | `1` skips the check and exits 0, unless `CI` is set. Any other value is ignored. |
 | `CI` | unset (GitHub Actions sets `true`) | `check-docs.ts`, `main` | Any non-empty value makes `SKIP_DOCS_CHECK` ignored. |
-| `DOMAINS` | `{ docs: 'Documentation contract', architecture: 'Architecture' }` | `decisions-index.ts` | Decision file stems and their index titles, in index order. |
+| `DOMAINS` | `[['docs', 'Documentation contract'], ['architecture', 'Architecture']]` | `decisions-index.ts` | Decision file stems and their index titles, in index order. A list of pairs, not an object, because an object would put a stem that looks like an integer (`2027`) first. |
 
 The scripts run git with `-z`, `--no-color` and `--no-ext-diff`, so `core.quotepath`, `color.ui` and external diff drivers do not change their input.
 
-The workspace needs Node 26 (`.nvmrc`), which strips the types when it loads a `.ts` file; it uses only erasable syntax (`erasableSyntaxOnly` in `tsconfig.base.json`). Its TypeScript projects are `tools/docs-check/tsconfig.lib.json` (`src/` without the tests) and `tools/docs-check/tsconfig.test.json` (the tests, `test/` and `vitest.config.ts`), both with `lib` ES2024 and the `node` types and without output; the [development guide](../guides/development.md#typescript) lists them with the others. `tools/docs-check/vitest.config.ts` names the Vitest project `docs-check`, with environment `node` and a 60-second timeout per test and hook, because a test copies the repository and runs the check several times.
+The workspace needs Node 26 (`.nvmrc`), which strips the types when it loads a `.ts` file; it uses only erasable syntax (`erasableSyntaxOnly` in `tsconfig.base.json`). Its TypeScript projects are `tools/docs-check/tsconfig.lib.json` (`src/` without the tests; it emits only declarations, into `node_modules/.tsbuild/docs-check/lib/`) and `tools/docs-check/tsconfig.test.json` (`src/**/*.test.ts`, `test/` and `vitest.config.ts`, with a reference to the library project, so the tests are checked against its declarations and `src/` is checked once), both with `lib` ES2024 and the `node` types, the test project also with `vitest`; the [development guide](../guides/development.md#typescript) lists them with the others. `tools/docs-check/vitest.config.ts` names the Vitest project `docs-check`, with environment `node` and a 60-second timeout per test and hook, because a test copies the repository and runs the check several times.
+
+A block in `eslint.config.js` for `tools/docs-check/src/**/*.ts` without `*.test.ts` allows only imports of `node:` modules and relative paths (`no-restricted-imports`) and no `import()` (`no-restricted-syntax`), with the message `The documentation check imports only Node built-ins (node:...) and its own files, because it runs without npm ci (docs/decisions/docs.md#the-check-uses-only-node-built-ins-and-runs-with-node-type-stripping).` A package import would pass every step of the "TypeScript" job, whose `npm ci` installs it, and fail only the documentation jobs, with `ERR_MODULE_NOT_FOUND`.
 
 ## Failure modes
 
@@ -177,7 +179,7 @@ Both scripts, exit code 2, on standard error: the usage line, such as `usage: ch
 | Message | Cause |
 | --- | --- |
 | `✗ <rule message> [<id>]`, then the triggering paths indented by four spaces | A rule is broken. |
-| `✗ version-bump filter failed on <path> (<error name>: <message>); the check fails instead of guessing [filter]` | `isVersionBump` threw, for example `TypeError: The encoded data was not valid for encoding utf-8` for a diff that is not UTF-8. |
+| `✗ version-bump filter failed on <path> (<error name>: <message>); the check fails instead of guessing [filter]` | `isVersionBump` threw, for example `GitError: git diff ... failed: <git's error>`, or `TypeError: The encoded data was not valid for encoding utf-8` for a diff that is not UTF-8. |
 | `✗ <file>:<line>: link '<target>' points to a missing file: <path> [integrity]` | Broken relative link. The same wording with `` `<span>` `` or `reference '<ref>'` instead of `link '<target>'` for a code span or a code comment. |
 | `✗ <file>:<line>: link '<target>' points to a missing heading: <file>#<anchor> [integrity]` | The anchor is not a heading slug or HTML id of the target. |
 | `✗ <file>:<line>: link '<target>' points outside the repository [integrity]` | The target starts with `../` after normalisation. |
@@ -213,6 +215,7 @@ Both scripts, exit code 2, on standard error: the usage line, such as `usage: ch
 | `` docs/decisions/README.md is stale: run `npm run decisions-index` `` | 1 | `--check`: the file differs from the rendered text. |
 | `docs/decisions/<stem>.md is not listed in DOMAINS in tools/docs-check/src/decisions-index.ts` | 1 | `--check`: a decision file without a `DOMAINS` entry. |
 | `DOMAINS in tools/docs-check/src/decisions-index.ts lists '<stem>', but docs/decisions/<stem>.md does not exist` | 1 | `--check`: an entry without a file. |
+| `docs/decisions/<stem>.md is not valid UTF-8` | 1 | A decision file of a listed domain cannot be read as UTF-8. Its domain is left out of the rendered text, and nothing is written. |
 | `docs/decisions/<stem>.md:<line>: decision '<heading>' needs 'Status: decided\|postponed\|superseded (#N)' as the first line under the heading, found: <line or None>` | 1 | A decision without a valid status. Nothing is written. |
 
 ## Tests
@@ -223,8 +226,9 @@ Vitest project `docs-check`; `npm test` runs it with the other projects. The tes
 - `test/bumps.test.ts`: a pure bump, a bump with another change, a changed action name, a moved `uses:` line, and a filter that throws (in-process, with `isVersionBump` replaced); in `package.json`, a dependency bump, a bump in a reformatted nested `package.json`, a change to `engines`, to `packageManager` and to the type of a value, a bump with an `engines` change, an added and a removed dependency, a change of source (`npm:`, `github:`, `file:`, `workspace:`, `user/repo`), a dependency moved to another field, and invalid JSON.
 - `test/integrity.test.ts`: missing file, missing heading, wrong case, outside the repository, code ignored, a `docs/` code span, a comment reference, line numbers in links, text and comments, section citations (unknown word, missing heading, alias), stale index, unlisted decision file, map rows (different, missing, extra, twice, not code spans, unescaped `|`), exclusion rows (different, twice), invariants (reused number, ordered list, no test, missing test, struck through). Vitest ids: one that passes (nested `describe`, `test` with a multi-line call, a literal with escapes, without `describe`), a missing `it`, a missing `describe`, names out of order, a template literal, `it.each` and a concatenation, and a wrong nesting that passes. `integrity` on this repository.
 - `test/paths.test.ts`: a file name with the byte 0xff is printed with its own bytes in the `-v` list and under F0. It is skipped where the file system refuses such a name, as APFS on macOS does, so it runs only on Linux, in CI.
-- `test/decisions-index.test.ts`: slugs (punctuation, code spans, links, non-ASCII, duplicates), headings in front matter and fenced code, setext headings, HTML ids, the rendered table, `check` for a fresh index, a stale one, an unlisted file and a missing domain file, a missing `Status:` line, and the exit codes of `main`.
+- `test/decisions-index.test.ts`: slugs (punctuation, code spans, links, non-ASCII, duplicates), headings in front matter and fenced code, setext headings, HTML ids, the rendered table, `check` for a fresh index, a stale one, an unlisted file and a missing domain file, a missing `Status:` line, and the exit codes of `main`, a decision file that is not UTF-8, and the order of `DOMAINS`.
 - `test/slugs.test.ts` compares `slugify` with `test/github-slugs.json`: the 150 headings of the repository's Markdown files when the check was ported, and 42 more with non-ASCII text, emoji, combining marks and punctuation, each with the anchor the Python version computed.
+- `test/eslint.test.ts`: the ESLint import rule for `src/` allows `node:` modules and relative paths, rejects packages, bare Node names (`fs`) and `import()`, and does not apply to the tests.
 - `src/text.test.ts`, `src/json.test.ts`, `src/cli.test.ts` and `src/check-docs.test.ts` test the helpers of [text semantics](#text-semantics), the JSON reader, the command-line options, the compiled `RULES` and `EXCLUDE`, `jsUnescape`, `parseTestId` and `missingTest` directly.
 
 Not covered: a `package.json` added or deleted on the branch (no merge-base side, so never a bump), a bump in a file whose path is not UTF-8, the messages `points outside the repository` for code-span and comment references, `cites a missing file`, the missing-table and missing-file messages of `checkMap` and `checkInvariants`, and `git ... failed`; setext headings next to list items and other CommonMark edge cases, links split across lines, comment markers inside string literals (they can produce a false failure), and the CI workflow itself, which runs only on GitHub.

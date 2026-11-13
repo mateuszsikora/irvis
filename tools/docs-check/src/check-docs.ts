@@ -247,7 +247,10 @@ function search(pattern: string, text: string): boolean {
   return re.test(text);
 }
 
-export class GitError extends Error {}
+export class GitError extends Error {
+  // Shown in the [filter] message, as `GitError: <message>`.
+  override name = 'GitError';
+}
 
 // ---------------------------------------------------------------------------
 // git

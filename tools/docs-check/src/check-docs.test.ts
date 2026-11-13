@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { EXCLUDE, RULES, excluded, jsUnescape, missingTest, parseTestId } from './check-docs.ts';
+import {
+  EXCLUDE,
+  GitError,
+  RULES,
+  excluded,
+  jsUnescape,
+  missingTest,
+  parseTestId,
+} from './check-docs.ts';
 
 describe('check-docs helpers', () => {
   it('compiles every rule and exclusion as a Unicode regex', () => {
@@ -12,6 +20,11 @@ describe('check-docs helpers', () => {
       'Test helpers and end-to-end tests of a package',
     );
     expect(excluded('tools/docs-check/src/check-docs.ts')).toBeNull();
+  });
+
+  it('GitError names itself in messages', () => {
+    const e = new GitError('git diff failed');
+    expect(`${e.name}: ${e.message}`).toBe('GitError: git diff failed');
   });
 
   it('jsUnescape resolves escapes as JavaScript does', () => {

@@ -63,7 +63,7 @@ TypeScript 6.0 (`~6.0.3`), not 7: typescript-eslint 8.72 supports TypeScript bel
 | `tools/docs-check/tsconfig.lib.json` | the documentation check's `src/` without tests | ES2024, `node` ([documentation contract](../features/docs-contract-technical.md#configuration)) |
 | `tools/docs-check/tsconfig.test.json` | its tests, `test/`, `vitest.config.ts` | ES2024, `node` and `vitest` |
 
-`packages/core/tsconfig.json`, `apps/web/tsconfig.json` and `tools/docs-check/tsconfig.json` are solution files of their package's projects. Only core's library project emits anything: declarations, into `node_modules/.tsbuild/core/lib/`, which `apps/web` type-checks against. Build info files go to `node_modules/.tsbuild/`. Delete that directory if `tsc --build` reports a project as up to date that is not.
+`packages/core/tsconfig.json`, `apps/web/tsconfig.json` and `tools/docs-check/tsconfig.json` are solution files of their package's projects. Only the library projects of core and of the documentation check emit anything: declarations, into `node_modules/.tsbuild/core/lib/` (which `apps/web` type-checks against) and `node_modules/.tsbuild/docs-check/lib/` (which the check's tests type-check against). Build info files go to `node_modules/.tsbuild/`. Delete that directory if `tsc --build` reports a project as up to date that is not.
 
 ## Lint and format
 
@@ -71,6 +71,7 @@ ESLint 10 with a flat config, `eslint.config.js`:
 
 - `@eslint/js` recommended and typescript-eslint `recommendedTypeChecked` on every file, with type information from the TypeScript projects above (`projectService`). `.js`, `.mjs` and `.cjs` files are linted without types. Unused `eslint-disable` comments are errors.
 - ESLint does not read `.gitignore`; the config ignores `node_modules/`, `dist/` and `coverage/` at any depth, `.context/` and `.claude/worktrees/`.
+- In `tools/docs-check/src/` outside the tests, only `node:` modules and relative paths may be imported, and `import()` is rejected: the check runs in CI without `npm ci` ([documentation contract](../features/docs-contract-technical.md#configuration)).
 - The rules for core from the architecture decisions (imports only of relative paths and `fflate`, the synchronous `fflate` API, the `Math` allow-list), and the test that makes every exception name a decision: [core: technical](../features/core-technical.md#configuration).
 - `npm run lint` fails on any warning (`--max-warnings 0`).
 

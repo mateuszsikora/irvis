@@ -26,7 +26,7 @@ Superseded by [the check uses only Node built-ins and runs with Node type stripp
 
 Status: decided (#30)
 
-The documentation check and the decisions index generator are TypeScript in the workspace `tools/docs-check/`. They import only Node built-ins (`node:child_process`, `node:fs`, `node:path`) and the other modules of `tools/docs-check/src/`, so `node tools/docs-check/src/check-docs.ts` runs on a fresh clone with Node 26 alone, through Node's type stripping, without `npm ci`. The "Documentation contract" and "Documentation integrity" jobs need only `actions/setup-node` with `.nvmrc`. Their tests are Vitest tests and run in the "TypeScript" job with every other test.
+The documentation check and the decisions index generator are TypeScript in the workspace `tools/docs-check/`. They import only Node built-ins (`node:child_process`, `node:fs`, `node:path`) and the other modules of `tools/docs-check/src/`, which an ESLint rule enforces, so `node tools/docs-check/src/check-docs.ts` runs on a fresh clone with Node 26 alone, through Node's type stripping, without `npm ci`. The "Documentation contract" and "Documentation integrity" jobs need only `actions/setup-node` with `.nvmrc`. Their tests are Vitest tests and run in the "TypeScript" job with every other test.
 
 The repository has needed Node 26 since #5, and every other tool in it (ESLint, Prettier, `tsc`, Vitest, Vite) is an npm package. With the check in Python, a contributor needed Python 3 and make next to Node, the check had its own test runner, test style and CI job, and its code could not share the TypeScript rules (`tsconfig.base.json`, ESLint) that the rest of the code follows. One language removes all of that.
 

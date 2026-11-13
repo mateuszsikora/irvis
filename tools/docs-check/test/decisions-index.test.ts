@@ -2,7 +2,7 @@ import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'n
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { DECISIONS_DIR, check, main, render } from '../src/decisions-index.ts';
+import { DECISIONS_DIR, type Domains, check, main, render } from '../src/decisions-index.ts';
 import { anchors, headings, slugify } from '../src/markdown.ts';
 
 const DECISIONS = `---
@@ -70,7 +70,7 @@ describe('slugs', () => {
 
 describe('decisions index', () => {
   let root: string;
-  let domains: Record<string, string>;
+  let domains: Domains;
 
   function write(name: string, text: string): void {
     writeFileSync(join(root, DECISIONS_DIR, name), text);
@@ -86,7 +86,7 @@ describe('decisions index', () => {
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'decisions-index-'));
     mkdirSync(join(root, 'docs/decisions'), { recursive: true });
-    domains = { build: 'Build' };
+    domains = [['build', 'Build']];
     write('build.md', DECISIONS);
   });
   afterEach(() => rmSync(root, { recursive: true, force: true }));
@@ -131,7 +131,7 @@ describe('decisions index', () => {
 
   it('listed domain without file fails check', () => {
     generate();
-    expect(check(root, { ...domains, ci: 'CI' })).toContain(
+    expect(check(root, [...domains, ['ci', 'CI']])).toContain(
       "DOMAINS in tools/docs-check/src/decisions-index.ts lists 'ci', but docs/decisions/ci.md does not exist",
     );
   });
@@ -141,6 +141,27 @@ describe('decisions index', () => {
     const [, errors] = render(root, domains);
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain("decision 'A decision without status' needs 'Status:");
+  });
+
+  it('decision file that is not utf-8 is an error', () => {
+    writeFileSync(
+      join(root, DECISIONS_DIR, 'build.md'),
+      Buffer.concat([
+        Buffer.from('# Build\n\n## Caf'),
+        Buffer.from([0xe9]),
+        Buffer.from('\n\nStatus: decided\n'),
+      ]),
+    );
+    const [text, errors] = render(root, domains);
+    expect(errors).toEqual(['docs/decisions/build.md is not valid UTF-8']);
+    expect(text).not.toContain('## Build');
+    expect(main([], { root, domains, write: () => {} })).toBe(1);
+  });
+
+  it('domains keep their order', () => {
+    write('2027.md', '# 2027\n');
+    const [text] = render(root, [...domains, ['2027', 'Year']]);
+    expect(text.indexOf('## Build')).toBeLessThan(text.indexOf('## Year'));
   });
 
   it('main check exit codes', () => {

@@ -3,7 +3,10 @@
   "compilerOptions": {
     "lib": ["ES2024"],
     "types": ["node"],
-    "noEmit": true,
+    "composite": true,
+    "emitDeclarationOnly": true,
+    "rootDir": "./src",
+    "outDir": "../../node_modules/.tsbuild/docs-check/lib",
     "tsBuildInfoFile": "../../node_modules/.tsbuild/docs-check/lib.tsbuildinfo"
   },
   "include": ["src"],
