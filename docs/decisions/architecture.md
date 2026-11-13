@@ -16,10 +16,10 @@ One repository holds the core, the UI, the backends, the two apps and the tools,
 | `packages/ui` | The React viewer |
 | `packages/media` | Browser-only code: MP4 export through WebCodecs, `ByteSink` and `ByteSource` for OPFS and `File` |
 | `packages/backend-browser` | `getUserMedia`, `MediaStreamTrackProcessor`, the reconstruction Worker |
-| `packages/backend-electron` | The renderer side of the desktop backend: an IPC client implementing `CameraBackend` |
+| `packages/backend-electron` | The renderer side of the desktop backend: an IPC client implementing `CameraBackend`, `ByteSink` and `ByteSource` over the preload API, without importing `electron` |
 | `packages/backend-replay` | Playback of `.irvis` files and fixtures |
-| `apps/web` | The only UI build, deployed to Netlify and loaded by Electron |
-| `apps/desktop` | Electron main process (ffmpeg, node-usb, file writes) and preload |
+| `apps/web` | The only UI build, deployed to Netlify and loaded by Electron; it picks the backends and storage at runtime |
+| `apps/desktop` | Electron main process (ffmpeg, node-usb, the file writes behind the IPC `ByteSink`) and preload |
 | `tools/capture-cli` | Node tool for the hardware spikes |
 | `fixtures/<camera-id>/` | Short series of real frames for tests |
 
@@ -31,17 +31,19 @@ Packages appear in the pull request that gives them their first real code, toget
 
 Status: decided (#3)
 
-Implemented in #5 (types), #17 (minimal `backend-replay`), #19 (`Player`, `ByteSink` and `ByteSource` implementations), #20.
+Implemented in #5 (types), #10 (`backend-electron` without `electron` imports), #17 (minimal `backend-replay`), #19 (`Player`, `ByteSink` and `ByteSource` implementations), #20.
 
 `CameraBackend`, `Player`, `RawFrame`, `ThermalFrame`, `CameraProfile`, `ByteSink` and `ByteSource` are types in `packages/core`. Dependencies point one way:
 
 ```
-core <- media <- ui <- apps
-core <- media <-------- apps
-core <- backend-* <---- apps
+core <- media <- ui <- apps/web
+core <- media <-------- apps/web
+core <- backend-* <---- apps/web
 ```
 
-`ui` imports `core`, and `media` only for the MP4 export; it never imports a backend package, and it sees backends and storage only through the core interfaces. The apps wire the concrete backends and the `ByteSink` and `ByteSource` implementations into the UI: `apps/web` the OPFS and `File` ones from `media`, `apps/desktop` the IPC client of `backend-electron`, which writes with `fs` in the main process. So the app, not the UI, decides where a recording goes, and the UI works the same over a camera, a browser stream or a recording.
+`ui` imports `core`, and `media` only for the MP4 export; it never imports a backend package, and it sees backends and storage only through the core interfaces. The renderer, in the browser and in Electron alike, runs only the `apps/web` bundle, so `apps/web` wires the concrete backends and the `ByteSink` and `ByteSource` implementations into the UI at runtime: without the preload API, `backend-browser` and the OPFS and `File` implementations from `media`; with it, `backend-electron` and its IPC `ByteSink` and `ByteSource`. The app, not the UI, decides where a recording goes, and the UI works the same over a camera, a browser stream or a recording.
+
+`apps/desktop` (the main process and the preload) serves the other end: ffmpeg, node-usb, and the file writes with `fs` behind the IPC `ByteSink`. `backend-electron` ends up in the bundle that Netlify serves too, so it never imports `electron`: it uses only the API that the preload exposes through `contextBridge`, and ESLint forbids the import.
 
 Changes against the interfaces in the specification:
 
