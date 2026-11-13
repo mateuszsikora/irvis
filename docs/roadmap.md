@@ -90,7 +90,7 @@ The three pull requests go in this order, because #3 and #4 change the same file
 
 **Owner:** connect the repository in Netlify with the production branch `release` (after #5).
 
-### M1. Spike: exact data through ffmpeg
+### M1. Spike: exact data via ffmpeg
 
 | Issue | Pull request |
 | --- | --- |
@@ -99,7 +99,7 @@ The three pull requests go in this order, because #3 and #4 change the same file
 
 **Acceptance (from the specification):** every frame has 196 608 B; the lower half gives sensible temperatures (room about 20–25 °C, hand about 30–35 °C) that agree with the Android app within ±2 °C; the report says whether the 384 mode works without commands, what the upper half looks like, the latency and the fps stability.
 
-**Owner:** run `npm run spike:m1` on macOS, note the Android app's readings at the same spots, keep the long series locally or attach them to a GitHub Release.
+**Owner:** install ffmpeg (Homebrew; the app ships its own build only from #23), run `npm run spike:m1` on macOS, note the Android app's readings at the same spots, keep the long series locally or attach them to a GitHub Release.
 
 ### M2. Spike: USB commands
 
@@ -135,10 +135,10 @@ Targets for the reconstruction (from the specification): Y matches the low bytes
 | [#12](https://github.com/mateuszsikora/irvis/issues/12) | Six palettes (Iron, White Hot, Black Hot, Rainbow, Red Hot, Cold Blue), render to RGBA, automatic and manual range; min and max with position, point (3×3 mean), line, area, histogram |
 | [#13](https://github.com/mateuszsikora/irvis/issues/13) | Emissivity with reflected temperature, offset, °C and °F, threshold alarms, isotherms |
 | [#14](https://github.com/mateuszsikora/irvis/issues/14) | The `.irvis` container and codec, `irvis-format.md` (planned, M4) |
-| [#15](https://github.com/mateuszsikora/irvis/issues/15) | Photo export: PNG with the temperature data, CSV |
-| [#17](https://github.com/mateuszsikora/irvis/issues/17) | The React viewer: live view, scale bar, controls generated from capabilities and profile commands, greyed-out hardware features in the browser, uncertain-pixel overlay, i18n (English, Polish skeleton) |
+| [#15](https://github.com/mateuszsikora/irvis/issues/15) | Photo export: PNG with the one-frame `.irvis` embedded in a private chunk, CSV |
+| [#17](https://github.com/mateuszsikora/irvis/issues/17) | A minimal `packages/backend-replay` that plays synthetic frames and fixtures from memory; the React viewer on top of it: live view, scale bar, controls generated from capabilities and profile commands, greyed-out hardware features in the browser, uncertain-pixel overlay, i18n (English, Polish skeleton) |
 | [#18](https://github.com/mateuszsikora/irvis/issues/18) | Several points, lines and areas at once; min, max and centre markers |
-| [#19](https://github.com/mateuszsikora/irvis/issues/19) | Crash-safe recording to `.irvis` (Electron `fs`, browser OPFS), playback with full measurements, MP4 export through WebCodecs |
+| [#19](https://github.com/mateuszsikora/irvis/issues/19) | `packages/media`; crash-safe recording to `.irvis` (Electron `fs`, browser OPFS); `.irvis` playback through `Player` in `backend-replay`, with full measurements; MP4 export through WebCodecs |
 | [#20](https://github.com/mateuszsikora/irvis/issues/20) | The browser and desktop backends completed, ffmpeg arguments per system |
 | [#21](https://github.com/mateuszsikora/irvis/issues/21) | Playwright runs the same fixtures through `backend-replay` in Chromium, WebKit and Electron; readings are bit-identical with Node |
 
@@ -171,7 +171,7 @@ Targets for the reconstruction (from the specification): Y matches the low bytes
 
 1. #3, then #4, then #5. The owner connects Netlify.
 2. #6 as early as possible, then #7, so that the owner can run them on the camera.
-3. In parallel, without hardware: #8, #14, #12, #13, #15, #17 on `backend-replay` with synthetic data.
+3. In parallel, without hardware: #8, #14, #12, #13 and #15 in core, tested on synthetic frames; #17, which creates the minimal `backend-replay` and builds the viewer on synthetic frames.
 4. After the results of #6 and with #14 in place: #16. After #7: #22. After #10: the decision on the browser path.
 5. M4 closes with #21, M5 with the checklist, then M6.
 
@@ -198,7 +198,7 @@ Targets for the reconstruction (from the specification): Y matches the low bytes
 1. Milestones do not run strictly in sequence (see [How the work runs](#how-the-work-runs)).
 2. The camera profile is generalised: no hard-coded `width: 256; height: 384; thermalRow0: 192`, and the conversion is data instead of a `toCelsius` function ([decision](decisions/architecture.md#a-camera-is-a-profile-and-its-conversion-is-data)).
 3. "Video recording" is a `.irvis` recording with MP4 export ([decision](decisions/architecture.md#recordings-are-irvis-files-and-mp4-is-an-export)).
-4. The "own raw format (header + Uint16Array)" is merged into `.irvis`: a snapshot is a one-frame recording.
+4. The "own raw format (header + Uint16Array)" is merged into `.irvis`: a snapshot is a one-frame recording, and the PNG photo embeds that one-frame `.irvis`, so there is one temperature format.
 5. Netlify instead of GitHub Pages ([decision](decisions/architecture.md#the-web-version-is-hosted-on-netlify-and-goes-to-production-from-release)).
 6. An own LGPL ffmpeg build instead of `ffmpeg-static` ([decision](decisions/architecture.md#the-desktop-app-ships-its-own-lgpl-ffmpeg-build)).
 7. New packages `backend-replay` and `media`, which the proposed repository layout does not have.

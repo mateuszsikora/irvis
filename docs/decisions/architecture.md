@@ -1,10 +1,12 @@
 # Decisions: architecture
 
-Why irvis is shaped as it is: packages, interfaces, camera profiles, the recording format, hosting and the ffmpeg build. These decisions were made before the code that implements them; the [roadmap](../roadmap.md) says which issue implements each one. How to add a decision: [documentation guide](../guides/documentation.md#decisions).
+Why irvis is shaped as it is: packages, interfaces, camera profiles, the recording format, hosting and the ffmpeg build. These decisions were made before the code that implements them: each one names the issues that implement it, and until those are merged it describes the intended design, not existing code. The [roadmap](../roadmap.md) holds the plan. How to add a decision: [documentation guide](../guides/documentation.md#decisions).
 
 ## The code lives in an npm workspaces monorepo
 
 Status: decided (#3)
+
+Implemented in #5, and each package in the issue that gives it its first code.
 
 One repository holds the core, the UI, the backends, the two apps and the tools, so that a change to an interface and to every user of it lands in one pull request. The planned layout:
 
@@ -29,7 +31,16 @@ Packages appear in the pull request that gives them their first real code, toget
 
 Status: decided (#3)
 
-`CameraBackend`, `Player`, `RawFrame`, `ThermalFrame`, `CameraProfile`, `ByteSink` and `ByteSource` are types in `packages/core`. Dependencies point one way: core is used by `media` and the backends, those by `ui` only through the core interfaces, and the apps wire the concrete backends into the UI. The UI never imports a backend package, so it works the same over a camera, a browser stream or a recording.
+Implemented in #5 (types), #17 (minimal `backend-replay`), #19 (`Player`, `ByteSink` and `ByteSource` implementations), #20.
+
+`CameraBackend`, `Player`, `RawFrame`, `ThermalFrame`, `CameraProfile`, `ByteSink` and `ByteSource` are types in `packages/core`. Dependencies point one way:
+
+```
+core <- media <- ui <- apps
+core <- backend-* <------ apps
+```
+
+`ui` imports `core` and `media` (it calls the MP4 export and the OPFS writer), never a backend package; it sees backends only through the core interfaces. The apps wire the concrete backends into the UI, so the UI works the same over a camera, a browser stream or a recording.
 
 Changes against the interfaces in the specification:
 
@@ -46,15 +57,19 @@ Every backend declares `capabilities` (`exactRaw`, `deviceControl`, `concurrentW
 
 Status: decided (#3)
 
+Implemented in #10 (the `app://` scheme and window settings), #17.
+
 The specification asks for one UI build in both environments. `apps/web` is built once by Vite with `base: '/'`; Netlify serves it, and Electron loads the same files. The backend is chosen at runtime: a preload API present means Electron, otherwise the browser.
 
-Electron serves the build through its own scheme, `app://irvis/`, registered with `protocol.registerSchemesAsPrivileged` as `standard`, `secure`, `supportFetchAPI` and `stream`, and answered by `protocol.handle` from the packaged `apps/web/dist`. The origin is stable, the page is a secure context, module Workers and localStorage behave as in a browser, and `stream` lets a `<video>` play the MP4 export preview. The window CSP lists `app:` where needed. Windows run with `contextIsolation: true`, `sandbox: true` and `nodeIntegration: false`; the preload exposes only frames, the device list, the commands on the profile's allow-list and file writes.
+Electron serves the build through its own scheme, `app://irvis/`, registered with `protocol.registerSchemesAsPrivileged` as `standard`, `secure`, `supportFetchAPI` and `stream`, and answered by `protocol.handle` from the packaged `apps/web/dist`. The origin is stable, the page is a secure context, module Workers and localStorage behave as in a browser, and `stream` lets a `<video>` play the MP4 export preview. The window CSP lists `app:` where needed. Whether module Workers and `fetch` from `app://irvis/` also need `corsEnabled` is checked in #10, which corrects this decision if they do. Windows run with `contextIsolation: true`, `sandbox: true` and `nodeIntegration: false`; the preload exposes only frames, the device list, the commands on the profile's allow-list and file writes.
 
 **Rejected:** `file://`, because it needs another `base`, gives a `null` origin and blocks module Workers. **Rejected:** loading the Netlify URL, for security and for offline use. **Rejected:** two builds with different backends compiled in, because the specification asks for one.
 
 ## Core uses only APIs that browsers and Node share
 
 Status: decided (#3)
+
+Implemented in #5.
 
 Core runs in the browser, in Workers, in Electron and in Node (tests, `capture-cli`). Its `tsconfig` has `lib: ["ES2022"]` and `types: []`, so DOM and Node APIs do not compile. An `env.d.ts` declares the short list of APIs that exist everywhere: `TextEncoder`, `TextDecoder`, `console`. Adding to that list is a decision. `CompressionStream`, `crypto`, `WebAssembly` and the DOM are not available in core: deflate comes from `fflate` (MIT, synchronous functions only), CRC32 is our own code, and WASM, if the reconstruction needs it, goes into a separate package. ESLint `no-restricted-imports` blocks `node:*`, `@irvis/ui`, `@irvis/backend-*` and `@irvis/media` in core, and a test checks the dependencies in every package's `package.json`.
 
@@ -64,15 +79,21 @@ Core runs in the browser, in Workers, in Electron and in Node (tests, `capture-c
 
 Status: decided (#3)
 
+Implemented in #5 (the ESLint rule), #12, #13, #21 (the parity test).
+
 ECMAScript requires `+`, `-`, `*`, `/` and `Math.sqrt` to be correctly rounded, but lets engines approximate `Math.pow`, `**`, `Math.exp`, `Math.log`, `Math.hypot`, `Math.cbrt`, the trigonometric functions and others. V8 and JavaScriptCore use different implementations, so a reading that goes through them can differ in the last bit between Chrome and Safari, and an exact comparison of readings across engines would fail.
 
 In `packages/core/src/{analysis,corrections,cameras,irvis}/**` an ESLint rule allows only these members of `Math`: the functions `abs`, `min`, `max`, `floor`, `ceil`, `round`, `trunc`, `sign`, `sqrt`, `fround`, `imul`, `clz32`, and the constants `PI`, `E`, `SQRT2`, `SQRT1_2`, `LN2`, `LN10`, `LOG2E`, `LOG10E`. It also forbids `**` and access to `Math` through a variable or a computed name. T⁴ in the emissivity correction is computed by multiplication, the fourth root as `sqrt(sqrt(x))`. Readings are then bit-identical in every engine, and the parity test compares them exactly. An exception, such as a camera whose conversion follows the Planck curve, needs its own decision, and the parity test compares those values with a tolerance.
+
+The reconstruction from I420/NV12 (`packages/core/src/reconstruction/`) is outside the rule: its output is approximate by nature and is judged by metrics against the exact path, not compared bit by bit. It still prefers the allowed functions, so that its regression tests give the same numbers in Node and in browsers.
 
 **Rejected:** comparing readings after rounding to the display precision, because values near a rounding boundary still flip. **Rejected:** a list of forbidden functions, because it lets through every approximated function nobody thought of.
 
 ## The UI is written in React
 
 Status: decided (#3)
+
+Implemented in #17.
 
 The viewer has many panels, settings and measurement overlays. Bundle size does not matter for a desktop app and a static site. What matters is the ecosystem (components, i18n, testing tools) and that the people and agents working on the code know it well. Camera frames at 25 per second bypass the React render cycle: the canvas is drawn directly from an external store, and numeric readouts update about five times a second.
 
@@ -81,6 +102,8 @@ The viewer has many panels, settings and measurement overlays. Bundle size does 
 ## A camera is a profile, and its conversion is data
 
 Status: decided (#3)
+
+Implemented in #5 (schema and registry), #6 (the first profile), #7 (commands and camera state).
 
 Adding a camera means a new directory `packages/core/src/cameras/<id>/` (`profile.ts` and a `README.md` with the source and confidence of every constant) and one line in the registry in `packages/core/src/cameras/index.ts`, with no change to the UI, the backends or the codec. A profile declares:
 
@@ -110,7 +133,9 @@ Profiles are compiled into the app, so a new camera is a pull request with its f
 
 Status: decided (#3)
 
-A recording keeps the temperature of every pixel in every frame, so that measurements, palette and range can change after the fact. A video file keeps a coloured picture; temperatures cannot be read back from it. A recording therefore writes only a `.irvis` file, and MP4 is an export from it, with palette, range, units, overlays and upscaling chosen at export time (by default, as seen live). A snapshot is a `.irvis` file with one frame. The format specification will be `irvis-format.md` (planned, M4), with a version number.
+Implemented in #14 (format and codec), #16 (measurements, v1 frozen), #19 (recording, playback, MP4 export).
+
+A recording keeps the temperature of every pixel in every frame, so that measurements, palette and range can change after the fact. A video file keeps a coloured picture; temperatures cannot be read back from it. A recording therefore writes only a `.irvis` file, and MP4 is an export from it, with palette, range, units, overlays and upscaling chosen at export time (by default, as seen live). A snapshot is a `.irvis` file with one frame, and the PNG photo embeds that one-frame `.irvis` in a private ancillary chunk, so there is one temperature format and irvis opens both files the same way. The format specification will be `irvis-format.md` (planned, M4), with a version number.
 
 The codec works like a video codec, with a guaranteed error bound: a keyframe about every 10 seconds and after every gain or camera-state change and every detected NUC; 8×8 blocks predicted from the previous decoded frame; per block the encoder picks the cheapest of skip (every pixel within the threshold), resend the block towards a temporally denoised value, or send only the pixels outside the threshold; an escape code for large residuals; deflate at the end. For every pixel and frame, |measured − stored| ≤ T. The threshold T comes from the camera profile (a multiple of the sensor noise, NETD, not of its accuracy: noise sets which detail is real), can be set per file before recording, and T = 0 is lossless. A file can be re-encoded to a larger threshold, never to a smaller one.
 
@@ -135,13 +160,17 @@ Writing survives crashes: Electron writes with `fs` in the main process and sync
 
 Status: decided (#3)
 
-GitHub Pages is not available for private repositories on the current plan. Netlify deploys from a private repository and builds a preview for every pull request, which lets the browser path be tried on each change. On the free plan a month has 300 credits and a production deploy costs 15, so about 20 production deploys a month; previews are free. Production therefore publishes only from the `release` branch. A manual workflow, "Promote to release", moves it: it checks that the commit is on `main` (`git merge-base --is-ancestor`) and pushes without `--force`, so only reviewed commits reach production and only by fast-forward. Only that job gets `contents: write`. The site is public even while the repository is private.
+Implemented in #5 (`netlify.toml`, "Promote to release"), #24.
+
+GitHub Pages is not available for private repositories on the current plan. Netlify deploys from a private repository and builds a preview for every pull request, which lets the browser path be tried on each change. On the free plan a month has 300 credits and a production deploy costs 15, so about 20 production deploys a month; previews are free ([Netlify pricing](https://www.netlify.com/pricing/), November 2026). Production therefore publishes only from the `release` branch. A manual workflow, "Promote to release", moves it: it checks that the commit is on `main` (`git merge-base --is-ancestor`) and pushes without `--force`, so only reviewed commits reach production and only by fast-forward. Only that job gets `contents: write`. The site is public even while the repository is private.
 
 **Rejected:** deploying production on every merge to `main`, because parallel work would use up the credits. **Rejected:** Cloudflare Pages as the first choice; it is the fallback if Netlify's limits or reported deploy blocks get in the way.
 
 ## The desktop app ships its own LGPL ffmpeg build
 
 Status: decided (#3)
+
+Implemented in #23.
 
 The desktop app needs ffmpeg only to read raw YUYV bytes from the operating system's camera API (AVFoundation, V4L2, DirectShow) and write them to a pipe. A minimal build with just those inputs, the rawvideo output, no `--enable-gpl` and no codecs is LGPL and a few megabytes. The package carries the LGPL text, the build script is in the repository, and the source tarball goes into each GitHub Release. `IRVIS_FFMPEG` points the app at another ffmpeg, which until the release milestone is the only way: the system ffmpeg.
 
