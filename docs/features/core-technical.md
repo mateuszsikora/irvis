@@ -115,7 +115,7 @@ The dependency test (`packages/core/test/package-dependencies.test.ts`) fails wi
 | `packages/core/test/eslint-directives.test.ts` | Every directive comment in `packages/core/src/` names its rules and a decision; accepted and rejected forms, inline configuration, and comments or strings that only look like directives (`// exported …`, `// global …`, `// eslint-disable` in a line comment) ([invariant 17](../invariants.md)). |
 | `packages/core/src/cameras/*.test.ts` | The registry and `validateProfile`: [cameras: technical](cameras-technical.md#tests). |
 
-Not covered: that the types fit the backends and the codec, which do not exist yet; the TypeScript library settings, which `make typecheck` exercises on every run but no test asserts (a file that uses `document` was checked by hand when they were set up). The ESLint test cannot see a rule that type-aware linting would add or change for a real file.
+Not covered: that the types fit the backends and the codec, which do not exist yet; the TypeScript library settings, which `npm run typecheck` exercises on every run but no test asserts (a file that uses `document` was checked by hand when they were set up). The ESLint test cannot see a rule that type-aware linting would add or change for a real file.
 
 ## See also
 

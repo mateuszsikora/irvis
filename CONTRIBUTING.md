@@ -69,9 +69,9 @@ Tool-generated names (for example `<username>/<random-words>` from Conductor) ar
 
 ## Documentation
 
-Every commit and pull request that changes behaviour lands its documentation in the same change, and removing behaviour removes its documentation. The ownership map in [docs/features/README.md](docs/features/README.md#ownership-map) says which document each path needs; `make docs-check` enforces it, and CI runs it on every pull request.
+Every commit and pull request that changes behaviour lands its documentation in the same change, and removing behaviour removes its documentation. The ownership map in [docs/features/README.md](docs/features/README.md#ownership-map) says which document each path needs; `npm run docs-check` enforces it, and CI runs it on every pull request.
 
-- Run `make docs-check` before pushing, and run it again **after** merging the base branch into yours: the merge changes what the branch changed.
+- Run `npm run docs-check` before pushing, and run it again **after** merging the base branch into yours: the merge changes what the branch changed.
 - Fill the Documentation section of the pull request template.
 - **Review:** a behaviour change without its documentation is a Major finding. The check only proves that a document changed, so review also checks that what the document says is true of the code.
 - Before deciding something, read [docs/decisions/README.md](docs/decisions/README.md).
@@ -82,14 +82,13 @@ Run the checks for every part of the repository the change touches, and read the
 
 | Change touches | Run | Expected output |
 | --- | --- | --- |
-| anything | `make docs-check` | `docs-check: <N> changed files since origin/main (<sha>), each with the documentation it needs` (`1 changed file` when N is 1), exit code 0 |
-| `scripts/**`, `tests/**` or the `Makefile` | `make test` | last line `OK` |
-| any TypeScript, JavaScript or JSON file, `package.json`, `package-lock.json` or a root configuration file | `npm ci` once, then `make lint`, `make typecheck`, `make js-test`, `make build` | `make lint`: no problems listed after `> eslint --max-warnings 0 .`, then `All matched files use Prettier code style!`; `make typecheck`: nothing after `> tsc --build`; `make js-test`: `Test Files  <n> passed (<n>)` and `Tests  <n> passed (<n>)`; `make build`: `✓ built in <time>`; each exit code 0 |
+| anything | `npm run docs-check` (no `npm ci` needed) | `docs-check: <N> changed files since origin/main (<sha>), each with the documentation it needs` (`1 changed file` when N is 1) after npm's `> node tools/docs-check/src/check-docs.ts` line, exit code 0 |
+| any TypeScript, JavaScript or JSON file (`tools/docs-check/` included), `package.json`, `package-lock.json` or a root configuration file | `npm ci` once, then `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm test`, `npm run build` | `npm run lint`: no problems listed after `> eslint --max-warnings 0 .`; `npm run format:check`: `All matched files use Prettier code style!`; `npm run typecheck`: nothing after `> tsc --build`; `npm test`: `Test Files  <n> passed (<n>)` and `Tests  <n> passed (<n>)`; `npm run build`: `✓ built in <time>`; each exit code 0 |
 | `.github/workflows/promote.yml` | read the step "Fast-forward release" against [Promote to release](docs/guides/development.md#promote-to-release); it runs only by hand on GitHub | the guide describes every check and message of the step |
 | `.agents/skills/**` or `.claude/skills/**` | the skill check from `.agents/skills/create-pr/SKILL.md`, step 3 | `ok: N skill(s)` and nothing else |
 | a rule in this file, `AGENTS.md` or a skill | compare the rule in `CONTRIBUTING.md`, `AGENTS.md` and every skill that restates it | all say the same thing |
 
-CI runs `make docs-check`, `make test` and the TypeScript job (lint, format, typecheck, test, build) on every pull request, and the integrity checks, `make test` and the TypeScript job on every push to `main` ([docs/guides/development.md](docs/guides/development.md#ci)). A failing CI job blocks the merge by this rule, even though GitHub does not enforce it (see Repository settings).
+CI runs `npm run docs-check` and the TypeScript job (lint, format, typecheck, test, build) on every pull request, and the integrity checks and the TypeScript job on every push to `main` ([docs/guides/development.md](docs/guides/development.md#ci)). A failing CI job blocks the merge by this rule, even though GitHub does not enforce it (see Repository settings).
 
 Whoever adds tooling (a build, linter, test runner, CI workflow) adds its command to this table, and to the verification table in the `create-pr` skill, in the same PR.
 
@@ -105,7 +104,7 @@ Edit the file under `.agents/skills/` only. The symlink must be relative (exactl
 
 ## Local files
 
-`.gitignore` excludes agent scratch space and local settings (`.context/`, `.claude/settings.local.json`, `.claude/worktrees/`), `.env*` files other than `.env.example`, `.DS_Store`, and Python bytecode (`__pycache__/`, `*.pyc`). Stage files by name anyway, and check `git diff --cached --name-only` before committing.
+`.gitignore` excludes agent scratch space and local settings (`.context/`, `.claude/settings.local.json`, `.claude/worktrees/`), `.env*` files other than `.env.example`, `.DS_Store`, and Node and build output (`node_modules/`, `dist/`, `coverage/`, `*.tsbuildinfo`). Stage files by name anyway, and check `git diff --cached --name-only` before committing.
 
 ## Repository settings
 

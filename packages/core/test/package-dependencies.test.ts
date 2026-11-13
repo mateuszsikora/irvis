@@ -30,6 +30,7 @@ const ALLOWED_IRVIS: Record<string, readonly string[]> = {
   ],
   'apps/desktop': ['@irvis/core'],
   'tools/capture-cli': ['@irvis/core'],
+  'tools/docs-check': [],
 };
 
 /** The only packages from outside irvis that core may depend on. */

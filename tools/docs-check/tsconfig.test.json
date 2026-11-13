@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2024"],
+    "types": ["node", "vitest"],
+    "noEmit": true,
+    "tsBuildInfoFile": "../../node_modules/.tsbuild/docs-check/test.tsbuildinfo"
+  },
+  "include": ["src", "test", "vitest.config.ts"]
+}

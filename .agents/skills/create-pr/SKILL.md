@@ -1,7 +1,7 @@
 ---
 name: create-pr
 description: Open a pull request in the irvis repository (mateuszsikora/irvis), or rewrite the title and description of an existing one, following its CONTRIBUTING.md (Conventional Commits, <type>/<slug> branches, squash merge, no AI attribution). Use when asked to open, create or ship a PR, push work for review, or fix an existing PR's title or description in this repository. Prefer it over generic PR, commit or commit-push-PR skills here.
-allowed-tools: Bash(git status:*), Bash(git fetch:*), Bash(git log:*), Bash(git diff:*), Bash(git show:*), Bash(git rev-parse:*), Bash(git rev-list:*), Bash(git merge-base:*), Bash(git merge-tree:*), Bash(git ls-remote:*), Bash(git ls-files:*), Bash(git check-ignore:*), Bash(git add:*), Bash(git commit:*), Bash(gh auth status:*), Bash(gh repo view:*), Bash(gh pr list:*), Bash(gh pr view:*), Bash(gh pr create:*), Bash(gh pr edit:*), Bash(gh issue list:*), Bash(gh issue view:*), Bash(gh label list:*), Bash(mktemp:*), Bash(test:*), Bash(readlink:*), Bash(basename:*), Bash(make docs-check), Bash(make test), Bash(make js-test), Bash(make lint), Bash(make typecheck), Bash(make build), Read, Grep, Glob
+allowed-tools: Bash(git status:*), Bash(git fetch:*), Bash(git log:*), Bash(git diff:*), Bash(git show:*), Bash(git rev-parse:*), Bash(git rev-list:*), Bash(git merge-base:*), Bash(git merge-tree:*), Bash(git ls-remote:*), Bash(git ls-files:*), Bash(git check-ignore:*), Bash(git add:*), Bash(git commit:*), Bash(gh auth status:*), Bash(gh repo view:*), Bash(gh pr list:*), Bash(gh pr view:*), Bash(gh pr create:*), Bash(gh pr edit:*), Bash(gh issue list:*), Bash(gh issue view:*), Bash(gh label list:*), Bash(mktemp:*), Bash(test:*), Bash(readlink:*), Bash(basename:*), Bash(npm run docs-check), Bash(npm run lint), Bash(npm run format:check), Bash(npm run typecheck), Bash(npm test), Bash(npm run build), Read, Grep, Glob
 ---
 
 # create-pr (irvis)
@@ -12,7 +12,7 @@ This skill is shared by Claude Code and Codex: the file lives in `.agents/skills
 
 `CONTRIBUTING.md` is the source of truth. This skill and `AGENTS.md` restate it; if they disagree, follow `CONTRIBUTING.md` and tell the user about the mismatch. A rule change goes into all three files that state it. The same holds for the documentation contract: where this skill disagrees with `docs/guides/documentation.md` or `docs/features/README.md`, the skill is wrong.
 
-**Permissions.** In Claude Code, `allowed-tools` pre-approves read-only commands and the normal commit/PR path: `git add`, `git commit` (which includes `--amend`; step 6 uses it only on an unpushed last commit), `gh pr create`, `gh pr edit`, and the checks `make docs-check`, `make test`, `make js-test`, `make lint`, `make typecheck` and `make build`, as exact commands. They only read the repository, apart from output that git ignores: Python bytecode caches, `node_modules/.tsbuild/` and `apps/web/dist/`. `npm ci` is not pre-approved, because it runs code from the registry; it asks. With make variables (`BASE=`, `ARGS=`, `PYTHON=`, `NPM=`) they ask, because `PYTHON=` and `NPM=` put any command into the recipe; do not pass them without the user's agreement. Prefix rules match more than the skill allows: `git add:*` also matches `git add -A`, which step 6 forbids, so the instructions in this file, not the permissions, are the safeguard. Everything else asks for permission on purpose, including `git branch -m`, `git switch`, `git rebase`, `git push`, `gh api`, `gh pr ready`, the skill check, and writing the message, title and body files (`cat` is deliberately not pre-approved, because `cat > <file>` would then write any file without asking; read files with the file-reading tool). Codex ignores `allowed-tools` and uses its own approval settings.
+**Permissions.** In Claude Code, `allowed-tools` pre-approves read-only commands and the normal commit/PR path: `git add`, `git commit` (which includes `--amend`; step 6 uses it only on an unpushed last commit), `gh pr create`, `gh pr edit`, and the checks `npm run docs-check`, `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm test` and `npm run build`, as exact commands. They only read the repository, apart from output that git ignores (`node_modules/.tsbuild/`, `apps/web/dist/`) and the temporary git repositories the documentation check's tests create and remove in the system's temporary directory. They run the commands that the `scripts` of the root `package.json` define, so on a branch that changes those scripts, read them before running any. `npm ci` is not pre-approved, because it runs code from the registry; it asks. With arguments after `--` (`npm run docs-check -- --base <ref>`) they ask, because the rules match the exact command; the arguments only reach the check. Prefix rules match more than the skill allows: `git add:*` also matches `git add -A`, which step 6 forbids, so the instructions in this file, not the permissions, are the safeguard. Everything else asks for permission on purpose, including `git branch -m`, `git switch`, `git rebase`, `git push`, `gh api`, `gh pr ready`, the skill check, and writing the message, title and body files (`cat` is deliberately not pre-approved, because `cat > <file>` would then write any file without asking; read files with the file-reading tool). Codex ignores `allowed-tools` and uses its own approval settings.
 
 The skill takes no arguments. Work out everything from the conversation, the branch, its commits and the issue tracker. Ask the user only for what none of those can tell (for example why an approach was chosen, if that was never discussed), and batch those questions into one message.
 
@@ -26,7 +26,7 @@ The skill takes no arguments. Work out everything from the conversation, the bra
   - in both cases GitHub appends ` (#N)` to the subject. The 72-character limit applies to the header as written (commit subject, PR title), not to the suffix; a header that goes past 72 only because of ` (#N)` is accepted.
 
   So every commit message on the branch ends up in `main`'s history and every one must follow the rules in step 6. A `wip` commit is not harmless.
-- **Documentation contract.** Every behaviour change carries its documentation in the same PR (`AGENTS.md`, section "Documentation contract"). `make docs-check` must pass before pushing (step 3). If `main` is merged into the branch (only with the user's agreement), run `make docs-check` again **after** the merge, never only before: the merge changes what the branch changed.
+- **Documentation contract.** Every behaviour change carries its documentation in the same PR (`AGENTS.md`, section "Documentation contract"). `npm run docs-check` must pass before pushing (step 3). If `main` is merged into the branch (only with the user's agreement), run `npm run docs-check` again **after** the merge, never only before: the merge changes what the branch changed.
 - **Never:** push to `main`; force-push, rebase onto `main` or merge `main` without the user's agreement; create labels; create issues or ask the user to create one; invent an issue number; claim a check passes unless it ran in this session.
 
 ## 1. Preflight
@@ -96,9 +96,8 @@ Run the checks for every part the change touches (including uncommitted changes 
 
 | Change touches | Run | Expected |
 | --- | --- | --- |
-| anything (run it after committing, before pushing) | `make docs-check` | `docs-check: <N> changed files since origin/main (<sha>), each with the documentation it needs` (`1 changed file` when N is 1), exit code 0 |
-| `scripts/**`, `tests/**` or the `Makefile` | `make test` | last line `OK` |
-| any TypeScript, JavaScript or JSON file, `package.json`, `package-lock.json` or a root configuration file | `npm ci` once, then `make lint`, `make typecheck`, `make js-test`, `make build` | `make lint`: no problems listed after `> eslint --max-warnings 0 .`, then `All matched files use Prettier code style!`; `make typecheck`: nothing after `> tsc --build`; `make js-test`: `Test Files  <n> passed (<n>)` and `Tests  <n> passed (<n>)`; `make build`: `✓ built in <time>`; each exit code 0 |
+| anything (run it after committing, before pushing) | `npm run docs-check` (no `npm ci` needed) | `docs-check: <N> changed files since origin/main (<sha>), each with the documentation it needs` (`1 changed file` when N is 1) after npm's `> node tools/docs-check/src/check-docs.ts` line, exit code 0 |
+| any TypeScript, JavaScript or JSON file (`tools/docs-check/` included), `package.json`, `package-lock.json` or a root configuration file | `npm ci` once, then `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm test`, `npm run build` | `npm run lint`: no problems listed after `> eslint --max-warnings 0 .`; `npm run format:check`: `All matched files use Prettier code style!`; `npm run typecheck`: nothing after `> tsc --build`; `npm test`: `Test Files  <n> passed (<n>)` and `Tests  <n> passed (<n>)`; `npm run build`: `✓ built in <time>`; each exit code 0 |
 | `.github/workflows/promote.yml` | read the step "Fast-forward release" against the "Promote to release" section of `docs/guides/development.md`; it runs only by hand on GitHub | the guide describes every check and message of the step |
 | `.agents/skills/**` or `.claude/skills/**` | the skill check below | exactly `ok: N skill(s)` |
 | a rule in `CONTRIBUTING.md`, `AGENTS.md` or a skill | read the rule in each of the three files that states it | all say the same thing |
@@ -130,7 +129,7 @@ git ls-files -s .claude/skills | awk '$1!="120000"{print "committed as a copy, n
 EOF
 ```
 
-If `make docs-check` fails, it names the document to update after each `✗`. Update that document so it says what is now true (read the code; do not invent), commit it with the change, and run the check again. Never set `SKIP_DOCS_CHECK=1` to get past it; CI ignores it anyway.
+If `npm run docs-check` fails, it names the document to update after each `✗`. Update that document so it says what is now true (read the code; do not invent), commit it with the change, and run the check again. Never set `SKIP_DOCS_CHECK=1` to get past it; CI ignores it anyway.
 
 Traps in this repository:
 
@@ -146,7 +145,7 @@ Traps in this repository:
 
 The PR is **incomplete** if any of these holds:
 
-- a check from step 3 fails or was not run, including `make docs-check`;
+- a check from step 3 fails or was not run, including `npm run docs-check`;
 - the change relies on a TODO/FIXME, a skipped test or a stub;
 - the branch has `wip`, `fixup!`, `squash!` or "address review" commits that were not folded in;
 - the description would say `Closes #N` but the issue is only partly done (switch to `Refs`, or the PR is incomplete if the user wants it to close the issue);
@@ -232,7 +231,7 @@ Never push to `main`. Never force-push without the user's agreement; with it, us
 - **Opening paragraph(s):** outcome first (what the project can do or does differently now, and why), then `Closes #N` or `Refs #N` on its own line.
 - **Changes:** grouped by meaning, not a list of files.
 - **Decisions:** one bullet per choice: **the choice in bold**, the alternative that was rejected, and why. Taken from the conversation; ask if the why was never discussed and is not obvious.
-- **Documentation:** the section from the template. Tick only what holds: the `make docs-check` box only if it passed in this session after the latest merge of `main`; name the documents that now say what is true, or say why the change has no behaviour to document.
+- **Documentation:** the section from the template. Tick only what holds: the `npm run docs-check` box only if it passed in this session after the latest merge of `main`; name the documents that now say what is true, or say why the change has no behaviour to document.
 - **Verification:** the exact commands from step 3 and their results, with numbers (`ok: 1 skill(s)`, test counts, timings). State what was not verified and why.
 - **Notes:** out of scope (with issue numbers), follow-ups, merge-time instructions (step 6). For a draft, first what is missing before it can be ready.
 
@@ -245,7 +244,7 @@ Delete empty sections and every template comment. Style: specific and checkable 
 - [ ] Every commit on the branch follows step 6 (it will all reach `main`).
 - [ ] Someone who did not see the conversation understands what changed and why.
 - [ ] Every verification claim was run in this session; what was not run is stated.
-- [ ] `make docs-check` passed after the last commit (and after the last merge of `main`); every behaviour change has its documentation, and the Documentation section says which.
+- [ ] `npm run docs-check` passed after the last commit (and after the last merge of `main`); every behaviour change has its documentation, and the Documentation section says which.
 - [ ] `Closes` only for a fully done issue, otherwise `Refs`; no invented issue.
 - [ ] Rule changes are in every file that states the rule (`CONTRIBUTING.md`, `AGENTS.md`, the skill); new tooling has rows in both verification tables.
 - [ ] No attribution lines in the commits or the PR.

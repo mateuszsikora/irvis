@@ -1,29 +1,29 @@
 # Documentation contract
 
-Every change that alters behaviour in this repository lands with the documentation that owns it, in the same commit or pull request. `make docs-check` tells you which documents your branch still has to update, and CI runs the same check on every pull request. It does not write documentation; you do.
+Every change that alters behaviour in this repository lands with the documentation that owns it, in the same commit or pull request. `npm run docs-check` tells you which documents your branch still has to update, and CI runs the same check on every pull request. It does not write documentation; you do.
 
 ## Check your branch
 
 Run from the repository root:
 
 ```sh
-make docs-check                       # compare with origin/main, else main
-make docs-check BASE=origin/release   # compare with another base branch
-make docs-check ARGS=-v               # also list the changed files
+npm run docs-check                               # compare with origin/main, else main
+npm run docs-check -- --base origin/release      # compare with another base branch
+npm run docs-check -- -v                         # also list the changed files
 ```
 
-Without make: `python3 scripts/check-docs.py [--base REF] [-v]`. Nothing has to be installed beyond git and Python 3.
+npm prints the command it runs (`> node tools/docs-check/src/check-docs.ts`) before the check's output. Without npm: `node tools/docs-check/src/check-docs.ts [--base REF] [-v]`. You need git and Node 26 (`nvm use` picks it from `.nvmrc`); the check needs no `npm ci`.
 
 The check compares your branch with its merge base on the base branch. It counts every file changed in the commits since then, staged and unstaged changes, and new files that git does not ignore, so you can run it before you commit. Moving or deleting a file counts as a change to it.
 
-For each changed file, the [ownership map](README.md#ownership-map) names the document that must change with it. These need no documentation: files under `tests/`, documentation itself, agent instructions and tooling, and the other paths in [Left out on purpose](README.md#left-out-on-purpose). A change to a workflow that only bumps an Action version needs none either, and neither does a `package.json` change that only changes versions in `dependencies`, `devDependencies`, `peerDependencies` or `optionalDependencies`. A change to `engines`, `packageManager` or any other field of `package.json`, an added or removed dependency, or a dependency switched to another source (`npm:` alias, `file:`, `workspace:`, a git repository), does.
+For each changed file, the [ownership map](README.md#ownership-map) names the document that must change with it. These need no documentation: test files (`*.test.ts` and a package's `test/` directory), documentation itself, agent instructions and tooling, and the other paths in [Left out on purpose](README.md#left-out-on-purpose). A change to a workflow that only bumps an Action version needs none either, and neither does a `package.json` change that only changes versions in `dependencies`, `devDependencies`, `peerDependencies` or `optionalDependencies`. A change to `engines`, `packageManager` or any other field of `package.json`, an added or removed dependency, or a dependency switched to another source (`npm:` alias, `file:`, `workspace:`, a git repository), does.
 
 A file that no rule owns (for example the first file of a new feature) needs feature documents that are new on your branch: `docs/features/<feature>-user.md`, `docs/features/<feature>-technical.md`, or both. Editing an existing document does not count, and neither does a document that git sees as a move of a deleted one, for example a copy of an old document under a new name. Then add the path to the ownership map, so the next change to it needs the right document. Deleting a file that no rule owns needs no document.
 
 ## Skip the check while work is in progress
 
 ```sh
-SKIP_DOCS_CHECK=1 make docs-check
+SKIP_DOCS_CHECK=1 npm run docs-check
 ```
 
 This works only on your machine. In CI the variable is ignored and the check runs.
@@ -31,14 +31,14 @@ This works only on your machine. In CI the variable is ignored and the check run
 ## Check only the documentation's integrity
 
 ```sh
-make docs-check ARGS=--integrity-only
+npm run docs-check -- --integrity-only
 ```
 
 Runs only the whole-tree checks (links, anchors, decisions index, ownership-map tables, invariants) and needs no base branch. It prints `docs-check: integrity checks pass on <N> files`, or `docs-check: integrity checks failed:` followed by the failures. CI runs it on every push to `main`.
 
 ## Regenerate the decisions index
 
-After you add or change a decision in `docs/decisions/`, run `make decisions-index`. It rewrites [docs/decisions/README.md](../decisions/README.md) and prints `decisions-index: wrote docs/decisions/README.md (<N> decisions)`. The check fails while the index is stale.
+After you add or change a decision in `docs/decisions/`, run `npm run decisions-index`. It rewrites [docs/decisions/README.md](../decisions/README.md) and prints `decisions-index: wrote docs/decisions/README.md (<N> decisions)`. The check fails while the index is stale.
 
 ## Results
 
@@ -54,8 +54,8 @@ docs-check: 3 changed files since origin/main (1a2b3c4), each with the documenta
 
 ```
 docs-check: failed against origin/main (1a2b3c4):
-✗ Build targets changed: update docs/guides/development.md (or docs/guides/testing.md for the test target) [C1]
-    Makefile
+✗ CI or GitHub configuration changed: update docs/guides/development.md [C2]
+    .github/workflows/ci.yml
 
 What to update: the "You changed / You must also update" table in AGENTS.md (section "Documentation contract").
 How to write it: docs/guides/documentation.md.
@@ -77,7 +77,9 @@ Every message is listed in [Failure modes](docs-contract-technical.md#failure-mo
 - `docs-check: base ref '<ref>' does not exist`
 - `docs-check: HEAD and <ref> have no merge base`
 
-Run `git fetch origin`, or pass `BASE=` with a branch that exists.
+Run `git fetch origin`, or pass `--base` with a branch that exists.
+
+**Unknown option.** Exit code 2, with `usage: check-docs.ts [-h] [--base REF] [-v] [--integrity-only]` and, for example, `check-docs.ts: error: unrecognized arguments: --verbos`. `npm run docs-check -- --help` lists the options.
 
 **Skipped.** Exit code 0 with `docs-check: skipped because SKIP_DOCS_CHECK=1 (local only; CI always runs the check)`. In CI you see `docs-check: SKIP_DOCS_CHECK is ignored because CI is set` and the check runs.
 
