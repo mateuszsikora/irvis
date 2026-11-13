@@ -41,11 +41,11 @@ No backend, decoder or codec exists yet; the types are what they will implement.
   // eslint-disable-next-line no-restricted-syntax -- docs/decisions/architecture.md#<the-decision>
   ```
 
-Check your change with `make lint`, `make typecheck` and `make js-test` ([development guide](../guides/development.md#build-targets)).
+Check your change with `npm run lint`, `npm run typecheck` and `npm test` ([development guide](../guides/development.md#npm-scripts)).
 
 ## What fails
 
-`make typecheck` fails when core code uses an API outside ES2022 and the shared three, for example:
+`npm run typecheck` fails when core code uses an API outside ES2022 and the shared three, for example:
 
 ```
 packages/core/src/probe.ts(1,18): error TS2584: Cannot find name 'document'. Do you need to change your target library? Try changing the 'lib' compiler option to include 'dom'.
@@ -53,14 +53,14 @@ packages/core/src/probe.ts(2,18): error TS2591: Cannot find name 'process'. Do y
 packages/core/src/probe.ts(4,18): error TS2304: Cannot find name 'setTimeout'.
 ```
 
-`make lint` fails on these, with the messages quoted in the [technical document](core-technical.md#failure-modes):
+`npm run lint` fails on these, with the messages quoted in the [technical document](core-technical.md#failure-modes):
 
 - an import in `packages/core/src/` of anything but a relative path or `fflate`: a Node module (`node:fs`, `fs`), `@irvis/ui`, `@irvis/media`, a `@irvis/backend-*` package, `react`, `fflate/node`;
 - an import of an asynchronous `fflate` function, or `import * as` from `fflate`;
 - any dynamic `import()` in `packages/core/src/`;
 - in the five measurement directories: a `Math` member outside the list, `Math` reached any other way than `Math.<name>`, `**` or `**=`.
 
-`make js-test` fails when a lint directive comment in `packages/core/src/` names no rules or no decision, or configures ESLint inline ([invariant 17](../invariants.md)), and when a `package.json` adds a dependency that breaks the direction core ← media ← ui ← apps/web, makes core depend on anything but `fflate`, lists `electron` outside `apps/desktop`, or belongs to a workspace that the dependency table does not list yet ([invariant 15](../invariants.md)).
+`npm test` fails when a lint directive comment in `packages/core/src/` names no rules or no decision, or configures ESLint inline ([invariant 17](../invariants.md)), and when a `package.json` adds a dependency that breaks the direction core ← media ← ui ← apps/web, makes core depend on anything but `fflate`, lists `electron` outside `apps/desktop`, or belongs to a workspace that the dependency table does not list yet ([invariant 15](../invariants.md)).
 
 ## See also
 

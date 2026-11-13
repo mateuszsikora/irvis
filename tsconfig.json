@@ -3,6 +3,7 @@
   "references": [
     { "path": "./tsconfig.node.json" },
     { "path": "./packages/core" },
-    { "path": "./apps/web" }
+    { "path": "./apps/web" },
+    { "path": "./tools/docs-check" }
   ]
 }

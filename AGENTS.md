@@ -23,19 +23,18 @@ Every commit and pull request that changes behaviour lands its documentation in 
 
 | You changed | You must also update | Rule |
 | --- | --- | --- |
-| `scripts/check-docs.py` or `scripts/decisions-index.py` | `docs/features/docs-contract-technical.md` (or `-user.md`, or `docs/guides/documentation.md`); this table and `docs/features/README.md` if `RULES` changed | F1 |
+| `tools/docs-check/` except its tests | `docs/features/docs-contract-technical.md` (or `-user.md`, or `docs/guides/documentation.md`); this table and `docs/features/README.md` if `RULES` changed | F1 |
 | `packages/core/` except `src/cameras/` | `docs/features/core-technical.md` (or `-user.md`) | F2 |
 | `apps/web/` or `netlify.toml` | `docs/features/web-app-technical.md` (or `-user.md`) | F3 |
 | `packages/core/src/cameras/` | `docs/features/cameras-technical.md` (or `-user.md`) | F4 |
-| `Makefile` | `docs/guides/development.md` (`docs/guides/testing.md` for the test targets) | C1 |
 | anything in `.github/` except the PR template | `docs/guides/development.md` | C2 |
 | root configuration: `package.json`, `tsconfig*.json`, `eslint.config.js`, `vitest.config.ts`, `.prettierrc*`, `.prettierignore`, `.nvmrc`, `.npmrc` | `docs/guides/development.md` (or `docs/guides/testing.md` for Vitest) | C3 |
 | any other path that no rule owns (new code) | new `docs/features/<feature>-user.md` and `-technical.md`, and a rule for the path in `RULES`, `docs/features/README.md` and this table | F0 |
 
 - Test files and bumps of an Action, a hook or a dependency version need no documentation. Neither do `docs/`, this file, `CONTRIBUTING.md`, the PR template and `.agents/` or `.claude/`; the full list is in [docs/features/README.md](docs/features/README.md#left-out-on-purpose).
-- Verify with `make docs-check` before finishing. `SKIP_DOCS_CHECK=1` works only locally; CI ignores it.
+- Verify with `npm run docs-check` before finishing. `SKIP_DOCS_CHECK=1` works only locally; CI ignores it.
 - Planned work, milestones and acceptance criteria: [docs/roadmap.md](docs/roadmap.md); read it before starting a milestone PR. It is a plan, not a description of the code.
-- Before deciding something, read [docs/decisions/README.md](docs/decisions/README.md). Record a new decision in `docs/decisions/` and run `make decisions-index`.
+- Before deciding something, read [docs/decisions/README.md](docs/decisions/README.md). Record a new decision in `docs/decisions/` and run `npm run decisions-index`.
 - A domain rule that a test enforces goes into [docs/invariants.md](docs/invariants.md) with the test id.
 - In review, a behaviour change without its documentation is a Major finding. The check proves only that a document changed, so also check that what the document says is true of the code.
-- `RULES` in `scripts/check-docs.py` is the source of truth for the table above; `make docs-check` compares it with `docs/features/README.md`, but nothing compares it with this file.
+- `RULES` in `tools/docs-check/src/check-docs.ts` is the source of truth for the table above; `npm run docs-check` compares it with `docs/features/README.md`, but nothing compares it with this file.

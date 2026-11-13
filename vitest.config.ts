@@ -4,6 +4,6 @@ import { defineConfig } from 'vitest/config';
 // picks its environment. How to run and add tests: docs/guides/testing.md
 export default defineConfig({
   test: {
-    projects: ['packages/*', 'apps/*'],
+    projects: ['packages/*', 'apps/*', 'tools/*'],
   },
 });

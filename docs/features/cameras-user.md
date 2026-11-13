@@ -19,8 +19,8 @@ irvis supports a camera model through a camera profile: data that says how to re
 
 3. Create `packages/core/src/cameras/<id>/README.md` with the source and the confidence of every constant: links, measurements, and what is still a guess.
 4. Add the profile to `cameraProfiles` in `packages/core/src/cameras/index.ts`.
-5. Run `make js-test`. The registry test validates every registered profile and fails with one line per problem (see [problems](#problems-the-check-reports)).
-6. Update [cameras: technical](cameras-technical.md) if the schema changed, and add the camera to `docs/features/cameras-user.md` (this document). `make docs-check` asks for one of the two whenever `packages/core/src/cameras/` changes.
+5. Run `npm test`. The registry test validates every registered profile and fails with one line per problem (see [problems](#problems-the-check-reports)).
+6. Update [cameras: technical](cameras-technical.md) if the schema changed, and add the camera to `docs/features/cameras-user.md` (this document). `npm run docs-check` asks for one of the two whenever `packages/core/src/cameras/` changes.
 
 Every constant carries a `source` (where it comes from, in words a reader can follow) and a `confidence`:
 

@@ -5,74 +5,73 @@ Numbered domain rules, each enforced by the tests listed under it. Cite a rule b
 Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the architecture of the TypeScript packages, 18 to the camera registry.
 
 - **1.** A changed path that a rule owns fails the check unless some changed path matches that rule's documentation regex.
-  - `tests/test_check_docs.py::RuleTests::test_owned_path_without_doc_fails`
-  - `tests/test_check_docs.py::RuleTests::test_owned_path_with_doc_passes`
+  - `tools/docs-check/test/rules.test.ts::rules::owned path without doc fails`
+  - `tools/docs-check/test/rules.test.ts::rules::owned path with doc passes`
 - **2.** Commits since the merge base, staged changes, unstaged changes and untracked files all count, on both the source and the documentation side.
-  - `tests/test_check_docs.py::RuleTests::test_untracked_source_counts`
-  - `tests/test_check_docs.py::RuleTests::test_untracked_doc_counts`
-  - `tests/test_check_docs.py::RuleTests::test_staged_doc_counts`
-  - `tests/test_check_docs.py::RuleTests::test_unstaged_doc_counts`
-  - `tests/test_check_docs.py::RuleTests::test_staged_source_counts`
-  - `tests/test_check_docs.py::RuleTests::test_unstaged_source_counts`
+  - `tools/docs-check/test/rules.test.ts::rules::untracked source counts`
+  - `tools/docs-check/test/rules.test.ts::rules::untracked doc counts`
+  - `tools/docs-check/test/rules.test.ts::rules::staged doc counts`
+  - `tools/docs-check/test/rules.test.ts::rules::unstaged doc counts`
+  - `tools/docs-check/test/rules.test.ts::rules::staged source counts`
+  - `tools/docs-check/test/rules.test.ts::rules::unstaged source counts`
 - **3.** Deleting or moving an owned file needs the same documentation as editing it.
-  - `tests/test_check_docs.py::RuleTests::test_deletion_needs_doc`
-  - `tests/test_check_docs.py::RuleTests::test_rename_needs_doc`
-- **4.** Changes under `tests/` and the other paths in `EXCLUDE` never need documentation.
-  - `tests/test_check_docs.py::RuleTests::test_tests_only_change_passes`
-  - `tests/test_check_docs.py::RuleTests::test_every_exclusion_needs_no_doc`
-  - `tests/test_check_docs.py::CarveOutTests::test_pr_template_needs_no_doc`
-  - `tests/test_check_docs.py::CarveOutTests::test_agent_tooling_needs_no_doc`
+  - `tools/docs-check/test/rules.test.ts::rules::deletion needs doc`
+  - `tools/docs-check/test/rules.test.ts::rules::rename needs doc`
+- **4.** Changes to the paths in `EXCLUDE` (test files, documentation, agent tooling and the rest) never need documentation.
+  - `tools/docs-check/test/rules.test.ts::rules::tests only change passes`
+  - `tools/docs-check/test/rules.test.ts::rules::every exclusion needs no doc`
+  - `tools/docs-check/test/rules.test.ts::carve-outs::pr template needs no doc`
+  - `tools/docs-check/test/rules.test.ts::carve-outs::agent tooling needs no doc`
 - **5.** A file whose diff changes only versions needs no documentation; any other change in the same file does, and a filter that raises fails the check.
-  - `tests/test_check_docs.py::BumpFilterTests::test_bump_only_passes`
-  - `tests/test_check_docs.py::BumpFilterTests::test_bump_with_other_change_fails`
-  - `tests/test_check_docs.py::BumpFilterTests::test_changed_action_name_is_not_a_bump`
-  - `tests/test_check_docs.py::BumpFilterTests::test_moved_uses_line_is_not_a_bump`
-  - `tests/test_check_docs.py::BumpFilterTests::test_crashing_filter_fails`
+  - `tools/docs-check/test/bumps.test.ts::version-bump filter::bump only passes`
+  - `tools/docs-check/test/bumps.test.ts::version-bump filter::bump with other change fails`
+  - `tools/docs-check/test/bumps.test.ts::version-bump filter::changed action name is not a bump`
+  - `tools/docs-check/test/bumps.test.ts::version-bump filter::moved uses line is not a bump`
+  - `tools/docs-check/test/bumps.test.ts::version-bump filter::crashing filter fails`
 - **6.** A path that no other rule owns needs a feature document that is new since the merge base; an edited document, or one git detects as a rename, does not count. Deleting such a path needs nothing.
-  - `tests/test_check_docs.py::CatchAllTests::test_unowned_path_needs_new_feature_doc`
-  - `tests/test_check_docs.py::CatchAllTests::test_new_feature_doc_satisfies_catch_all`
-  - `tests/test_check_docs.py::CatchAllTests::test_moved_doc_is_not_new`
-  - `tests/test_check_docs.py::CatchAllTests::test_new_script_is_caught`
-  - `tests/test_check_docs.py::CatchAllTests::test_deleting_unowned_path_needs_no_new_doc`
+  - `tools/docs-check/test/rules.test.ts::catch-all::unowned path needs new feature doc`
+  - `tools/docs-check/test/rules.test.ts::catch-all::new feature doc satisfies catch all`
+  - `tools/docs-check/test/rules.test.ts::catch-all::moved doc is not new`
+  - `tools/docs-check/test/rules.test.ts::catch-all::new script is caught`
+  - `tools/docs-check/test/rules.test.ts::catch-all::deleting unowned path needs no new doc`
 - **7.** The base is `--base`, else `origin/main`, else `main`; without one, or without a merge base, the check exits 2 and never compares with another branch.
-  - `tests/test_check_docs.py::BaseTests::test_no_base_exits_2`
-  - `tests/test_check_docs.py::BaseTests::test_no_merge_base_exits_2`
-  - `tests/test_check_docs.py::BaseTests::test_missing_base_ref_exits_2`
-  - `tests/test_check_docs.py::BaseTests::test_base_option`
-  - `tests/test_check_docs.py::BaseTests::test_origin_main_before_main`
+  - `tools/docs-check/test/rules.test.ts::base branch::no base exits 2`
+  - `tools/docs-check/test/rules.test.ts::base branch::no merge base exits 2`
+  - `tools/docs-check/test/rules.test.ts::base branch::missing base ref exits 2`
+  - `tools/docs-check/test/rules.test.ts::base branch::base option`
+  - `tools/docs-check/test/rules.test.ts::base branch::origin main before main`
 - **8.** `SKIP_DOCS_CHECK=1` skips the check only when `CI` is unset.
-  - `tests/test_check_docs.py::SkipTests::test_skip_works_locally`
-  - `tests/test_check_docs.py::SkipTests::test_skip_ignored_in_ci`
+  - `tools/docs-check/test/rules.test.ts::skip::skip works locally`
+  - `tools/docs-check/test/rules.test.ts::skip::skip ignored in ci`
 - **9.** The ownership-map and exclusions tables in `docs/features/README.md` equal `RULES` and `EXCLUDE`.
-  - `tests/test_check_docs.py::IntegrityTests::test_map_row_differs_fails`
-  - `tests/test_check_docs.py::IntegrityTests::test_map_row_missing_fails`
-  - `tests/test_check_docs.py::IntegrityTests::test_map_row_extra_fails`
-  - `tests/test_check_docs.py::IntegrityTests::test_exclusion_differs_fails`
-- **10.** `docs/decisions/README.md` equals the output of `scripts/decisions-index.py`.
-  - `tests/test_check_docs.py::IntegrityTests::test_stale_decisions_index_fails`
-  - `tests/test_decisions_index.py::IndexTests::test_stale_index_fails_check`
+  - `tools/docs-check/test/integrity.test.ts::integrity::map row differs fails`
+  - `tools/docs-check/test/integrity.test.ts::integrity::map row missing fails`
+  - `tools/docs-check/test/integrity.test.ts::integrity::map row extra fails`
+  - `tools/docs-check/test/integrity.test.ts::integrity::exclusion differs fails`
+- **10.** `docs/decisions/README.md` equals the output of `tools/docs-check/src/decisions-index.ts`.
+  - `tools/docs-check/test/integrity.test.ts::integrity::stale decisions index fails`
+  - `tools/docs-check/test/decisions-index.test.ts::decisions index::stale index fails check`
 - **11.** This repository passes its own integrity checks.
-  - `tests/test_check_docs.py::RealRepositoryTests::test_integrity_of_this_repository`
-- **12.** Every test id in this file names an existing test, with the method in the named class.
-  - `tests/test_check_docs.py::IntegrityTests::test_invariant_with_missing_test_fails`
-  - `tests/test_check_docs.py::IntegrityTests::test_invariant_with_test_under_wrong_class_fails`
+  - `tools/docs-check/test/integrity.test.ts::this repository::integrity of this repository`
+- **12.** ~~Every test id in this file names an existing test, with the method in the named class.~~ Retired in #30: there are no Python tests. That a test id names an existing Vitest test is invariant 14.
 - **13.** A `package.json` change that only changes version ranges (strings without `:` or `/`) of existing keys in `dependencies`, `devDependencies`, `peerDependencies` or `optionalDependencies` needs no documentation; a change to `engines`, `packageManager` or any other field, an added, removed or moved dependency, a change of a dependency's source (`npm:`, `file:`, `workspace:`, `github:`, `user/repo`), and a file that does not parse do.
-  - `tests/test_check_docs.py::PackageJsonBumpTests::test_dependency_bump_passes`
-  - `tests/test_check_docs.py::PackageJsonBumpTests::test_reformatted_bump_in_a_package_passes`
-  - `tests/test_check_docs.py::PackageJsonBumpTests::test_engines_change_fails`
-  - `tests/test_check_docs.py::PackageJsonBumpTests::test_package_manager_change_fails`
-  - `tests/test_check_docs.py::PackageJsonBumpTests::test_bump_with_engines_change_fails`
-  - `tests/test_check_docs.py::PackageJsonBumpTests::test_added_dependency_fails`
-  - `tests/test_check_docs.py::PackageJsonBumpTests::test_removed_dependency_fails`
-  - `tests/test_check_docs.py::PackageJsonBumpTests::test_alias_change_fails`
-  - `tests/test_check_docs.py::PackageJsonBumpTests::test_dependency_moved_to_another_field_fails`
-  - `tests/test_check_docs.py::PackageJsonBumpTests::test_invalid_json_is_not_a_bump`
-- **14.** A test id for a file other than `.py` names `describe` literals and then an `it` or `test` literal, each a plain string literal whose value, with escapes resolved, equals the name exactly, that appear in the file in that order.
-  - `tests/test_check_docs.py::VitestIdTests::test_vitest_id_passes`
-  - `tests/test_check_docs.py::VitestIdTests::test_vitest_id_with_missing_name_fails`
-  - `tests/test_check_docs.py::VitestIdTests::test_vitest_id_with_missing_describe_fails`
-  - `tests/test_check_docs.py::VitestIdTests::test_vitest_id_out_of_order_fails`
-  - `tests/test_check_docs.py::VitestIdTests::test_vitest_id_needs_a_plain_literal`
+  - `tools/docs-check/test/bumps.test.ts::package.json bumps::dependency bump passes`
+  - `tools/docs-check/test/bumps.test.ts::package.json bumps::reformatted bump in a package passes`
+  - `tools/docs-check/test/bumps.test.ts::package.json bumps::engines change fails`
+  - `tools/docs-check/test/bumps.test.ts::package.json bumps::package manager change fails`
+  - `tools/docs-check/test/bumps.test.ts::package.json bumps::bump with engines change fails`
+  - `tools/docs-check/test/bumps.test.ts::package.json bumps::added dependency fails`
+  - `tools/docs-check/test/bumps.test.ts::package.json bumps::removed dependency fails`
+  - `tools/docs-check/test/bumps.test.ts::package.json bumps::alias change fails`
+  - `tools/docs-check/test/bumps.test.ts::package.json bumps::dependency moved to another field fails`
+  - `tools/docs-check/test/bumps.test.ts::package.json bumps::invalid json is not a bump`
+- **14.** A test id names `describe` literals and then an `it` or `test` literal, each a plain string literal whose value, with escapes resolved, equals the name exactly, that appear in the file in that order.
+  - `tools/docs-check/test/integrity.test.ts::Vitest ids::vitest id passes`
+  - `tools/docs-check/test/integrity.test.ts::Vitest ids::vitest id with missing name fails`
+  - `tools/docs-check/test/integrity.test.ts::Vitest ids::vitest id with missing describe fails`
+  - `tools/docs-check/test/integrity.test.ts::Vitest ids::vitest id out of order fails`
+  - `tools/docs-check/test/integrity.test.ts::Vitest ids::vitest id needs a plain literal`
+  - `tools/docs-check/test/integrity.test.ts::integrity::invariant with missing test fails`
 - **15.** Dependencies between workspaces point one way: every workspace in `packages/`, `apps/` and `tools/` is listed with the irvis packages it may depend on, and depends on no other; core depends on nothing outside irvis but `fflate`; only `apps/desktop` depends on `electron`.
   - `packages/core/test/package-dependencies.test.ts::package dependencies::lists every workspace in the dependency table`
   - `packages/core/test/package-dependencies.test.ts::package dependencies::point only from apps towards core`

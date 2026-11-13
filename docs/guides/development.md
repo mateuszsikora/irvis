@@ -1,55 +1,47 @@
 # Development guide
 
-For anyone who works on this repository, person or agent: what to install, which build targets exist, how the TypeScript toolchain is set up, what CI runs, and how the web version reaches production. Branch, commit and pull request rules are in [CONTRIBUTING.md](../../CONTRIBUTING.md).
+For anyone who works on this repository, person or agent: what to install, which npm scripts exist, how the TypeScript toolchain is set up, what CI runs, and how the web version reaches production. Branch, commit and pull request rules are in [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 ## Setup
 
 You need:
 
-- git 2.32 or later, Python 3.9 or later, and make, for the documentation check and its tests. They use only the Python standard library. The suite was run with Python 3.9.6, 3.13 and 3.14.6 and git 2.54.0 when it was added.
-- Node.js 26 (the current LTS) with the npm it ships, for the TypeScript code. `.nvmrc` holds `26`, so `nvm use` or `fnm use` picks it. `.npmrc` sets `engine-strict=true`: with an older Node, `npm ci` stops with `npm error code EBADENGINE` and `Required: {"node":">=26"}`. The toolchain was set up with Node 26.13.0 and npm 11.20.0.
+- Node.js 26 (the current LTS) with the npm it ships. `.nvmrc` holds `26`, so `nvm use` or `fnm use` picks it. `.npmrc` sets `engine-strict=true`: with an older Node, `npm ci` stops with `npm error code EBADENGINE` and `Required: {"node":">=26"}`. The toolchain was set up with Node 26.13.0 and npm 11.20.0.
+- git 2.32 or later, for the documentation check and its tests (they use `GIT_CONFIG_GLOBAL`). They were run with git 2.54.0.
+
+The documentation check runs without `npm ci`: `npm run docs-check` works on a fresh clone, because the check imports only Node built-ins ([decision](../decisions/docs.md#the-check-uses-only-node-built-ins-and-runs-with-node-type-stripping)). Everything else needs `npm ci` first.
 
 ```sh
 git clone git@github.com:mateuszsikora/irvis.git
 cd irvis
 nvm use
 npm ci
-make test
-make js-test
-make docs-check
+npm test
+npm run docs-check
 ```
 
-## Build targets
+## npm scripts
 
-Defined in the [Makefile](../../Makefile). Run them from the repository root.
+Defined in the root [package.json](../../package.json). Run them from the repository root; pass options to the script after `--`, as in `npm run docs-check -- --base origin/release -v`.
 
-| Target | What it does |
-| --- | --- |
-| `make help` | Lists the targets. The default target. |
-| `make docs-check [BASE=<ref>] [ARGS=-v]` | Runs `scripts/check-docs.py`, which checks that every change on the branch carries its documentation. `BASE` defaults to `origin/main`, else `main`. See [the documentation contract](../features/docs-contract-user.md). |
-| `make decisions-index` | Rewrites [docs/decisions/README.md](../decisions/README.md) from the files in `docs/decisions/`. |
-| `make test` | Runs the Python test suite of the documentation check; see the [testing guide](testing.md). |
-| `make js-test` | `npm test`: every Vitest project; see the [testing guide](testing.md#typescript-tests). |
-| `make lint` | `npm run lint` (ESLint), then `npm run format:check` (Prettier). |
-| `make typecheck` | `npm run typecheck`: `tsc --build` over every TypeScript project. |
-| `make build` | `npm run build`: the `build` script of every workspace that has one; today only `apps/web`, into `apps/web/dist/`. |
+| Script | Command | What it does |
+| --- | --- | --- |
+| `npm run docs-check` | `node tools/docs-check/src/check-docs.ts` | Checks that every change on the branch carries its documentation. Options: `--base <ref>` (default `origin/main`, else `main`), `-v`, `--integrity-only`. See [the documentation contract](../features/docs-contract-user.md). Needs no `npm ci`. |
+| `npm run decisions-index` | `node tools/docs-check/src/decisions-index.ts` | Rewrites [docs/decisions/README.md](../decisions/README.md) from the files in `docs/decisions/`; with `-- --check` it only reports. Needs no `npm ci`. |
+| `npm test` | `vitest run` | Every Vitest project, the documentation check's tests included; see the [testing guide](testing.md). |
+| `npm run lint` | `eslint --max-warnings 0 .` | ESLint; see [Lint and format](#lint-and-format). |
+| `npm run format:check` | `prettier --check .` | Prettier, without changing files. |
+| `npm run format` | `prettier --write .` | Prettier, rewriting the files. |
+| `npm run typecheck` | `tsc --build` | Type-checks every TypeScript project. |
+| `npm run build` | `npm run build --workspaces --if-present` | The `build` script of every workspace that has one; today only `apps/web`, into `apps/web/dist/`. |
 
-`PYTHON` selects the interpreter for the Python targets (default `python3`), for example `make test PYTHON=python3.9`, and `NPM` the npm binary for the others (default `npm`). The npm targets need `npm ci` first.
+npm prints `> <command>` before a script's output.
 
 ## npm workspaces
 
-The root `package.json` declares the workspaces `packages/*` and `apps/*`; today they are `packages/core` (`@irvis/core`) and `apps/web` (`@irvis/web`). A workspace depends on another with `"@irvis/<name>": "*"`, which npm links to the local directory. Packages export their TypeScript source and have no build step ([decision](../decisions/architecture.md#workspace-packages-are-consumed-as-typescript-source)). Which package may depend on which is enforced by a test ([core: technical](../features/core-technical.md#tests)).
+The root `package.json` declares the workspaces `packages/*`, `apps/*` and `tools/*`; today they are `packages/core` (`@irvis/core`), `apps/web` (`@irvis/web`) and `tools/docs-check` (`@irvis/docs-check`, the documentation check, which depends on nothing). A workspace depends on another with `"@irvis/<name>": "*"`, which npm links to the local directory. Packages export their TypeScript source and have no build step ([decision](../decisions/architecture.md#workspace-packages-are-consumed-as-typescript-source)). Which package may depend on which is enforced by a test ([core: technical](../features/core-technical.md#tests)).
 
-Root scripts:
-
-| Script | Command |
-| --- | --- |
-| `test` | `vitest run` |
-| `build` | `npm run build --workspaces --if-present` |
-| `lint` | `eslint --max-warnings 0 .` |
-| `typecheck` | `tsc --build` |
-| `format` | `prettier --write .` |
-| `format:check` | `prettier --check .` |
+The root scripts are listed under [npm scripts](#npm-scripts).
 
 Every development tool is a `devDependency` of the root `package.json`; a workspace lists only what its own code imports.
 
@@ -68,8 +60,10 @@ TypeScript 6.0 (`~6.0.3`), not 7: typescript-eslint 8.72 supports TypeScript bel
 | `packages/core/tsconfig.test.json` | core's tests, `test/`, `vitest.config.ts` | ES2024, `node` and `vitest` |
 | `apps/web/tsconfig.app.json` | `apps/web/src/` | ES2022, DOM and DOM.Iterable, `vite/client` ([web app](../features/web-app-technical.md#build)) |
 | `apps/web/tsconfig.node.json` | `apps/web/vite.config.ts` | ES2024, `node` |
+| `tools/docs-check/tsconfig.lib.json` | the documentation check's `src/` without tests | ES2024, `node` ([documentation contract](../features/docs-contract-technical.md#configuration)) |
+| `tools/docs-check/tsconfig.test.json` | its tests, `test/`, `vitest.config.ts` | ES2024, `node` and `vitest` |
 
-`packages/core/tsconfig.json` and `apps/web/tsconfig.json` are solution files of their package's projects. Only core's library project emits anything: declarations, into `node_modules/.tsbuild/core/lib/`, which `apps/web` type-checks against. Build info files go to `node_modules/.tsbuild/`. Delete that directory if `tsc --build` reports a project as up to date that is not.
+`packages/core/tsconfig.json`, `apps/web/tsconfig.json` and `tools/docs-check/tsconfig.json` are solution files of their package's projects. Only the library projects of core and of the documentation check emit anything: declarations, into `node_modules/.tsbuild/core/lib/` (which `apps/web` type-checks against) and `node_modules/.tsbuild/docs-check/lib/` (which the check's tests type-check against). Build info files go to `node_modules/.tsbuild/`. Delete that directory if `tsc --build` reports a project as up to date that is not.
 
 ## Lint and format
 
@@ -77,6 +71,7 @@ ESLint 10 with a flat config, `eslint.config.js`:
 
 - `@eslint/js` recommended and typescript-eslint `recommendedTypeChecked` on every file, with type information from the TypeScript projects above (`projectService`). `.js`, `.mjs` and `.cjs` files are linted without types. Unused `eslint-disable` comments are errors.
 - ESLint does not read `.gitignore`; the config ignores `node_modules/`, `dist/` and `coverage/` at any depth, `.context/` and `.claude/worktrees/`.
+- In `tools/docs-check/src/` outside the tests, only `node:` modules and relative paths may be imported, and `import()` is rejected: the check runs in CI without `npm ci` ([documentation contract](../features/docs-contract-technical.md#configuration)).
 - The rules for core from the architecture decisions (imports only of relative paths and `fflate`, the synchronous `fflate` API, the `Math` allow-list), and the test that makes every exception name a decision: [core: technical](../features/core-technical.md#configuration).
 - `npm run lint` fails on any warning (`--max-warnings 0`).
 
@@ -84,7 +79,7 @@ Prettier 3 (`.prettierrc.json`: `printWidth` 100, `singleQuote`) checks every fi
 
 ## Hooks
 
-There are no git hooks. The documentation check looks at the whole branch, and a commit hook would block a code-only commit whose documentation comes in the next commit of the same pull request; [the decision](../decisions/docs.md#the-check-runs-in-ci-not-as-a-git-hook). Run `make docs-check` yourself before you push.
+There are no git hooks. The documentation check looks at the whole branch, and a commit hook would block a code-only commit whose documentation comes in the next commit of the same pull request; [the decision](../decisions/docs.md#the-check-runs-in-ci-not-as-a-git-hook). Run `npm run docs-check` yourself before you push.
 
 ## CI
 
@@ -92,12 +87,11 @@ There are no git hooks. The documentation check looks at the whole branch, and a
 
 | Job | Runs on | Steps | Timeout |
 | --- | --- | --- | --- |
-| `docs`, shown as "Documentation contract" | pull requests | `actions/checkout` with `fetch-depth: 0` (a shallow clone has no merge base), then the step "Documentation contract": `make docs-check BASE="origin/$BASE_REF"`, with `BASE_REF` set from `github.base_ref` through `env` | 5 minutes |
-| `integrity`, shown as "Documentation integrity" | pushes to `main` | `actions/checkout`, then `make docs-check ARGS=--integrity-only` | 5 minutes |
-| `test`, shown as "Tests" | both | `actions/checkout`, then `make test` | 10 minutes |
-| `typescript`, shown as "TypeScript" | both | `actions/checkout`; `actions/setup-node` with `node-version-file: .nvmrc` and `cache: npm`; then the steps Install (`npm ci`), Lint (`npm run lint`), Format (`npm run format:check`), Typecheck (`npm run typecheck`), Test (`npm test`), Build (`npm run build`) | 10 minutes |
+| `docs`, shown as "Documentation contract" | pull requests | `actions/checkout` with `fetch-depth: 0` (a shallow clone has no merge base); `actions/setup-node` with `node-version-file: .nvmrc`; then the step "Documentation contract": `npm run docs-check -- --base "origin/$BASE_REF"`, with `BASE_REF` set from `github.base_ref` through `env` | 5 minutes |
+| `integrity`, shown as "Documentation integrity" | pushes to `main` | `actions/checkout`; `actions/setup-node` with `node-version-file: .nvmrc`; then `npm run docs-check -- --integrity-only` | 5 minutes |
+| `typescript`, shown as "TypeScript" | both | `actions/checkout`; `actions/setup-node` with `node-version-file: .nvmrc` and `cache: npm`; then the steps Install (`npm ci`), Lint (`npm run lint`), Format (`npm run format:check`), Typecheck (`npm run typecheck`), Test (`npm test`, which includes the documentation check's tests), Build (`npm run build`) | 10 minutes |
 
-The Python jobs use the runner's `python3`; no setup step installs another one. On a pull request, `actions/checkout` checks out GitHub's merge commit of the branch into the base as it was when the run started. GitHub does not rerun the job when the base moves, so two pull requests that pass alone can break `main` together, for example one renames a heading and the other links to it. The `integrity` job reports that on the push that merges the second one, so the breakage shows up on `main` itself, not first in an unrelated pull request. It does not prevent it: open pull requests turn red on their next run until `main` is fixed.
+The two documentation jobs run no `npm ci`: the check imports only Node built-ins, so Node from `actions/setup-node` is all they need. The documentation check's tests run in the `typescript` job with every other test. On a pull request, `actions/checkout` checks out GitHub's merge commit of the branch into the base as it was when the run started. GitHub does not rerun the job when the base moves, so two pull requests that pass alone can break `main` together, for example one renames a heading and the other links to it. The `integrity` job reports that on the push that merges the second one, so the breakage shows up on `main` itself, not first in an unrelated pull request. It does not prevent it: open pull requests turn red on their next run until `main` is fixed.
 
 No job is a required check: branch protection and rulesets return HTTP 403 on this private repository on the free plan, so GitHub cannot block a merge on them. A red job is still a blocker by the rules in [CONTRIBUTING.md](../../CONTRIBUTING.md#verification); [the decision](../decisions/docs.md#the-documentation-check-is-not-a-required-status-check-yet).
 

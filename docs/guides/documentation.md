@@ -2,7 +2,7 @@
 
 For anyone, person or agent, who writes or changes documentation in this repository: which kinds of document exist, how to write each one, how the documentation check works, and what it cannot catch. Where each document lives is in [docs/README.md](../README.md).
 
-Documentation is written by hand. `scripts/check-docs.py` does not generate any of it (the decisions index is the one exception); it only makes sure nobody forgets it. Every change that alters behaviour updates the document that owns the behaviour in the same commit or pull request, and a change that removes behaviour removes its documentation.
+Documentation is written by hand. `tools/docs-check/src/check-docs.ts` does not generate any of it (the decisions index is the one exception); it only makes sure nobody forgets it. Every change that alters behaviour updates the document that owns the behaviour in the same commit or pull request, and a change that removes behaviour removes its documentation.
 
 ## Feature documents
 
@@ -42,18 +42,18 @@ In `docs/guides/`: development, testing, this guide, and any how-to for users. A
 
 ```md
 - **7.** A deleted owned file needs its documentation.
-  - `tests/test_check_docs.py::RuleTests::test_deletion_needs_doc`
+  - `tools/docs-check/test/rules.test.ts::rules::deletion needs doc`
   - `packages/core/src/yuyv.test.ts::decodeYUYV::reads lo and hi bytes`
 ```
 
-A Python test id is `<path>::<Class>::<method>`. A Vitest test id is `<path>::<describe>::...::<it>`, with the names exactly as Vitest shows them, that is the values of the string literals in `describe("...")` and `it("...")` or `test("...")` with escapes resolved; give such a test a plain literal name, not a template literal or `it.each`.
+A test id is `<path>::<describe>::...::<it>`, with the names exactly as Vitest shows them, that is the values of the string literals in `describe("...")` and `it("...")` or `test("...")` with escapes resolved; give such a test a plain literal name, not a template literal or `it.each`.
 
 - Use bold `**<N>.**`, not an ordered list: GitHub renumbers ordered lists, and other documents cite invariants by number.
 - Take the next free number. Never reuse one, even after the rule is gone.
 - A rule that stops holding is struck through, with the reason, so old references keep their meaning: `- **7.** ~~<rule>~~ Retired in #12: <why>.`
 - A rule that no test enforces is not an invariant. Write it as a note in the technical document.
 
-The check fails on a reused number, on a list item in any other form, on a live invariant without a test, and on a test id that does not name an existing test (for Python, the method has to be in the named class; for Vitest, the names have to appear in the file in the given order). Two pull requests that take the same next number each pass alone. Each CI run checks the merge with the base as it is when the run starts, so the second one fails on its next run after the first is merged. If it is merged without another run, the `integrity` job fails on `main` right after the merge ([CI](development.md#ci)).
+The check fails on a reused number, on a list item in any other form, on a live invariant without a test, and on a test id that does not name an existing test (the names have to appear in the file in the given order). Two pull requests that take the same next number each pass alone. Each CI run checks the merge with the base as it is when the run starts, so the second one fails on its next run after the first is merged. If it is merged without another run, the `integrity` job fails on `main` right after the merge ([CI](development.md#ci)).
 
 ## Decisions
 
@@ -73,12 +73,12 @@ One or two paragraphs of reasoning.
 - The first line after the heading is `Status: decided`, `Status: postponed` or `Status: superseded`, followed by ` (#<PR or issue>)` once there is a number.
 - A superseded decision links its replacement by heading anchor (`[replacement](docs.md#the-new-heading)`), never by line number.
 - A decision made before its code has a line `Implemented in #N, …` after the status, naming the issues that implement it ([decision](../decisions/docs.md#plans-and-spike-reports-live-in-docs-as-marked-exceptions)). The line stays after those issues are merged, as the record of where the decision was implemented.
-- A new domain file needs an entry in `DOMAINS` in `scripts/decisions-index.py`.
-- After any change in `docs/decisions/`, run `make decisions-index`. The index is generated; do not edit it.
+- A new domain file needs an entry in `DOMAINS` in `tools/docs-check/src/decisions-index.ts`.
+- After any change in `docs/decisions/`, run `npm run decisions-index`. The index is generated; do not edit it.
 
 ## The ownership map
 
-The map in [docs/features/README.md](../features/README.md#ownership-map) says which document has to change when a path changes. `RULES` in `scripts/check-docs.py` is its source of truth, the table in `docs/features/README.md` must equal it (the check compares them), and [AGENTS.md](../../AGENTS.md#documentation-contract) restates it for agents (nothing compares that one; rule F1 makes a change to the script touch a document, and review checks the rest).
+The map in [docs/features/README.md](../features/README.md#ownership-map) says which document has to change when a path changes. `RULES` in `tools/docs-check/src/check-docs.ts` is its source of truth, the table in `docs/features/README.md` must equal it (the check compares them), and [AGENTS.md](../../AGENTS.md#documentation-contract) restates it for agents (nothing compares that one; rule F1 makes a change to the script touch a document, and review checks the rest).
 
 When you add code:
 
@@ -89,9 +89,9 @@ When you add code:
 How to write a rule:
 
 - **Carve-outs, not lists of files.** Where a directory has a sub-part with another owner, match the whole directory minus the exception, as C2 does for `.github/`. A new file is then owned from its first line.
-- **List files by name** only where a directory has several owners, as F1 does for `scripts/`. A new file there matches no rule but the catch-all F0.
+- **List files by name** only where a directory has several owners, as C3 does for the repository root. A new file there matches no rule but the catch-all F0.
 - **The catch-all F0** owns every path no other rule matches and asks for a new feature document. Its message tells you to add the documents and the path to the map.
-- **A file with several owners** gets one rule whose documentation regex accepts the document of any owner, as C1 does for the `Makefile`.
+- **A file with several owners** gets one rule whose documentation regex accepts the document of any owner, as C3 does for the root configuration, which either guide may describe.
 - **Left out on purpose** are tests, test data, lock files, the licence, `.gitignore`, and files that are documentation or rules themselves. They are in `EXCLUDE`, and in the [table](../features/README.md#left-out-on-purpose) that must equal it.
 - Every rule message names the exact document to update, such as `CI or GitHub configuration changed: update docs/guides/development.md`. The check fails if a document named in a message does not exist.
 
@@ -99,7 +99,7 @@ Edit `RULES`, the table in `docs/features/README.md` and the table in `AGENTS.md
 
 ## How the check works
 
-`make docs-check` takes the merge base of `HEAD` and the base branch (`origin/main`, else `main`, or `BASE=<ref>`). It collects every path changed since then: commits, staged and unstaged changes, untracked files. It drops the paths in `EXCLUDE` and the files whose diff only changes a version, then fails every rule whose source regex matches a remaining path while no changed path matches its documentation regex. Then it checks the whole tree: links and anchors, `docs/` references in code comments, line-number references, section citations, the decisions index, the map tables and the invariants. Every step, every message and every exit code is in the [technical document](../features/docs-contract-technical.md).
+`npm run docs-check` takes the merge base of `HEAD` and the base branch (`origin/main`, else `main`, or `-- --base <ref>`). It collects every path changed since then: commits, staged and unstaged changes, untracked files. It drops the paths in `EXCLUDE` and the files whose diff only changes a version, then fails every rule whose source regex matches a remaining path while no changed path matches its documentation regex. Then it checks the whole tree: links and anchors, `docs/` references in code comments, line-number references, section citations, the decisions index, the map tables and the invariants. Every step, every message and every exit code is in the [technical document](../features/docs-contract-technical.md).
 
 CI runs it on every pull request, and the integrity part alone (`--integrity-only`) on every push to `main` (see [CI](development.md#ci)). `SKIP_DOCS_CHECK=1` skips it locally while work is in progress and is ignored in CI.
 
@@ -121,14 +121,14 @@ The version-bump filter drops a file only when every changed line matches its pa
 What the check cannot catch:
 
 - **It proves coverage, not correctness.** It knows that a document changed, not that the document is now true. A blank line satisfies a rule. Review has to check that what the document says is true of the code.
-- **New files in a by-name part of the map go to the catch-all.** A new file in `scripts/` matches no rule of its real owner. F0 then asks for new feature documents, which is wrong for a helper script, until someone adds the path to a rule.
+- **New files in a by-name part of the map go to the catch-all.** A new configuration file in the repository root matches no rule of its real owner. F0 then asks for new feature documents, which is wrong for a configuration file, until someone adds the path to C3.
 - **The catch-all cannot tell what a new document describes.** Any new feature document satisfies F0, even one about another feature.
 - **Adding the path to the map is not enforced.** F0 asks for it, but a pull request that adds the new documents and no rule passes. The next change to that path hits F0 again and asks for new documents again.
 - **"New" means "not a rename" to git.** A feature document that git pairs with a deleted one (at least 50% similar content, as after `git mv`, or after copying the old document as a starting point) does not count as new for F0, however it was made.
 - **Deleting a path no rule owns needs nothing.** F0 skips deleted paths, so removing unowned code passes without any document change.
 - **A change reverted in the working tree still counts.** The changed set is a union, so a file changed in a commit and then restored to the base in the working tree still needs its document. Commit the revert, or ignore the failure until it is committed.
 - **Vitest test ids are found by text, not by parsing.** The names must appear in the file in order, but their real nesting is not checked: a test named under the wrong `describe` passes when that `describe` comes earlier in the file, and a call in a comment counts. Review checks that the id names the right test.
-- **Docstrings are not read.** References to `docs/` are checked in comments only, so a path in a Python docstring can go stale unnoticed.
-- **A file with several owners passes with any owner's document.** Changing the test target in the `Makefile` and updating only the development guide passes C1.
+- **Strings are not read.** References to `docs/` are checked in comments only, so a path in a string, such as an error message, can go stale unnoticed.
+- **A file with several owners passes with any owner's document.** Changing the Vitest configuration and updating only the development guide passes C3.
 - **Agent tooling restates normative files and can go stale silently.** The table in `AGENTS.md` and the `create-pr` skill restate the map and these rules; nothing compares them with `RULES` except the paths in code spans, which must exist.
-- **Comment detection is per line and by file extension.** A `#` inside a Python string starts a "comment", which can cause a false failure; a file with an unknown extension is not read at all.
+- **Comment detection is per line and by file extension.** A `//` inside a TypeScript string, such as a URL, starts a "comment", which can cause a false failure; a file with an unknown extension is not read at all.

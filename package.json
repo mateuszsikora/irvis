@@ -4,12 +4,15 @@
   "type": "module",
   "workspaces": [
     "packages/*",
-    "apps/*"
+    "apps/*",
+    "tools/*"
   ],
   "engines": {
     "node": ">=26"
   },
   "scripts": {
+    "docs-check": "node tools/docs-check/src/check-docs.ts",
+    "decisions-index": "node tools/docs-check/src/decisions-index.ts",
     "test": "vitest run",
     "build": "npm run build --workspaces --if-present",
     "lint": "eslint --max-warnings 0 .",

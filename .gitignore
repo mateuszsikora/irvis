@@ -10,10 +10,6 @@
 # OS files
 .DS_Store
 
-# Python bytecode
-__pycache__/
-*.pyc
-
 # Node and build output
 node_modules/
 dist/

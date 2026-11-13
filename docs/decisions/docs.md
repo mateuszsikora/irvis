@@ -12,13 +12,27 @@ The documents say what the code does for a user, why it is shaped as it is, and 
 
 ## The check uses only the Python standard library
 
-Status: decided
+Status: superseded (#30)
+
+Superseded by [the check uses only Node built-ins and runs with Node type stripping](#the-check-uses-only-node-built-ins-and-runs-with-node-type-stripping).
 
 `scripts/check-docs.py` and `scripts/decisions-index.py` run with the system `python3` and need no virtual environment, lock file or install step. Contributors and CI runners can run them on a fresh clone, and the check cannot break because a dependency changed.
 
 **Rejected:** a Markdown parser library (for example `markdown-it-py`) for headings and links, because it needs an install step in every environment, and the subset of CommonMark the check needs (fences, ATX and setext headings, inline links) fits in about a hundred lines.
 
 **Rejected:** a shell script, because the GitHub slug rules, multiset comparison and table parsing are hard to get right in POSIX shell and differ between GNU and BSD tools.
+
+## The check uses only Node built-ins and runs with Node type stripping
+
+Status: decided (#30)
+
+The documentation check and the decisions index generator are TypeScript in the workspace `tools/docs-check/`. They import only Node built-ins (`node:child_process`, `node:fs`, `node:path`) and the other modules of `tools/docs-check/src/`, which an ESLint rule enforces, so `node tools/docs-check/src/check-docs.ts` runs on a fresh clone with Node 26 alone, through Node's type stripping, without `npm ci`. The "Documentation contract" and "Documentation integrity" jobs need only `actions/setup-node` with `.nvmrc`. Their tests are Vitest tests and run in the "TypeScript" job with every other test.
+
+The repository has needed Node 26 since #5, and every other tool in it (ESLint, Prettier, `tsc`, Vitest, Vite) is an npm package. With the check in Python, a contributor needed Python 3 and make next to Node, the check had its own test runner, test style and CI job, and its code could not share the TypeScript rules (`tsconfig.base.json`, ESLint) that the rest of the code follows. One language removes all of that.
+
+The check is ported from the Python version without changing its messages, exit codes or options. Where JavaScript differs from what the Python version did, `tools/docs-check/src/text.ts` and `tools/docs-check/src/json.ts` reimplement it: Unicode-aware word, digit and space classes, Unicode line splitting, quoting of values in messages, code point order, git paths that are not UTF-8, and a JSON reader that rejects repeated keys and keeps `true`, `1` and `1.0` apart ([technical document](../features/docs-contract-technical.md#text-semantics)).
+
+**Rejected:** keeping the check in Python, because it keeps a second language, a second test runner and the make wrapper in a repository that is otherwise TypeScript, for a tool that every contributor runs. **Rejected:** letting the check depend on npm packages (a Markdown parser, `typescript`), because the two documentation jobs would then need `npm ci`, about 210 packages from the registry, before a check that only reads Markdown and git output, and the check would stop working on a fresh clone until `npm ci` ran. **Rejected:** compiling the check to JavaScript, because Node 26 runs the TypeScript directly, and a build output can go stale.
 
 ## The check runs in CI, not as a git hook
 
@@ -40,7 +54,7 @@ The ownership check needs a base branch (`github.base_ref`) to diff against, whi
 
 Status: decided
 
-The variable exists so that `make docs-check` does not get in the way of work in progress on a laptop. If it worked in CI, setting it in a workflow would switch the contract off for everyone without anyone noticing. The script prints that it ignored the variable, so nobody wonders why the skip had no effect.
+The variable exists so that `npm run docs-check` does not get in the way of work in progress on a laptop. If it worked in CI, setting it in a workflow would switch the contract off for everyone without anyone noticing. The script prints that it ignored the variable, so nobody wonders why the skip had no effect.
 
 **Rejected:** honouring the skip everywhere, because then the check proves nothing. **Rejected:** a skip marker in the commit message or pull request body, because it is an off switch in the same place as the change it is meant to check.
 
@@ -48,7 +62,7 @@ The variable exists so that `make docs-check` does not get in the way of work in
 
 Status: decided
 
-A rule like C2 owns all of `.github/` except the pull request template. A new workflow is then owned from its first line, and nobody has to remember to add it to a list. Files are listed by name only where a directory has several owners, as in `scripts/`.
+A rule like C2 owns all of `.github/` except the pull request template. A new workflow is then owned from its first line, and nobody has to remember to add it to a list. Files are listed by name only where a directory has several owners, as in the repository root (C3).
 
 **Rejected:** one rule per file, because every new file would start unowned until someone noticed.
 
@@ -74,7 +88,7 @@ Bumping an Action from `@v6` to `@v7` changes nothing a document describes. With
 
 Status: decided
 
-Tests describe behaviour; they do not change it. A pull request that only adds tests has no document to update. Test files still count on the documentation side, and a test that enforces a domain rule is listed in `docs/invariants.md`. All of `tests/` is left out, test data and helpers included. Python keeps tests in separate files, so no inline tests had to be moved. TypeScript keeps them next to the code as `*.test.ts`, which a file-name pattern leaves out; test helpers and end-to-end tests of a package live in `<packages|apps|tools>/<name>/test/` or `e2e/`, and shared test data in `fixtures/`, and those directories are left out as well. Only those exact directories are: `packages/core/src/test/` is source code, because a pattern that matched `test/` anywhere would also leave out product code that happens to sit in such a directory.
+Tests describe behaviour; they do not change it. A pull request that only adds tests has no document to update. Test files still count on the documentation side, and a test that enforces a domain rule is listed in `docs/invariants.md`. TypeScript keeps them next to the code as `*.test.ts`, which a file-name pattern leaves out; test helpers and end-to-end tests of a package live in `<packages|apps|tools>/<name>/test/` or `e2e/`, and shared test data in `fixtures/`, and those directories are left out as well. Only those exact directories are: `packages/core/src/test/` is source code, because a pattern that matched `test/` anywhere would also leave out product code that happens to sit in such a directory.
 
 **Rejected:** treating tests as source owned by their feature's rule, because every new test would need a document edit that says nothing new.
 
@@ -82,7 +96,7 @@ Tests describe behaviour; they do not change it. A pull request that only adds t
 
 Status: decided
 
-Agents read `docs/decisions/README.md` to find out cheaply whether a question was already settled. A hand-kept index goes stale, and a stale index answers "no such decision" for one that exists, which is worse than no index. `scripts/decisions-index.py` writes it from the headings and `Status:` lines, and the check fails while it is stale.
+Agents read `docs/decisions/README.md` to find out cheaply whether a question was already settled. A hand-kept index goes stale, and a stale index answers "no such decision" for one that exists, which is worse than no index. `tools/docs-check/src/decisions-index.ts` writes it from the headings and `Status:` lines, and the check fails while it is stale.
 
 **Rejected:** a hand-kept index, for the reason above. **Rejected:** no index, because reading every decision file in full costs an agent much more context than one table.
 
@@ -104,7 +118,9 @@ The CI job should be a required check, but the plan does not allow it: `gh api r
 
 ## Tests use unittest from the standard library
 
-Status: decided
+Status: superseded (#30)
+
+Superseded by [the check uses only Node built-ins and runs with Node type stripping](#the-check-uses-only-node-built-ins-and-runs-with-node-type-stripping): the check's tests are Vitest tests.
 
 `unittest` runs with the system `python3` like the scripts themselves, so `make test` needs no virtual environment or dependency manifest in a repository that has no Python project otherwise.
 
@@ -156,6 +172,8 @@ Every other bump filter works line by line: a changed line must match a version 
 
 Status: decided (#4)
 
-`docs/invariants.md` names TypeScript tests as `<path>::<describe>::<it>`, with the literal names Vitest shows. The check finds `describe("...")`, `it("...")` and `test("...")` calls whose first argument is one plain string literal, and requires the names in the given order. It does not parse TypeScript, because [the check uses only the Python standard library](#the-check-uses-only-the-python-standard-library). The cost is that it does not verify the real nesting: a test named under the wrong `describe` passes when that `describe` comes earlier in the file. Template literals, `it.each` and modifiers such as `it.only` are not found, so a test that enforces an invariant has a fixed, literal name.
+`docs/invariants.md` names TypeScript tests as `<path>::<describe>::<it>`, with the literal names Vitest shows. The check finds `describe("...")`, `it("...")` and `test("...")` calls whose first argument is one plain string literal, and requires the names in the given order. It does not parse TypeScript, because a parser is an npm package and [the check uses only Node built-ins](#the-check-uses-only-node-built-ins-and-runs-with-node-type-stripping). The cost is that it does not verify the real nesting: a test named under the wrong `describe` passes when that `describe` comes earlier in the file. Template literals, `it.each` and modifiers such as `it.only` are not found, so a test that enforces an invariant has a fixed, literal name.
 
-**Rejected:** a TypeScript parser (the `typescript` package, or `tree-sitter`), because it needs Node or a Python dependency in the check. **Rejected:** asking Vitest for its test list (`vitest list`), because the check would need `npm ci` before it runs, and the integrity job on `main` would depend on the TypeScript toolchain. **Rejected:** matching brackets to recover the nesting, because strings, comments, template literals and regex literals make a bracket counter wrong in exactly the files that are hard to read.
+Revisited in #30, when the check moved to TypeScript: Node is now there anyway, but the TypeScript compiler API is not, so the decision stands.
+
+**Rejected:** the TypeScript compiler API (the `typescript` package), because the check would import an npm package, so both documentation jobs would need `npm ci` before they run and the check would fail on a fresh clone without it; the gain, verified nesting, covers a limitation that review catches today. `tree-sitter` is rejected for the same reason. **Rejected:** asking Vitest for its test list (`vitest list`), because the check would need `npm ci` before it runs, would run every test file's imports, and the integrity job on `main` would depend on the whole TypeScript toolchain. **Rejected:** matching brackets to recover the nesting, because strings, comments, template literals and regex literals make a bracket counter wrong in exactly the files that are hard to read.

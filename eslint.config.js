@@ -79,6 +79,12 @@ const NO_DYNAMIC_IMPORT = {
     'Core does not load modules with import(); use a static import (docs/decisions/architecture.md#core-uses-only-apis-that-browsers-and-node-share).',
 };
 
+// The documentation check runs in CI without npm ci, so its code imports only
+// Node built-ins and its own modules:
+// docs/decisions/docs.md#the-check-uses-only-node-built-ins-and-runs-with-node-type-stripping
+const DOCS_CHECK_IMPORT_MESSAGE =
+  'The documentation check imports only Node built-ins (node:...) and its own files, because it runs without npm ci (docs/decisions/docs.md#the-check-uses-only-node-built-ins-and-runs-with-node-type-stripping).';
+
 export const MEASUREMENT_DIRS = ['analysis', 'corrections', 'cameras', 'irvis', 'reconstruction'];
 
 const MATH_MESSAGE =
@@ -170,6 +176,20 @@ export default defineConfig(
             },
           ],
         },
+      ],
+    },
+  },
+  {
+    files: ['tools/docs-check/src/**/*.ts'],
+    ignores: ['tools/docs-check/src/**/*.test.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: [{ regex: '^(?!node:|\\.{1,2}/)', message: DOCS_CHECK_IMPORT_MESSAGE }] },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        { selector: 'ImportExpression', message: DOCS_CHECK_IMPORT_MESSAGE },
       ],
     },
   },

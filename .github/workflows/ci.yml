@@ -20,10 +20,14 @@ jobs:
         with:
           # The check diffs against the merge base; a shallow clone has none.
           fetch-depth: 0
+      # Node only: the check imports nothing but Node built-ins, so no npm ci.
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
       - name: Documentation contract
         env:
           BASE_REF: ${{ github.base_ref }}
-        run: make docs-check BASE="origin/$BASE_REF"
+        run: npm run docs-check -- --base "origin/$BASE_REF"
 
   integrity:
     name: Documentation integrity
@@ -32,17 +36,11 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
       - name: Documentation integrity
-        run: make docs-check ARGS=--integrity-only
-
-  test:
-    name: Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v7
-      - name: Unit tests
-        run: make test
+        run: npm run docs-check -- --integrity-only
 
   typescript:
     name: TypeScript
