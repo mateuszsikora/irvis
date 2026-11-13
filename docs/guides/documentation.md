@@ -103,7 +103,8 @@ The version-bump filter drops a file only when every changed line matches its pa
 
 ## Style
 
-- Write what is true now. No roadmap: plans belong in issues or a plan document.
+- Write what is true now. The exceptions are the [roadmap](../roadmap.md) and the spike reports in `docs/findings/`: they say what is planned or what was measured, and other documents never cite them for what the code does. A plan names a document that does not exist yet without the `docs/` prefix and with "(planned, M<n>)", because the check fails on links and `docs/` code spans to missing files; the pull request that creates the document turns the mention into a link ([decision](../decisions/docs.md#plans-and-spike-reports-live-in-docs-as-marked-exceptions)).
+- Cite a section by a link to its heading, not with a section sign and a number: the check reads that as a citation and fails unless it can resolve it.
 - Use real paths, real names, real defaults. Quote messages and command output verbatim.
 - Refer to code by path and symbol, never by line number, because lines move. The check fails on `<file>.md:<n>` and `#L<n>`.
 - Write `TODO(<owner>): <what is unknown>` instead of guessing.
