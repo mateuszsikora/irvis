@@ -38,6 +38,9 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [Core uses only APIs that browsers and Node share](architecture.md#core-uses-only-apis-that-browsers-and-node-share) | [architecture.md](architecture.md) | decided (#3) |
 | [Measurement code uses only correctly rounded arithmetic](architecture.md#measurement-code-uses-only-correctly-rounded-arithmetic) | [architecture.md](architecture.md) | decided (#3) |
 | [The UI is written in React](architecture.md#the-ui-is-written-in-react) | [architecture.md](architecture.md) | decided (#3) |
+| [Workspace packages are consumed as TypeScript source](architecture.md#workspace-packages-are-consumed-as-typescript-source) | [architecture.md](architecture.md) | decided (#5) |
+| [TypeScript stays on 6.0 until typescript-eslint supports 7](architecture.md#typescript-stays-on-60-until-typescript-eslint-supports-7) | [architecture.md](architecture.md) | decided (#5) |
+| [Frames and state in core are subscriptions](architecture.md#frames-and-state-in-core-are-subscriptions) | [architecture.md](architecture.md) | decided (#5) |
 | [A camera is a profile, and its conversion is data](architecture.md#a-camera-is-a-profile-and-its-conversion-is-data) | [architecture.md](architecture.md) | decided (#3) |
 | [Loading camera profiles from files at runtime](architecture.md#loading-camera-profiles-from-files-at-runtime) | [architecture.md](architecture.md) | postponed (#3) |
 | [Recordings are .irvis files and MP4 is an export](architecture.md#recordings-are-irvis-files-and-mp4-is-an-export) | [architecture.md](architecture.md) | decided (#3) |

@@ -24,8 +24,12 @@ Every commit and pull request that changes behaviour lands its documentation in 
 | You changed | You must also update | Rule |
 | --- | --- | --- |
 | `scripts/check-docs.py` or `scripts/decisions-index.py` | `docs/features/docs-contract-technical.md` (or `-user.md`, or `docs/guides/documentation.md`); this table and `docs/features/README.md` if `RULES` changed | F1 |
-| `Makefile` | `docs/guides/development.md` (`docs/guides/testing.md` for the test target) | C1 |
+| `packages/core/` except `src/cameras/` | `docs/features/core-technical.md` (or `-user.md`) | F2 |
+| `apps/web/` or `netlify.toml` | `docs/features/web-app-technical.md` (or `-user.md`) | F3 |
+| `packages/core/src/cameras/` | `docs/features/cameras-technical.md` (or `-user.md`) | F4 |
+| `Makefile` | `docs/guides/development.md` (`docs/guides/testing.md` for the test targets) | C1 |
 | anything in `.github/` except the PR template | `docs/guides/development.md` | C2 |
+| root configuration: `package.json`, `tsconfig*.json`, `eslint.config.js`, `vitest.config.ts`, `.prettierrc*`, `.prettierignore`, `.nvmrc`, `.npmrc` | `docs/guides/development.md` (or `docs/guides/testing.md` for Vitest) | C3 |
 | any other path that no rule owns (new code) | new `docs/features/<feature>-user.md` and `-technical.md`, and a rule for the path in `RULES`, `docs/features/README.md` and this table | F0 |
 
 - Test files and bumps of an Action, a hook or a dependency version need no documentation. Neither do `docs/`, this file, `CONTRIBUTING.md`, the PR template and `.agents/` or `.claude/`; the full list is in [docs/features/README.md](docs/features/README.md#left-out-on-purpose).

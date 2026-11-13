@@ -112,7 +112,7 @@ The version-bump filter drops a file only when every changed line matches its pa
 - Use real paths, real names, real defaults. Quote messages and command output verbatim.
 - Refer to code by path and symbol, never by line number, because lines move. The check fails on `<file>.md:<n>` and `#L<n>`.
 - Write `TODO(<owner>): <what is unknown>` instead of guessing.
-- Every fact lives in one document. Link to it; do not restate it. The root README, once there is one, is an entry point that links into `docs/`.
+- Every fact lives in one document. Link to it; do not restate it. The root [README](../../README.md) is an entry point that links into `docs/`.
 - Use plain, precise language, and measured claims with their numbers. Do not use filler words such as "comprehensive", "robust" or "seamless".
 - Link headings by their GitHub anchor: lowercase, punctuation removed, spaces turned into `-`.
 

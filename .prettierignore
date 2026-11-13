@@ -1,0 +1,6 @@
+# Markdown is formatted by hand (tables, line breaks): docs/guides/documentation.md#style
+*.md
+package-lock.json
+node_modules/
+dist/
+coverage/

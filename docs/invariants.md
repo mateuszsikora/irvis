@@ -2,7 +2,7 @@
 
 Numbered domain rules, each enforced by the tests listed under it. Cite a rule by number ("invariant 4"). A number is never reused; a rule that stops holding is struck through with the reason. How to add one: [documentation guide](guides/documentation.md#invariants).
 
-irvis has no product code yet, so the only domain is the documentation contract.
+Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the architecture of the TypeScript packages, 18 to the camera registry.
 
 - **1.** A changed path that a rule owns fails the check unless some changed path matches that rule's documentation regex.
   - `tests/test_check_docs.py::RuleTests::test_owned_path_without_doc_fails`
@@ -73,3 +73,25 @@ irvis has no product code yet, so the only domain is the documentation contract.
   - `tests/test_check_docs.py::VitestIdTests::test_vitest_id_with_missing_describe_fails`
   - `tests/test_check_docs.py::VitestIdTests::test_vitest_id_out_of_order_fails`
   - `tests/test_check_docs.py::VitestIdTests::test_vitest_id_needs_a_plain_literal`
+- **15.** Dependencies between workspaces point one way: every workspace in `packages/`, `apps/` and `tools/` is listed with the irvis packages it may depend on, and depends on no other; core depends on nothing outside irvis but `fflate`; only `apps/desktop` depends on `electron`.
+  - `packages/core/test/package-dependencies.test.ts::package dependencies::lists every workspace in the dependency table`
+  - `packages/core/test/package-dependencies.test.ts::package dependencies::point only from apps towards core`
+  - `packages/core/test/package-dependencies.test.ts::package dependencies::keep core free of packages other than fflate`
+  - `packages/core/test/package-dependencies.test.ts::package dependencies::keep electron in apps/desktop`
+- **16.** ESLint lets code in `packages/core/src/` import only relative paths and `fflate` (tests next to the code also `vitest`), so Node modules, `@irvis/ui`, `@irvis/media`, `@irvis/backend-*` and packages hoisted from other workspaces are rejected; from `fflate` only the synchronous functions, and never as a namespace; no dynamic `import()`.
+  - `packages/core/test/eslint-rules.test.ts::core imports::rejects Node modules`
+  - `packages/core/test/eslint-rules.test.ts::core imports::rejects the UI, media and backend packages`
+  - `packages/core/test/eslint-rules.test.ts::core imports::rejects packages that core does not declare`
+  - `packages/core/test/eslint-rules.test.ts::core imports::rejects dynamic import()`
+  - `packages/core/test/eslint-rules.test.ts::core imports::allows vitest only in tests next to the code`
+  - `packages/core/test/eslint-rules.test.ts::core imports::allows only the synchronous fflate functions`
+- **17.** ESLint allows, in `packages/core/src/{analysis,corrections,cameras,irvis,reconstruction}/`, only the listed `Math` members, reached as `Math.<name>`, and no `**`. An exception to any lint rule in `packages/core/src/` is a disable comment that names its rules and a decision; a comment without them, and inline ESLint configuration, fail the tests.
+  - `packages/core/test/eslint-rules.test.ts::Math allow-list::allows correctly rounded functions in measurement code`
+  - `packages/core/test/eslint-rules.test.ts::Math allow-list::rejects approximated functions and indirect access`
+  - `packages/core/test/eslint-directives.test.ts::eslint directives in core::name their rules and a decision in every file of packages/core/src`
+  - `packages/core/test/eslint-directives.test.ts::eslint directives in core::rejects a disable comment without rules`
+  - `packages/core/test/eslint-directives.test.ts::eslint directives in core::rejects a disable comment without a decision`
+  - `packages/core/test/eslint-directives.test.ts::eslint directives in core::rejects inline configuration`
+- **18.** Every profile in the camera registry passes `validateProfile`, and no two share an id.
+  - `packages/core/src/cameras/index.test.ts::camera registry::holds only valid profiles`
+  - `packages/core/src/cameras/index.test.ts::camera registry::has unique profile ids`
