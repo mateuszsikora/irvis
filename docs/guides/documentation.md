@@ -69,6 +69,7 @@ One or two paragraphs of reasoning.
 - One `##` heading per decision. The heading states what was decided, not the question.
 - The first line after the heading is `Status: decided`, `Status: postponed` or `Status: superseded`, followed by ` (#<PR or issue>)` once there is a number.
 - A superseded decision links its replacement by heading anchor (`[replacement](docs.md#the-new-heading)`), never by line number.
+- A decision made before its code has a line `Implemented in #N, …` after the status, naming the issues that implement it ([decision](../decisions/docs.md#plans-and-spike-reports-live-in-docs-as-marked-exceptions)). The line stays after those issues are merged, as the record of where the decision was implemented.
 - A new domain file needs an entry in `DOMAINS` in `scripts/decisions-index.py`.
 - After any change in `docs/decisions/`, run `make decisions-index`. The index is generated; do not edit it.
 

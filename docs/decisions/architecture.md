@@ -37,10 +37,11 @@ Implemented in #5 (types), #17 (minimal `backend-replay`), #19 (`Player`, `ByteS
 
 ```
 core <- media <- ui <- apps
-core <- backend-* <------ apps
+core <- media <-------- apps
+core <- backend-* <---- apps
 ```
 
-`ui` imports `core` and `media` (it calls the MP4 export and the OPFS writer), never a backend package; it sees backends only through the core interfaces. The apps wire the concrete backends into the UI, so the UI works the same over a camera, a browser stream or a recording.
+`ui` imports `core`, and `media` only for the MP4 export; it never imports a backend package, and it sees backends and storage only through the core interfaces. The apps wire the concrete backends and the `ByteSink` and `ByteSource` implementations into the UI: `apps/web` the OPFS and `File` ones from `media`, `apps/desktop` the IPC client of `backend-electron`, which writes with `fs` in the main process. So the app, not the UI, decides where a recording goes, and the UI works the same over a camera, a browser stream or a recording.
 
 Changes against the interfaces in the specification:
 
@@ -79,13 +80,13 @@ Core runs in the browser, in Workers, in Electron and in Node (tests, `capture-c
 
 Status: decided (#3)
 
-Implemented in #5 (the ESLint rule), #12, #13, #21 (the parity test).
+Implemented in #5 (the ESLint rule), #8, #12, #13, #21 (the parity test).
 
 ECMAScript requires `+`, `-`, `*`, `/` and `Math.sqrt` to be correctly rounded, but lets engines approximate `Math.pow`, `**`, `Math.exp`, `Math.log`, `Math.hypot`, `Math.cbrt`, the trigonometric functions and others. V8 and JavaScriptCore use different implementations, so a reading that goes through them can differ in the last bit between Chrome and Safari, and an exact comparison of readings across engines would fail.
 
-In `packages/core/src/{analysis,corrections,cameras,irvis}/**` an ESLint rule allows only these members of `Math`: the functions `abs`, `min`, `max`, `floor`, `ceil`, `round`, `trunc`, `sign`, `sqrt`, `fround`, `imul`, `clz32`, and the constants `PI`, `E`, `SQRT2`, `SQRT1_2`, `LN2`, `LN10`, `LOG2E`, `LOG10E`. It also forbids `**` and access to `Math` through a variable or a computed name. T⁴ in the emissivity correction is computed by multiplication, the fourth root as `sqrt(sqrt(x))`. Readings are then bit-identical in every engine, and the parity test compares them exactly. An exception, such as a camera whose conversion follows the Planck curve, needs its own decision, and the parity test compares those values with a tolerance.
+In `packages/core/src/{analysis,corrections,cameras,irvis,reconstruction}/**` an ESLint rule allows only these members of `Math`: the functions `abs`, `min`, `max`, `floor`, `ceil`, `round`, `trunc`, `sign`, `sqrt`, `fround`, `imul`, `clz32`, and the constants `PI`, `E`, `SQRT2`, `SQRT1_2`, `LN2`, `LN10`, `LOG2E`, `LOG10E`. It also forbids `**` and access to `Math` through a variable or a computed name. T⁴ in the emissivity correction is computed by multiplication, the fourth root as `sqrt(sqrt(x))`. Readings are then bit-identical in every engine, and the parity test compares them exactly. An exception, such as a camera whose conversion follows the Planck curve, needs its own decision, and the parity test compares those values with a tolerance.
 
-The reconstruction from I420/NV12 (`packages/core/src/reconstruction/`) is outside the rule: its output is approximate by nature and is judged by metrics against the exact path, not compared bit by bit. It still prefers the allowed functions, so that its regression tests give the same numbers in Node and in browsers.
+The reconstruction from I420/NV12 (`packages/core/src/reconstruction/`) is inside the rule too. Its output is approximate by nature and is judged by metrics against the exact path, but what it needs (the √|Δ| cost, medians, isotonic regression, R²) fits in the allowed functions, and its output is then the same in every engine. An unavoidable exception in any of these directories is an `eslint-disable` comment that names the decision allowing it.
 
 **Rejected:** comparing readings after rounding to the display precision, because values near a rounding boundary still flip. **Rejected:** a list of forbidden functions, because it lets through every approximated function nobody thought of.
 
@@ -133,7 +134,7 @@ Profiles are compiled into the app, so a new camera is a pull request with its f
 
 Status: decided (#3)
 
-Implemented in #14 (format and codec), #16 (measurements, v1 frozen), #19 (recording, playback, MP4 export).
+Implemented in #14 (format and codec), #15 (the PNG photo), #16 (measurements, v1 frozen), #19 (recording, playback, MP4 export).
 
 A recording keeps the temperature of every pixel in every frame, so that measurements, palette and range can change after the fact. A video file keeps a coloured picture; temperatures cannot be read back from it. A recording therefore writes only a `.irvis` file, and MP4 is an export from it, with palette, range, units, overlays and upscaling chosen at export time (by default, as seen live). A snapshot is a `.irvis` file with one frame, and the PNG photo embeds that one-frame `.irvis` in a private ancillary chunk, so there is one temperature format and irvis opens both files the same way. The format specification will be `irvis-format.md` (planned, M4), with a version number.
 

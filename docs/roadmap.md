@@ -171,7 +171,7 @@ Targets for the reconstruction (from the specification): Y matches the low bytes
 
 1. #3, then #4, then #5. The owner connects Netlify.
 2. #6 as early as possible, then #7, so that the owner can run them on the camera.
-3. In parallel, without hardware: #8, #14, #12, #13 and #15 in core, tested on synthetic frames; #17, which creates the minimal `backend-replay` and builds the viewer on synthetic frames.
+3. In parallel, without hardware: #8, #14, #12, #13 and, after #14, #15 in core, tested on synthetic frames; #17, which creates the minimal `backend-replay` and builds the viewer on synthetic frames.
 4. After the results of #6 and with #14 in place: #16. After #7: #22. After #10: the decision on the browser path.
 5. M4 closes with #21, M5 with the checklist, then M6.
 
