@@ -15,7 +15,8 @@ documentation regex. The catch-all rule (F0) matches the paths that no other
 rule owns and needs a feature document that is new since the merge base.
 
 Paths that match EXCLUDE (tests, docs, agent tooling, ...) and files whose
-diff only changes versions (BUMP_FILTERS) are left out of the source side.
+diff only changes versions (BUMP_FILTERS, line by line; JSON_BUMP_FILTERS,
+on the parsed JSON) are left out of the source side.
 Integrity checks on the whole tree run every time: relative links and
 anchors, references to docs/ in code comments, no line-number references,
 section citations, the decisions index, the ownership-map tables in
@@ -41,6 +42,7 @@ import argparse
 import ast
 import functools
 import importlib.util
+import json
 import os
 import posixpath
 import re
@@ -107,6 +109,9 @@ EXCLUDE: List[Tuple[str, str]] = [
     (r"^CONTRIBUTING\.md$", "Contribution rules"),
     (r"^\.github/pull_request_template\.md$", "Pull request template"),
     (r"^\.(agents|claude)/", "Agent tooling: skills and agent settings"),
+    (r"^(packages|apps|tools)/[^/]+/(test|e2e)/", "Test helpers and end-to-end tests of a package"),
+    (r"^fixtures/", "Test data"),
+    (r"^NOTICE$", "Attribution notices, next to the licence"),
 ]
 
 # Files whose diff may change only versions: (path regex, line regex). A
@@ -116,6 +121,13 @@ EXCLUDE: List[Tuple[str, str]] = [
 BUMP_FILTERS: List[Tuple[str, str]] = [
     (r"^\.github/workflows/[^/]+\.ya?ml$",
      r"^\s*(?:-\s+)?uses:\s*[\"']?[\w.\-/]+@(?P<v>[\w.\-]+)[\"']?(?P<c>\s+#.*)?\s*$"),
+]
+
+# JSON files whose change may touch only the values inside some top-level
+# objects: (path regex, field names). Compared on the parsed JSON, not line by
+# line, because a JSON line does not say which object it belongs to.
+JSON_BUMP_FILTERS: List[Tuple[str, Tuple[str, ...]]] = [
+    (r"(^|/)package\.json$", ("dependencies", "devDependencies", "peerDependencies", "optionalDependencies")),
 ]
 
 # Words that cite a document by section number (a word, the section sign,
@@ -151,7 +163,12 @@ LINE_REF_RE = re.compile(r"[\w./-]+\.md(?::\d+|#L\d+)(?!\w)")
 SECTION_RE = re.compile(r"(?:(?P<doc>[\w./-]+\.md)|(?P<alias>\b[A-Za-z][\w-]*))\s*§\s*(?P<sec>\d+(?:\.\d+)*)")
 EXTERNAL_RE = re.compile(r"^(?:[a-zA-Z][a-zA-Z0-9+.-]*:|//)")
 INVARIANT_RE = re.compile(r"^- \*\*(\d+)\.\*\* \S")
-TEST_ID_RE = re.compile(r"^\s+- `([^`:]+)((?:::[A-Za-z_]\w*)+)`\s*$")
+TEST_ID_RE = re.compile(r"^\s+- `([^`]+)`\s*$")
+PY_NAME_RE = re.compile(r"[A-Za-z_]\w*")
+# describe("..."), it("...") or test("...") with a plain string literal as the
+# whole first argument. No template literals, no .each/.only/.skip.
+JS_CALL_RE = re.compile(r"(?<![\w$.])(describe|it|test)\s*\(\s*"
+                        r"(?:\"((?:[^\"\\\n]|\\.)*)\"|'((?:[^'\\\n]|\\.)*)')\s*[,)]")
 LIST_ITEM_RE = re.compile(r"^(\s*)(?:[-*+]|\d+[.)])(?:\s|$)")
 
 
@@ -242,9 +259,71 @@ def _without_version(m: re.Match) -> str:
     return "".join(out)
 
 
+def _unique_keys(pairs: List[Tuple[str, object]]) -> dict:
+    if len({k for k, _ in pairs}) != len(pairs):
+        raise ValueError("duplicate key")
+    return dict(pairs)
+
+
+def _load_json(data: bytes) -> object:
+    """Parsed JSON, or None if `data` is not UTF-8 JSON with unique keys."""
+    try:
+        return json.loads(data.decode("utf-8"), object_pairs_hook=_unique_keys)
+    except ValueError:  # also JSONDecodeError and UnicodeDecodeError
+        return None
+
+
+def _canonical(value: object) -> str:
+    """Equal for equal JSON values; unlike ==, keeps true and 1 apart."""
+    return json.dumps(value, sort_keys=True)
+
+
+def _is_version_range(value: object) -> bool:
+    """A string without ':' or '/': a semver range or a dist-tag (^19.1.0,
+    >=1 <2, latest, *), not a package source (npm:, file:, workspace:,
+    github:, git+https://..., user/repo)."""
+    return isinstance(value, str) and ":" not in value and "/" not in value
+
+
+def is_json_version_bump(root: str, mb: str, path: str, fields: Sequence[str]) -> bool:
+    """True if `path` (merge base -> working tree) is JSON on both sides and
+    only version ranges of existing keys inside `fields` changed."""
+    old_proc = git(root, "show", f"{mb}:{path}", ok=(0, 128))
+    full = os.path.join(root, path)
+    if old_proc.returncode != 0 or os.path.islink(full) or not os.path.isfile(full):
+        return False  # added, deleted or not a regular file
+    with open(full, "rb") as f:
+        old, new = _load_json(old_proc.stdout), _load_json(f.read())
+    if not isinstance(old, dict) or not isinstance(new, dict):
+        return False
+    rest = [{k: v for k, v in d.items() if k not in fields} for d in (old, new)]
+    if _canonical(rest[0]) != _canonical(rest[1]):
+        return False
+    bumped = False
+    for field in fields:
+        if (field in old) != (field in new):
+            return False
+        if field not in old:
+            continue
+        o, n = old[field], new[field]
+        if not isinstance(o, dict) or not isinstance(n, dict) or o.keys() != n.keys():
+            return False
+        for name in o:
+            if o[name] == n[name]:
+                continue
+            if not _is_version_range(o[name]) or not _is_version_range(n[name]):
+                return False
+            bumped = True
+    return bumped
+
+
 def is_version_bump(root: str, mb: str, path: str) -> bool:
-    """True if every changed line of `path` (merge base -> working tree) is a
-    version line and the lines differ only in their versions."""
+    """True if the change to `path` (merge base -> working tree) only changes
+    versions: per JSON_BUMP_FILTERS, or else every changed line is a version
+    line of BUMP_FILTERS and the lines differ only in their versions."""
+    fields = next((f for px, f in JSON_BUMP_FILTERS if re.search(px, path)), None)
+    if fields is not None:
+        return is_json_version_bump(root, mb, path, fields)
     line_rx = next((re.compile(lx) for px, lx in BUMP_FILTERS if re.search(px, path)), None)
     if line_rx is None:
         return False
@@ -607,8 +686,8 @@ def check_invariants(tree: Tree) -> List[str]:
         return [f"{INVARIANTS} is missing"]
     problems = []
     seen: Dict[str, int] = {}
-    current: Optional[Tuple[int, str, bool, List[str]]] = None
-    items: List[Tuple[int, str, bool, List[str]]] = []
+    current: Optional[Tuple[int, str, bool, List[Tuple[str, List[str]]]]] = None
+    items: List[Tuple[int, str, bool, List[Tuple[str, List[str]]]]] = []
     for n, line, kind in index_module().scan(text):
         if kind != "text":
             continue
@@ -630,19 +709,20 @@ def check_invariants(tree: Tree) -> List[str]:
             items.append(current)
         else:
             tm = TEST_ID_RE.match(line)
-            if not tm or current is None:
+            tid = parse_test_id(tm.group(1)) if tm else None
+            if tid is None or current is None:
                 problems.append(f"{INVARIANTS}:{n}: nested item is not a test id under an invariant "
                                 f"('  - `path::test_name`'): {line.strip()}")
                 continue
-            current[3].append(tm.group(1) + tm.group(2))
+            current[3].append(tid)
     for n, num, struck, ids in items:
         if struck:
             continue
         if not ids:
             problems.append(f"{INVARIANTS}:{n}: invariant {num} names no test; a rule no test enforces "
                             "belongs in the technical document as a note")
-        for tid in ids:
-            path, *names = tid.split("::")
+        for path, names in ids:
+            tid = "::".join([path, *names])
             body = tree.text(path) if tree.exists(path) else None
             if body is None:
                 problems.append(f"{INVARIANTS}:{n}: invariant {num}: test file {path} does not exist")
@@ -653,6 +733,66 @@ def check_invariants(tree: Tree) -> List[str]:
     return problems
 
 
+def parse_test_id(text: str) -> Optional[Tuple[str, List[str]]]:
+    """(path, names) from `path::name::...`, or None if it is not a test id.
+    A .py id names Python identifiers; any other id names any text without
+    `::` that neither starts nor ends with `:` (so the split is unambiguous)."""
+    path, *names = text.split("::")
+    if not path or ":" in path or not names:
+        return None
+    if path.endswith(".py"):
+        ok = all(PY_NAME_RE.fullmatch(name) for name in names)
+    else:
+        ok = all(name and not name.startswith(":") and not name.endswith(":") for name in names)
+    return (path, names) if ok else None
+
+
+_JS_ESCAPES = {"b": "\b", "f": "\f", "n": "\n", "r": "\r", "t": "\t", "v": "\v", "0": "\0"}
+_JS_ESCAPE_RE = re.compile(r"\\(?:x([0-9a-fA-F]{2})|u\{([0-9a-fA-F]{1,6})\}|u([0-9a-fA-F]{4})|(.))")
+
+
+def _js_unescape(raw: str) -> str:
+    """The value of a JS string literal's body: \\n, \\t, \\xHH, \\uHHHH,
+    \\u{H...} and the rest resolved; any other escaped character stands for
+    itself, as in JS. Surrogate pairs from \\uHHHH\\uHHHH are joined."""
+    def one(m: re.Match) -> str:
+        hexa = m.group(1) or m.group(2) or m.group(3)
+        if hexa:
+            return chr(min(int(hexa, 16), 0x10FFFF))
+        return _JS_ESCAPES.get(m.group(4), m.group(4))
+    text = _JS_ESCAPE_RE.sub(one, raw)
+    try:
+        return text.encode("utf-16", "surrogatepass").decode("utf-16")
+    except UnicodeDecodeError:  # a lone surrogate stays as it is
+        return text
+
+
+@functools.lru_cache(maxsize=None)
+def _js_calls(body: str) -> Tuple[Tuple[str, str], ...]:
+    """(function, literal value) for each describe/it/test call, in file order."""
+    return tuple((m.group(1), _js_unescape(m.group(2) if m.group(2) is not None else m.group(3)))
+                 for m in JS_CALL_RE.finditer(body))
+
+
+def missing_js_test(path: str, body: str, names: List[str]) -> Optional[str]:
+    """None if the names before the last are describe(...) literals and the
+    last an it(...) or test(...) literal, appearing in this order in `body`.
+    Text search, not a parse: nesting is not verified."""
+    calls = _js_calls(body)
+    pos, prev = 0, None
+    for i, name in enumerate(names):
+        kinds = ("it", "test") if i == len(names) - 1 else ("describe",)
+        quoted = json.dumps(name, ensure_ascii=False)
+        label = " or ".join(f"{k}({quoted})" for k in kinds)
+        found = next((j for j in range(pos, len(calls)) if calls[j][0] in kinds and calls[j][1] == name), None)
+        if found is None:
+            if prev and any(k in kinds and lit == name for k, lit in calls):
+                return f"{label} does not come after {prev} in {path}"
+            return f"no {label} in {path}"
+        pos, prev = found + 1, f"{calls[found][0]}({quoted})"
+    return None
+
+
 @functools.lru_cache(maxsize=None)
 def _parse_python(body: str) -> ast.Module:
     """Parsed once per file content: docs/invariants.md names one test file many times."""
@@ -661,13 +801,10 @@ def _parse_python(body: str) -> ast.Module:
 
 def missing_test(path: str, body: str, names: List[str]) -> Optional[str]:
     """None if `path::names` is a test that exists, else what is missing. Python
-    files are parsed, so a method named under the wrong class is missing."""
+    files are parsed, so a method named under the wrong class is missing; other
+    files are searched for Vitest-style calls (missing_js_test)."""
     if not path.endswith(".py"):
-        for i, name in enumerate(names):
-            kw = "def" if i == len(names) - 1 else "class"
-            if not re.search(rf"^\s*(?:async\s+)?{kw}\s+{re.escape(name)}\b", body, re.M):
-                return f"no {kw} {name} in {path}"
-        return None
+        return missing_js_test(path, body, names)
     try:
         nodes = _parse_python(body).body
     except SyntaxError as e:

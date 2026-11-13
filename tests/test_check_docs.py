@@ -10,6 +10,7 @@ from __future__ import annotations
 import contextlib
 import importlib.util
 import io
+import json
 import os
 import re
 import shutil
@@ -190,7 +191,8 @@ class RuleTests(RepoCase):
 
     SAMPLES = ["tests/data/x.json", "src/app.test.js", "web/package-lock.json", "LICENSE", ".gitignore",
                "docs/notes.md", "README.md", "AGENTS.md", "CONTRIBUTING.md", ".github/pull_request_template.md",
-               ".claude/settings.json"]
+               ".claude/settings.json", "packages/core/test/helpers.ts", "tools/capture-cli/e2e/cli.ts",
+               "fixtures/p2pro/frame.yuv", "NOTICE"]
 
     def test_every_exclusion_needs_no_doc(self):
         mod = load_check_docs()
@@ -208,6 +210,13 @@ class RuleTests(RepoCase):
         self.git("rm", "-q", "Makefile")
         self.commit()
         self.assertFails("C1")
+
+    def test_package_source_is_not_excluded(self):
+        self.write("packages/core/src/test/frames.ts", "export const frames = [];\n")
+        self.write("packages/core/testing.ts", "export {};\n")
+        out = self.assertFails("F0")
+        self.assertIn("    packages/core/src/test/frames.ts", out)
+        self.assertIn("    packages/core/testing.ts", out)
 
     def test_rename_needs_doc(self):
         self.git("mv", ".github/workflows/ci.yml", ".github/workflows/pr.yml")
@@ -298,6 +307,102 @@ class BumpFilterTests(RepoCase):
         self.assertEqual(code, 1, out.getvalue())
         self.assertIn("version-bump filter failed on Makefile (RuntimeError: filter bug)", out.getvalue())
         self.assertIn("[filter]", out.getvalue())
+
+
+class PackageJsonBumpTests(RepoCase):
+    """The JSON bump filter, on a package.json that exists on main."""
+
+    MANIFEST = """{
+  "name": "irvis",
+  "private": true,
+  "packageManager": "npm@11.0.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}
+"""
+
+    def setUp(self):
+        super().setUp()
+        self.git("switch", "-q", "main")
+        self.write("package.json", self.MANIFEST)
+        self.write("packages/core/package.json", self.MANIFEST.replace('"irvis"', '"@irvis/core"'))
+        self.commit(msg="manifests")
+        self.git("switch", "-q", "-C", "feature")
+
+    def test_dependency_bump_passes(self):
+        self.replace("package.json", '"react": "^19.0.0"', '"react": "^19.1.0"')
+        self.replace("package.json", '"vitest": "^3.0.0"', '"vitest": "^3.2.4"')
+        self.commit()
+        out = self.assertPasses("-v")
+        self.assertIn("package.json  (left out: version bump only)", out)
+
+    def test_reformatted_bump_in_a_package_passes(self):
+        path = "packages/core/package.json"
+        text = (self.root / path).read_text(encoding="utf-8").replace('"^5.6.0"', '"^5.7.2"')
+        self.write(path, json.dumps(json.loads(text), indent=4) + "\n")
+        self.commit()
+        self.assertPasses()
+
+    def test_engines_change_fails(self):
+        self.replace("package.json", '"node": ">=22"', '"node": ">=24"')
+        self.commit()
+        out = self.assertFails("F0")
+        self.assertIn("    package.json", out)
+
+    def test_package_manager_change_fails(self):
+        self.replace("package.json", '"npm@11.0.0"', '"npm@11.1.0"')
+        self.commit()
+        self.assertFails("F0")
+
+    def test_bump_with_engines_change_fails(self):
+        self.replace("package.json", '"react": "^19.0.0"', '"react": "^19.1.0"')
+        self.replace("package.json", '"node": ">=22"', '"node": ">=24"')
+        self.commit()
+        self.assertFails("F0")
+
+    def test_added_dependency_fails(self):
+        self.replace("package.json", '"react": "^19.0.0"', '"react": "^19.0.0",\n    "react-dom": "^19.0.0"')
+        self.commit()
+        self.assertFails("F0")
+
+    def test_removed_dependency_fails(self):
+        self.replace("package.json", '"react": "^19.0.0"', '"react": "^19.1.0"')
+        self.replace("package.json", '"typescript": "^5.6.0",\n    "vitest": "^3.0.0"', '"typescript": "^5.6.0"')
+        self.commit()
+        self.assertFails("F0")
+
+    def test_alias_change_fails(self):
+        for source in ("npm:preact@^10.0.0", "github:someone/react", "file:../vendor/react",
+                       "workspace:*", "someone/react"):
+            with self.subTest(source=source):
+                self.replace("package.json", '"react": "^19.0.0"', f'"react": "{source}"')
+                self.assertFails("F0")
+                self.replace("package.json", f'"react": "{source}"', '"react": "^19.0.0"')
+
+    def test_dependency_moved_to_another_field_fails(self):
+        self.replace("package.json", '"react": "^19.0.0"\n', '"react": "^19.0.0",\n    "vitest": "^3.0.0"\n')
+        self.replace("package.json", '"typescript": "^5.6.0",\n    "vitest": "^3.0.0"', '"typescript": "^5.6.0"')
+        self.commit()
+        self.assertFails("F0")
+
+    def test_other_value_type_is_not_a_bump(self):
+        self.replace("package.json", '"private": true', '"private": 1')
+        self.commit()
+        self.assertFails("F0")
+
+    def test_invalid_json_is_not_a_bump(self):
+        self.replace("package.json", '"react": "^19.0.0"', '"react": "^19.1.0",')
+        self.commit()
+        out = self.assertFails("F0")
+        self.assertNotIn("[filter]", out)
 
 
 class CarveOutTests(RepoCase):
@@ -516,9 +621,84 @@ class IntegrityTests(RepoCase):
         self.append("docs/invariants.md", "\n- **99.** A rule.\n  - `tests/test_check_docs.py::BaseTests::test_deletion_needs_doc`\n")
         self.assertIntegrityFails("no def test_deletion_needs_doc in tests/test_check_docs.py::BaseTests")
 
+    def test_python_id_with_non_identifier_fails(self):
+        self.append("docs/invariants.md", "\n- **99.** A rule.\n  - `tests/test_check_docs.py::RuleTests::test no`\n")
+        self.assertIntegrityFails("nested item is not a test id under an invariant")
+
     def test_struck_invariant_needs_no_test(self):
         self.append("docs/invariants.md", "\n- **99.** ~~A retired rule.~~ Retired because it stopped holding.\n")
         self.assertPasses()
+
+
+class VitestIdTests(RepoCase):
+    """Test ids in docs/invariants.md for files other than .py."""
+
+    SPEC = "packages/core/src/yuyv.test.ts"
+
+    def setUp(self):
+        super().setUp()
+        self.write(self.SPEC, """import { describe, expect, it, test } from "vitest";
+
+describe("decodeYUYV", () => {
+  describe("thermal half", () => {
+    it("reads lo and hi bytes", () => {
+      expect(1).toBe(1);
+    });
+  });
+  test(
+    'keeps the "image" half',
+    () => {},
+  );
+  it("says \\"don\\'t\\" \\u00e9", () => {});
+  it(`template ${1}`, () => {});
+  it.each([1, 2])("each %i", () => {});
+  it("con" + "cat", () => {});
+});
+
+describe("encodeYUYV", () => {
+  it("round-trips", () => {});
+});
+""")
+
+    def add_id(self, test_id: str) -> None:
+        self.append("docs/invariants.md", f"\n- **99.** A rule.\n  - `{self.SPEC}::{test_id}`\n")
+
+    def test_vitest_id_passes(self):
+        self.add_id("decodeYUYV::thermal half::reads lo and hi bytes")
+        for test_id in ('decodeYUYV::keeps the "image" half', "decodeYUYV::says \"don't\" \u00e9",
+                        "encodeYUYV::round-trips", "round-trips"):
+            self.append("docs/invariants.md", f"  - `{self.SPEC}::{test_id}`\n")
+        self.assertPasses()
+
+    def test_vitest_id_with_missing_name_fails(self):
+        self.add_id("decodeYUYV::reads nothing")
+        self.assertIntegrityFails(f'no it("reads nothing") or test("reads nothing") in {self.SPEC}')
+
+    def test_vitest_id_with_missing_describe_fails(self):
+        self.add_id("decode::reads lo and hi bytes")
+        self.assertIntegrityFails(f'no describe("decode") in {self.SPEC}')
+
+    def test_vitest_id_out_of_order_fails(self):
+        self.add_id("thermal half::decodeYUYV::reads lo and hi bytes")
+        self.assertIntegrityFails(f'describe("decodeYUYV") does not come after describe("thermal half") in {self.SPEC}')
+
+    def test_vitest_id_needs_a_plain_literal(self):
+        for name in ("template ${1}", "each %i", "con"):
+            with self.subTest(name=name):
+                self.add_id(f"decodeYUYV::{name}")
+                self.assertIntegrityFails(f'no it("{name}") or test("{name}")')
+                self.replace("docs/invariants.md", f"\n- **99.** A rule.\n  - `{self.SPEC}::decodeYUYV::{name}`\n", "")
+
+    def test_vitest_id_with_wrong_nesting_passes(self):
+        # Known limitation: names are found in order, not in their real nesting.
+        # "round-trips" is under encodeYUYV, not under decodeYUYV.
+        self.add_id("decodeYUYV::round-trips")
+        self.assertPasses()
+
+    def assertIntegrityFails(self, needle: str) -> str:
+        out = self.assertFails("integrity")
+        self.assertIn(needle, out)
+        return out
 
 
 class OutputTests(RepoCase):

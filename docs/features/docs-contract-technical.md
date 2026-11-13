@@ -40,13 +40,33 @@ Markdown parsing, shared by both scripts:
 
 ### Version-bump filter
 
-`BUMP_FILTERS` pairs a path regex with a line regex. For a changed path that matches a path regex, `is_version_bump` reads `git diff -U0 --no-renames --no-color --no-ext-diff <mb> -- <path>` (merge base against the working tree). The path is a pure bump only if there is at least one hunk, every hunk removes as many lines as it adds, and each removed line and the added line at the same position in the hunk both match the line regex in full, differ, and are equal once the groups `v` (the version) and `c` (a trailing comment) are cut out. Pairing by position means a `uses:` line moved to another job is not a bump: its removal and its addition land in different hunks. An untracked file has no diff against the merge base and is never a bump.
+`is_version_bump(root, mb, path)` first looks for a `JSON_BUMP_FILTERS` entry whose path regex matches, then for a `BUMP_FILTERS` entry. A path that matches neither is never a bump.
+
+**Line filters.** `BUMP_FILTERS` pairs a path regex with a line regex. For a changed path that matches a path regex, `is_version_bump` reads `git diff -U0 --no-renames --no-color --no-ext-diff <mb> -- <path>` (merge base against the working tree). The path is a pure bump only if there is at least one hunk, every hunk removes as many lines as it adds, and each removed line and the added line at the same position in the hunk both match the line regex in full, differ, and are equal once the groups `v` (the version) and `c` (a trailing comment) are cut out. Pairing by position means a `uses:` line moved to another job is not a bump: its removal and its addition land in different hunks. An untracked file has no diff against the merge base and is never a bump.
 
 | Path regex | Line regex matches |
 | --- | --- |
 | `^\.github/workflows/[^/]+\.ya?ml$` | `uses: <owner>/<action>@<version>`, optionally after `- `, optionally quoted, optionally followed by `# <comment>` |
 
-No other file pins versions yet. When one does (a dependency manifest, a hook configuration), add a pair. A pin that the documentation states, such as a toolchain version, must not match the line regex, so a change to it still needs the document.
+**JSON filters.** `JSON_BUMP_FILTERS` pairs a path regex with the names of top-level fields whose values may change. `is_json_version_bump` reads the file at the merge base (`git show <mb>:<path>`) and in the working tree, and parses both with `json.loads`. The path is a pure bump only if:
+
+- the file exists on both sides as a regular file, and both sides are UTF-8 JSON objects without a repeated key in any object;
+- every top-level field outside the list is equal on both sides (compared as `json.dumps(..., sort_keys=True)`, so `true` and `1` differ and key order does not matter);
+- each listed field is present on both sides or on neither; where present, it is an object on both sides with the same keys;
+- every value that differs is a version range on both sides (`_is_version_range`: a string without `:` and without `/`, such as `^19.1.0`, `>=1 <2`, `latest` or `*`); a value that names a package source (`npm:preact@^10`, `file:../x`, `workspace:*`, `github:user/repo`, `git+https://...`, `user/repo`) is not a version, on either side;
+- at least one value differs.
+
+An unchanged value is not checked, so a `workspace:*` dependency next to a bumped one does not stop the bump.
+
+A dependency that is added, removed or moved to another field is not a bump, and neither is a change that only reformats the file. A file that does not parse is not a bump either: it stays on the source side, and the check does not fail with `[filter]`. Formatting, indentation and key order are ignored, so a bump that also reformats the file still passes.
+
+| Path regex | Fields whose version ranges may change |
+| --- | --- |
+| `(^\|/)package\.json$` | `dependencies`, `devDependencies`, `peerDependencies`, `optionalDependencies` |
+
+`engines`, `packageManager`, `scripts`, `workspaces` and every other field are compared in full, so a change to them needs the document that states them. Lock files are left out by `EXCLUDE`, not by this filter.
+
+No other file pins versions yet. When one does (a hook configuration), add a pair. A pin that the documentation states, such as a toolchain version, must not match a line regex or be in a JSON field list, so a change to it still needs the document. [Why `package.json` is parsed](../decisions/docs.md#packagejson-bumps-are-compared-as-parsed-json).
 
 ## Schema
 
@@ -60,7 +80,7 @@ No other file pins versions yet. When one does (a dependency manifest, a hook co
 | `message` | Printed after `✗`; names the document to update. Every `docs/<path>.md` path in it must exist. |
 | `catch_all` | `True` only for F0. |
 
-**`EXCLUDE`**: list of `(regex, why)`. **`BUMP_FILTERS`**: list of `(path regex, line regex)`. **`SECTION_ALIASES`**: word to document path, empty.
+**`EXCLUDE`**: list of `(regex, why)`. **`BUMP_FILTERS`**: list of `(path regex, line regex)`. **`JSON_BUMP_FILTERS`**: list of `(path regex, tuple of top-level field names)`. **`SECTION_ALIASES`**: word to document path, empty.
 
 **Ownership-map table** in `docs/features/README.md`: the first table whose header cells are `#`, `source path regex`, `doc path regex`, `message` (case-insensitive). One row per rule, in any order. The regex cells are code spans. In every cell `\|` stands for `|`. The message cell is plain text and must equal `Rule.message` character for character.
 
@@ -71,7 +91,10 @@ No other file pins versions yet. When one does (a dependency manifest, a hook co
 Every list item outside fenced code is checked:
 
 - A top-level item is `- **<N>.** <rule>`. Any other top-level list item (an ordered `1.`, a bullet without a number) fails. A number appears once.
-- A nested item is a test id, `  - ` followed by a code span holding `<path>::<name>` or `<path>::<Class>::<name>`. The file must exist. `missing_test` parses a `.py` file with `ast` (`_parse_python` caches the tree per file content, because one test file is named many times) and walks the names: `<Class>` must be a top-level class and `<name>` a function directly in it (or a top-level function when there is no class). For other files it only searches for `def <name>` and `class <Class>`.
+- A nested item is a test id: `  - ` followed by a code span (`TEST_ID_RE`) holding `<path>::<name>`, with one or more names. `parse_test_id` splits it at `::`. The path must not be empty and must not contain `:`. The file must exist.
+- **Python** (`.py`): every name is an identifier (`PY_NAME_RE`), as in `tests/test_check_docs.py::RuleTests::test_deletion_needs_doc`. `missing_test` parses the file with `ast` (`_parse_python` caches the tree per file content, because one test file is named many times) and walks the names: every name before the last must be a top-level class, or a class directly in the previous one, and the last a function directly in the class (or a top-level function when there is no class).
+- **Every other file** (Vitest): a name is any text without a backtick and without `::` that neither starts nor ends with `:`, as in `packages/core/src/yuyv.test.ts::decodeYUYV::reads lo and hi bytes`. `missing_js_test` lists the calls `describe(...)`, `it(...)` and `test(...)` whose whole first argument is one string literal in `"` or `'` (`JS_CALL_RE`; `_js_calls` caches the list per file content). Every name before the last must equal a `describe` literal and the last an `it` or `test` literal, and they must appear in the file in that order, each after the previous one. The literal's value is compared exactly with the name, after `_js_unescape` resolves its escapes as JavaScript does (`\"`, `\'`, `\\`, `\n`, `\t` and the other one-letter escapes, `\xHH`, `\uHHHH`, `\u{H...}`; any other escaped character stands for itself), so the name is the one Vitest shows: `it("say \"hi\"")` is `<path>::say "hi"`. A template literal, a concatenation, `it.each`, and calls with a modifier such as `it.only` or `describe.skip` are not found.
+- **Known limitation of the Vitest search:** the script uses the standard library only, so it has no TypeScript parser, and it does not verify the real nesting. `describe("A", ...)` followed by a separate `describe("B", () => { it("x") })` lets `<path>::A::x` pass, although `x` is in `B` (`VitestIdTests::test_vitest_id_with_wrong_nesting_passes`). Calls inside comments and strings count too. Review checks that a Vitest test id names the test that enforces the rule. [Why there is no parser](../decisions/docs.md#vitest-test-ids-are-checked-by-text-search).
 - An invariant whose text starts with `~~` is retired and may have no test ids. Every other invariant needs at least one.
 
 **Decision file** `docs/decisions/<stem>.md`: each `##` heading (ATX or setext) is one decision. The first non-blank line after it must match `^Status: (decided|postponed|superseded)( \(#N(, #N)*\))?$`. Other heading levels are ignored.
@@ -146,7 +169,7 @@ The scripts run git with `-z`, `--no-color` and `--no-ext-diff`, so `core.quotep
 | `✗ docs/invariants.md:<line>: invariant <N> is already used on line <line> [integrity]` | A reused number. |
 | `` ✗ docs/invariants.md:<line>: nested item is not a test id under an invariant ('  - `path::test_name`'): <item> [integrity] `` | A nested item that is not a test id, or one before the first invariant. |
 | `✗ docs/invariants.md:<line>: invariant <N> names no test; a rule no test enforces belongs in the technical document as a note [integrity]` | A live invariant without test ids. |
-| `✗ docs/invariants.md:<line>: invariant <N>: test file <path> does not exist [integrity]` | Also `invariant <N>: <id>: no def <name> in <path>::<Class>` (or `no class <Class> in <path>`), and `invariant <N>: <id>: <path> does not parse (<error>, line <n>)`. |
+| `✗ docs/invariants.md:<line>: invariant <N>: test file <path> does not exist [integrity]` | Also, for Python, `invariant <N>: <id>: no def <name> in <path>::<Class>` (or `no class <Class> in <path>`) and `invariant <N>: <id>: <path> does not parse (<error>, line <n>)`. For other files, `invariant <N>: <id>: no describe("<name>") in <path>`, `... no it("<name>") or test("<name>") in <path>`, and `... <call>("<name>") does not come after <call>("<previous name>") in <path>` when the name exists only before the previous one. The names are printed as JSON strings, so a `"` or `\` in a name is escaped. |
 | `✗ docs/invariants.md is missing [integrity]` | The file is gone. |
 
 `decisions-index.py` (printed after `decisions-index: `):
@@ -162,10 +185,10 @@ The scripts run git with `-z`, `--no-color` and `--no-ext-diff`, so `core.quotep
 
 ## Tests
 
-- `tests/test_check_docs.py` copies the working tree into a temporary repository and runs the copied script there. It covers: an owned path with and without its document; tests-only changes and a sample path for every `EXCLUDE` pattern; untracked, staged and unstaged sources and documents; deletion and rename; no base, no merge base, a missing `--base` ref, `--base`, and `origin/main` before `main`; a pure bump, a bump with another change, a changed action name, a moved `uses:` line, and a filter that raises (in-process, with `is_version_bump` patched); the `.github/` carve-out, the PR template, agent tooling, both check scripts; the catch-all with an edited, a new and a moved document, a deleted unowned path, and a new script; the skip locally and in CI; `--integrity-only`; the success line and `-v`. Integrity: missing file, missing heading, wrong case, outside the repository, code ignored, a `docs/` code span, a comment reference, line numbers in links, text and comments, section citations (unknown word, missing heading, alias), stale index, unlisted decision file, map rows (different, missing, extra, twice, not code spans, unescaped `|`), exclusion rows (different, twice), invariants (reused number, ordered list, no test, missing test, test under the wrong class, struck through). `RealRepositoryTests` runs `integrity` on this repository.
+- `tests/test_check_docs.py` copies the working tree into a temporary repository and runs the copied script there. It covers: an owned path with and without its document; tests-only changes and a sample path for every `EXCLUDE` pattern; untracked, staged and unstaged sources and documents; deletion and rename; no base, no merge base, a missing `--base` ref, `--base`, and `origin/main` before `main`; a pure bump, a bump with another change, a changed action name, a moved `uses:` line, and a filter that raises (in-process, with `is_version_bump` patched); in `package.json` (`PackageJsonBumpTests`), a dependency bump, a bump in a reformatted nested `package.json`, a change to `engines`, to `packageManager` and to the type of a value, a bump with an `engines` change, an added and a removed dependency, a change of source (`npm:`, `github:`, `file:`, `workspace:`, `user/repo`), a dependency moved to another field, and invalid JSON; a package source path that looks like a test directory but is not excluded; the `.github/` carve-out, the PR template, agent tooling, both check scripts; the catch-all with an edited, a new and a moved document, a deleted unowned path, and a new script; the skip locally and in CI; `--integrity-only`; the success line and `-v`. Integrity: missing file, missing heading, wrong case, outside the repository, code ignored, a `docs/` code span, a comment reference, line numbers in links, text and comments, section citations (unknown word, missing heading, alias), stale index, unlisted decision file, map rows (different, missing, extra, twice, not code spans, unescaped `|`), exclusion rows (different, twice), invariants (reused number, ordered list, no test, missing test, test under the wrong class, a Python id with a name that is not an identifier, struck through). `VitestIdTests`: a Vitest id that passes (nested `describe`, `test` with a multi-line call, a literal with escapes, without `describe`), a missing `it`, a missing `describe`, names out of order, a template literal, `it.each` and a concatenation, and a wrong nesting that passes. `RealRepositoryTests` runs `integrity` on this repository.
 - `tests/test_decisions_index.py` covers slugs (punctuation, code spans, links, non-ASCII, duplicates), headings in front matter and fenced code, setext headings, HTML ids, the rendered table, `check` for a fresh index, a stale one, an unlisted file and a missing domain file, a missing `Status:` line, and the exit codes of `main`.
 
-Not covered: the messages `points outside the repository` for code-span and comment references, `cites a missing file`, the missing-table and missing-file messages of `check_map` and `check_invariants`, a test file that does not parse, and `git ... failed`; setext headings next to list items and other CommonMark edge cases, links split across lines, comment markers inside string literals (they can produce a false failure), and the CI workflow itself, which runs only on GitHub.
+Not covered: a `package.json` added or deleted on the branch (no merge-base side, so never a bump), the messages `points outside the repository` for code-span and comment references, `cites a missing file`, the missing-table and missing-file messages of `check_map` and `check_invariants`, a test file that does not parse, and `git ... failed`; setext headings next to list items and other CommonMark edge cases, links split across lines, comment markers inside string literals (they can produce a false failure), and the CI workflow itself, which runs only on GitHub.
 
 ## See also
 

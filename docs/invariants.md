@@ -56,3 +56,20 @@ irvis has no product code yet, so the only domain is the documentation contract.
 - **12.** Every test id in this file names an existing test, with the method in the named class.
   - `tests/test_check_docs.py::IntegrityTests::test_invariant_with_missing_test_fails`
   - `tests/test_check_docs.py::IntegrityTests::test_invariant_with_test_under_wrong_class_fails`
+- **13.** A `package.json` change that only changes version ranges (strings without `:` or `/`) of existing keys in `dependencies`, `devDependencies`, `peerDependencies` or `optionalDependencies` needs no documentation; a change to `engines`, `packageManager` or any other field, an added, removed or moved dependency, a change of a dependency's source (`npm:`, `file:`, `workspace:`, `github:`, `user/repo`), and a file that does not parse do.
+  - `tests/test_check_docs.py::PackageJsonBumpTests::test_dependency_bump_passes`
+  - `tests/test_check_docs.py::PackageJsonBumpTests::test_reformatted_bump_in_a_package_passes`
+  - `tests/test_check_docs.py::PackageJsonBumpTests::test_engines_change_fails`
+  - `tests/test_check_docs.py::PackageJsonBumpTests::test_package_manager_change_fails`
+  - `tests/test_check_docs.py::PackageJsonBumpTests::test_bump_with_engines_change_fails`
+  - `tests/test_check_docs.py::PackageJsonBumpTests::test_added_dependency_fails`
+  - `tests/test_check_docs.py::PackageJsonBumpTests::test_removed_dependency_fails`
+  - `tests/test_check_docs.py::PackageJsonBumpTests::test_alias_change_fails`
+  - `tests/test_check_docs.py::PackageJsonBumpTests::test_dependency_moved_to_another_field_fails`
+  - `tests/test_check_docs.py::PackageJsonBumpTests::test_invalid_json_is_not_a_bump`
+- **14.** A test id for a file other than `.py` names `describe` literals and then an `it` or `test` literal, each a plain string literal whose value, with escapes resolved, equals the name exactly, that appear in the file in that order.
+  - `tests/test_check_docs.py::VitestIdTests::test_vitest_id_passes`
+  - `tests/test_check_docs.py::VitestIdTests::test_vitest_id_with_missing_name_fails`
+  - `tests/test_check_docs.py::VitestIdTests::test_vitest_id_with_missing_describe_fails`
+  - `tests/test_check_docs.py::VitestIdTests::test_vitest_id_out_of_order_fails`
+  - `tests/test_check_docs.py::VitestIdTests::test_vitest_id_needs_a_plain_literal`
