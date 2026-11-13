@@ -19,7 +19,7 @@ One repository holds the core, the UI, the backends, the two apps and the tools,
 | `packages/backend-electron` | The renderer side of the desktop backend: an IPC client implementing `CameraBackend`, `ByteSink` and `ByteSource` over the preload API, without importing `electron` |
 | `packages/backend-replay` | Playback of `.irvis` files and fixtures |
 | `apps/web` | The only UI build, deployed to Netlify and loaded by Electron; it picks the backends and storage at runtime |
-| `apps/desktop` | Electron main process (ffmpeg, node-usb, the file writes behind the IPC `ByteSink`) and preload |
+| `apps/desktop` | Electron main process (ffmpeg, node-usb, the file writes and reads behind the IPC `ByteSink` and `ByteSource`) and preload |
 | `tools/capture-cli` | Node tool for the hardware spikes |
 | `fixtures/<camera-id>/` | Short series of real frames for tests |
 
@@ -43,7 +43,7 @@ core <- backend-* <---- apps/web
 
 `ui` imports `core`, and `media` only for the MP4 export; it never imports a backend package, and it sees backends and storage only through the core interfaces. The renderer, in the browser and in Electron alike, runs only the `apps/web` bundle, so `apps/web` wires the concrete backends and the `ByteSink` and `ByteSource` implementations into the UI at runtime: without the preload API, `backend-browser` and the OPFS and `File` implementations from `media`; with it, `backend-electron` and its IPC `ByteSink` and `ByteSource`. The app, not the UI, decides where a recording goes, and the UI works the same over a camera, a browser stream or a recording.
 
-`apps/desktop` (the main process and the preload) serves the other end: ffmpeg, node-usb, and the file writes with `fs` behind the IPC `ByteSink`. `backend-electron` ends up in the bundle that Netlify serves too, so it never imports `electron`: it uses only the API that the preload exposes through `contextBridge`, and ESLint forbids the import.
+`apps/desktop` (the main process and the preload) serves the other end: ffmpeg, node-usb, and the file writes and reads with `fs` behind the IPC `ByteSink` and `ByteSource`, limited to the app's recordings directory, so that a read over IPC never becomes a read of an arbitrary path. `backend-electron` ends up in the bundle that Netlify serves too, so it never imports `electron`: it uses only the API that the preload exposes through `contextBridge`, and ESLint forbids the import.
 
 Changes against the interfaces in the specification:
 
@@ -54,7 +54,7 @@ Changes against the interfaces in the specification:
 
 Every backend declares `capabilities` (`exactRaw`, `deviceControl`, `concurrentWith`), and the UI offers only what they allow.
 
-**Rejected:** the UI importing the backends directly, because the browser build would then pull in Electron code and the replay path would need special cases.
+**Rejected:** the UI importing the backends directly, because the UI would then choose the backend and the storage itself, and the replay path and component tests would need special cases.
 
 ## One UI build serves the web and the desktop app
 
@@ -64,7 +64,7 @@ Implemented in #10 (the `app://` scheme and window settings), #17.
 
 The specification asks for one UI build in both environments. `apps/web` is built once by Vite with `base: '/'`; Netlify serves it, and Electron loads the same files. The backend is chosen at runtime: a preload API present means Electron, otherwise the browser.
 
-Electron serves the build through its own scheme, `app://irvis/`, registered with `protocol.registerSchemesAsPrivileged` as `standard`, `secure`, `supportFetchAPI` and `stream`, and answered by `protocol.handle` from the packaged `apps/web/dist`. The origin is stable, the page is a secure context, module Workers and localStorage behave as in a browser, and `stream` lets a `<video>` play the MP4 export preview. The window CSP lists `app:` where needed. Whether module Workers and `fetch` from `app://irvis/` also need `corsEnabled` is checked in #10, which corrects this decision if they do. Windows run with `contextIsolation: true`, `sandbox: true` and `nodeIntegration: false`; the preload exposes only frames, the device list, the commands on the profile's allow-list and file writes.
+Electron serves the build through its own scheme, `app://irvis/`, registered with `protocol.registerSchemesAsPrivileged` as `standard`, `secure`, `supportFetchAPI` and `stream`, and answered by `protocol.handle` from the packaged `apps/web/dist`. The origin is stable, the page is a secure context, module Workers and localStorage behave as in a browser, and `stream` lets a `<video>` play the MP4 export preview. The window CSP lists `app:` where needed. Whether module Workers and `fetch` from `app://irvis/` also need `corsEnabled` is checked in #10, which corrects this decision if they do. Windows run with `contextIsolation: true`, `sandbox: true` and `nodeIntegration: false`; the preload exposes only frames, the device list, the commands on the profile's allow-list, and file writes and reads (the IPC `ByteSink` and `ByteSource`) in the recordings directory.
 
 **Rejected:** `file://`, because it needs another `base`, gives a `null` origin and blocks module Workers. **Rejected:** loading the Netlify URL, for security and for offline use. **Rejected:** two builds with different backends compiled in, because the specification asks for one.
 
