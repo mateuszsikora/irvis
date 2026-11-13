@@ -31,7 +31,7 @@ The tests use `unittest` from the standard library; nothing has to be installed 
 
 - Put it in `tests/test_<area>.py` as a method of a `unittest.TestCase`. Files under `tests/` need no documentation; the [ownership map](../features/README.md#left-out-on-purpose) leaves them out.
 - For the documentation check, subclass `RepoCase` and use its helpers: `write`, `append`, `replace`, `commit`, `git`, `check`, `assertPasses`, `assertFails(<rule id>)`.
-- A test that enforces a rule of the domain goes into [docs/invariants.md](../invariants.md) by its id, `tests/<file>.py::<Class>::<test>`.
+- A test that enforces a rule of the domain goes into [docs/invariants.md](../invariants.md) by its id, `tests/<file>.py::<Class>::<test>` (a Vitest test, once there is TypeScript code: `<path>::<describe>::<it>`, see the [documentation guide](documentation.md#invariants)).
 - Test fixtures that contain a broken reference must not put it in a comment of the test file itself, or the integrity check of the real repository fails on the test file. Build such strings from parts, as `tests/test_check_docs.py` does.
 
 ## See also

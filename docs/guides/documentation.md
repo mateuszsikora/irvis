@@ -43,14 +43,17 @@ In `docs/guides/`: development, testing, this guide, and any how-to for users. A
 ```md
 - **7.** A deleted owned file needs its documentation.
   - `tests/test_check_docs.py::RuleTests::test_deletion_needs_doc`
+  - `packages/core/src/yuyv.test.ts::decodeYUYV::reads lo and hi bytes`
 ```
+
+A Python test id is `<path>::<Class>::<method>`. A Vitest test id is `<path>::<describe>::...::<it>`, with the names exactly as Vitest shows them, that is the values of the string literals in `describe("...")` and `it("...")` or `test("...")` with escapes resolved; give such a test a plain literal name, not a template literal or `it.each`.
 
 - Use bold `**<N>.**`, not an ordered list: GitHub renumbers ordered lists, and other documents cite invariants by number.
 - Take the next free number. Never reuse one, even after the rule is gone.
 - A rule that stops holding is struck through, with the reason, so old references keep their meaning: `- **7.** ~~<rule>~~ Retired in #12: <why>.`
 - A rule that no test enforces is not an invariant. Write it as a note in the technical document.
 
-The check fails on a reused number, on a list item in any other form, on a live invariant without a test, and on a test id that does not name an existing test (for Python, the method has to be in the named class). Two pull requests that take the same next number each pass alone. Each CI run checks the merge with the base as it is when the run starts, so the second one fails on its next run after the first is merged. If it is merged without another run, the `integrity` job fails on `main` right after the merge ([CI](development.md#ci)).
+The check fails on a reused number, on a list item in any other form, on a live invariant without a test, and on a test id that does not name an existing test (for Python, the method has to be in the named class; for Vitest, the names have to appear in the file in the given order). Two pull requests that take the same next number each pass alone. Each CI run checks the merge with the base as it is when the run starts, so the second one fails on its next run after the first is merged. If it is merged without another run, the `integrity` job fails on `main` right after the merge ([CI](development.md#ci)).
 
 ## Decisions
 
@@ -124,6 +127,7 @@ What the check cannot catch:
 - **"New" means "not a rename" to git.** A feature document that git pairs with a deleted one (at least 50% similar content, as after `git mv`, or after copying the old document as a starting point) does not count as new for F0, however it was made.
 - **Deleting a path no rule owns needs nothing.** F0 skips deleted paths, so removing unowned code passes without any document change.
 - **A change reverted in the working tree still counts.** The changed set is a union, so a file changed in a commit and then restored to the base in the working tree still needs its document. Commit the revert, or ignore the failure until it is committed.
+- **Vitest test ids are found by text, not by parsing.** The names must appear in the file in order, but their real nesting is not checked: a test named under the wrong `describe` passes when that `describe` comes earlier in the file, and a call in a comment counts. Review checks that the id names the right test.
 - **Docstrings are not read.** References to `docs/` are checked in comments only, so a path in a Python docstring can go stale unnoticed.
 - **A file with several owners passes with any owner's document.** Changing the test target in the `Makefile` and updating only the development guide passes C1.
 - **Agent tooling restates normative files and can go stale silently.** The table in `AGENTS.md` and the `create-pr` skill restate the map and these rules; nothing compares them with `RULES` except the paths in code spans, which must exist.

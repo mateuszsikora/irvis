@@ -47,5 +47,8 @@ These paths are removed from the source side before any rule runs, so changing t
 | `^CONTRIBUTING\.md$` | Contribution rules |
 | `^\.github/pull_request_template\.md$` | Pull request template |
 | `^\.(agents\|claude)/` | Agent tooling: skills and agent settings |
+| `^(packages\|apps\|tools)/[^/]+/(test\|e2e)/` | Test helpers and end-to-end tests of a package |
+| `^fixtures/` | Test data |
+| `^NOTICE$` | Attribution notices, next to the licence |
 
-Files whose diff changes only version strings are also left out; which files and which lines is in [the technical document](docs-contract-technical.md#version-bump-filter).
+Files whose change touches only versions are also left out: a workflow whose diff only changes Action versions, and a `package.json` whose change only touches the values in its dependency fields. Which files and what counts as a version is in [the technical document](docs-contract-technical.md#version-bump-filter).

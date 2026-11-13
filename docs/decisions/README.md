@@ -25,6 +25,8 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [No path-scoped rule file for agents](docs.md#no-path-scoped-rule-file-for-agents) | [docs.md](docs.md) | decided |
 | [The documentation check is documented as a feature](docs.md#the-documentation-check-is-documented-as-a-feature) | [docs.md](docs.md) | decided |
 | [Plans and spike reports live in docs/ as marked exceptions](docs.md#plans-and-spike-reports-live-in-docs-as-marked-exceptions) | [docs.md](docs.md) | decided (#3) |
+| [package.json bumps are compared as parsed JSON](docs.md#packagejson-bumps-are-compared-as-parsed-json) | [docs.md](docs.md) | decided (#4) |
+| [Vitest test ids are checked by text search](docs.md#vitest-test-ids-are-checked-by-text-search) | [docs.md](docs.md) | decided (#4) |
 
 ## Architecture
 
