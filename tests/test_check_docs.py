@@ -214,7 +214,7 @@ class RuleTests(RepoCase):
     def test_package_source_is_not_excluded(self):
         self.write("packages/core/src/test/frames.ts", "export const frames = [];\n")
         self.write("packages/core/testing.ts", "export {};\n")
-        out = self.assertFails("F0")
+        out = self.assertFails("F2")
         self.assertIn("    packages/core/src/test/frames.ts", out)
         self.assertIn("    packages/core/testing.ts", out)
 
@@ -354,55 +354,103 @@ class PackageJsonBumpTests(RepoCase):
     def test_engines_change_fails(self):
         self.replace("package.json", '"node": ">=22"', '"node": ">=24"')
         self.commit()
-        out = self.assertFails("F0")
+        out = self.assertFails("C3")
         self.assertIn("    package.json", out)
 
     def test_package_manager_change_fails(self):
         self.replace("package.json", '"npm@11.0.0"', '"npm@11.1.0"')
         self.commit()
-        self.assertFails("F0")
+        self.assertFails("C3")
 
     def test_bump_with_engines_change_fails(self):
         self.replace("package.json", '"react": "^19.0.0"', '"react": "^19.1.0"')
         self.replace("package.json", '"node": ">=22"', '"node": ">=24"')
         self.commit()
-        self.assertFails("F0")
+        self.assertFails("C3")
 
     def test_added_dependency_fails(self):
         self.replace("package.json", '"react": "^19.0.0"', '"react": "^19.0.0",\n    "react-dom": "^19.0.0"')
         self.commit()
-        self.assertFails("F0")
+        self.assertFails("C3")
 
     def test_removed_dependency_fails(self):
         self.replace("package.json", '"react": "^19.0.0"', '"react": "^19.1.0"')
         self.replace("package.json", '"typescript": "^5.6.0",\n    "vitest": "^3.0.0"', '"typescript": "^5.6.0"')
         self.commit()
-        self.assertFails("F0")
+        self.assertFails("C3")
 
     def test_alias_change_fails(self):
         for source in ("npm:preact@^10.0.0", "github:someone/react", "file:../vendor/react",
                        "workspace:*", "someone/react"):
             with self.subTest(source=source):
                 self.replace("package.json", '"react": "^19.0.0"', f'"react": "{source}"')
-                self.assertFails("F0")
+                self.assertFails("C3")
                 self.replace("package.json", f'"react": "{source}"', '"react": "^19.0.0"')
 
     def test_dependency_moved_to_another_field_fails(self):
         self.replace("package.json", '"react": "^19.0.0"\n', '"react": "^19.0.0",\n    "vitest": "^3.0.0"\n')
         self.replace("package.json", '"typescript": "^5.6.0",\n    "vitest": "^3.0.0"', '"typescript": "^5.6.0"')
         self.commit()
-        self.assertFails("F0")
+        self.assertFails("C3")
 
     def test_other_value_type_is_not_a_bump(self):
         self.replace("package.json", '"private": true', '"private": 1')
         self.commit()
-        self.assertFails("F0")
+        self.assertFails("C3")
 
     def test_invalid_json_is_not_a_bump(self):
         self.replace("package.json", '"react": "^19.0.0"', '"react": "^19.1.0",')
         self.commit()
-        out = self.assertFails("F0")
+        out = self.assertFails("C3")
         self.assertNotIn("[filter]", out)
+
+
+class TypeScriptRuleTests(RepoCase):
+    """The rules that own the TypeScript code and its configuration."""
+
+    def test_core_needs_core_doc(self):
+        self.write("packages/core/src/frames.ts", "export {};\n")
+        self.commit()
+        out = self.assertFails("F2")
+        self.assertNotIn("[F4]", out)
+        self.append("docs/features/core-technical.md", "\nTouched.\n")
+        self.assertPasses()
+
+    def test_cameras_need_cameras_doc_not_core_doc(self):
+        self.write("packages/core/src/cameras/index.ts", "export {};\n")
+        self.append("docs/features/core-technical.md", "\nTouched.\n")
+        self.commit()
+        out = self.assertFails("F4")
+        self.assertNotIn("[F2]", out)
+        self.append("docs/features/cameras-user.md", "\nTouched.\n")
+        self.assertPasses()
+
+    def test_web_app_and_netlify_need_web_app_doc(self):
+        for path in ("apps/web/src/App.tsx", "netlify.toml"):
+            with self.subTest(path=path):
+                self.write(path, "x\n")
+                self.assertFails("F3")
+                self.git("checkout", "-q", "--", path)
+        self.write("netlify.toml", "x\n")
+        self.append("docs/features/web-app-technical.md", "\nTouched.\n")
+        self.assertPasses()
+
+    def test_root_configuration_needs_a_guide(self):
+        for path in ("tsconfig.base.json", "tsconfig.json", "eslint.config.js", "vitest.config.ts",
+                     ".prettierrc.json", ".prettierignore", ".nvmrc", ".npmrc"):
+            with self.subTest(path=path):
+                self.write(path, "x\n")
+                self.assertFails("C3")
+                self.git("checkout", "-q", "--", path)
+        self.write("tsconfig.base.json", "x\n")
+        self.append("docs/guides/development.md", "\nTouched.\n")
+        self.assertPasses()
+
+    def test_package_test_helpers_need_no_doc(self):
+        self.append("packages/core/test/profiles.ts", "\n// touched\n")
+        self.append("packages/core/src/cameras/index.test.ts", "\n// touched\n")
+        self.commit()
+        self.assertPasses()
 
 
 class CarveOutTests(RepoCase):

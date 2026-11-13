@@ -1,0 +1,18 @@
+irvis
+Copyright (c) 2026 Mateusz Sikora
+Licensed under the MIT License; see LICENSE.
+
+This file lists code, data and protocol knowledge that irvis takes from other
+projects, with their licences. Add an entry in the same pull request that adds
+the material, in this form:
+
+  <project name> (<URL>)
+  Copyright (c) <year> <holder>
+  Licence: <SPDX identifier>
+  Used in: <paths in this repository>
+  What: <what was taken: code, constants, a protocol description>
+
+Third-party npm packages are not listed here; their licences ship with them
+in node_modules and in the release packages.
+
+No third-party material yet.

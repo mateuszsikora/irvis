@@ -56,7 +56,7 @@ A rule like C2 owns all of `.github/` except the pull request template. A new wo
 
 Status: decided
 
-A catch-all rule usually covers the main package. irvis has no package yet, and nobody knows where the first product code will live. F0 therefore owns every path that no other rule owns and that `EXCLUDE` does not list, anywhere in the tree, and asks for a new feature document. When a package appears, its own `F<n>` rules take over its paths. F0 skips deleted paths: removing code that no rule owns leaves no document to update, and asking for a new one would contradict "removing behaviour removes its documentation".
+A catch-all rule usually covers the main package. irvis has no package yet, and nobody knows where the first product code will live. F0 therefore owns every path that no other rule owns and that `EXCLUDE` does not list, anywhere in the tree, and asks for a new feature document. When a package appears, its own `F<n>` rules take over its paths, as F2, F3 and F4 did for `packages/core` and `apps/web` in #5; F0 still owns every other path, so the next package needs its own documents too. F0 skips deleted paths: removing code that no rule owns leaves no document to update, and asking for a new one would contradict "removing behaviour removes its documentation".
 
 **Rejected:** scoping F0 to a guessed directory such as `src/` or `irvis/`, because code put anywhere else would be owned by nothing. **Rejected:** accepting an edit to an existing feature document, because a blank line would satisfy it.
 
@@ -130,7 +130,7 @@ An extra rule file (for example in `.claude/rules/`) could restate the "You chan
 
 Status: decided
 
-The check is the only code in the repository, it has users (everyone who opens a pull request), messages and exit codes, which is what feature documents are for. Its user and technical documents hold the details; the documentation guide explains how to write documents and links to them for how the check works.
+The check was the only code in the repository when this was decided, it has users (everyone who opens a pull request), messages and exit codes, which is what feature documents are for. Its user and technical documents hold the details; the documentation guide explains how to write documents and links to them for how the check works.
 
 **Rejected:** describing the check only in the documentation guide, because the guide would then mix writing advice with a full list of failure messages, and the catch-all rule would have no example of the feature-document pair.
 

@@ -84,10 +84,12 @@ Run the checks for every part of the repository the change touches, and read the
 | --- | --- | --- |
 | anything | `make docs-check` | `docs-check: <N> changed files since origin/main (<sha>), each with the documentation it needs` (`1 changed file` when N is 1), exit code 0 |
 | `scripts/**`, `tests/**` or the `Makefile` | `make test` | last line `OK` |
+| any TypeScript, JavaScript or JSON file, `package.json`, `package-lock.json` or a root configuration file | `npm ci` once, then `make lint`, `make typecheck`, `make js-test`, `make build` | `make lint`: no problems listed after `> eslint --max-warnings 0 .`, then `All matched files use Prettier code style!`; `make typecheck`: nothing after `> tsc --build`; `make js-test`: `Test Files  <n> passed (<n>)` and `Tests  <n> passed (<n>)`; `make build`: `✓ built in <time>`; each exit code 0 |
+| `.github/workflows/promote.yml` | read the step "Fast-forward release" against [Promote to release](docs/guides/development.md#promote-to-release); it runs only by hand on GitHub | the guide describes every check and message of the step |
 | `.agents/skills/**` or `.claude/skills/**` | the skill check from `.agents/skills/create-pr/SKILL.md`, step 3 | `ok: N skill(s)` and nothing else |
 | a rule in this file, `AGENTS.md` or a skill | compare the rule in `CONTRIBUTING.md`, `AGENTS.md` and every skill that restates it | all say the same thing |
 
-CI runs `make docs-check` and `make test` on every pull request, and the integrity checks and `make test` on every push to `main` ([docs/guides/development.md](docs/guides/development.md#ci)). A failing CI job blocks the merge by this rule, even though GitHub does not enforce it (see Repository settings).
+CI runs `make docs-check`, `make test` and the TypeScript job (lint, format, typecheck, test, build) on every pull request, and the integrity checks, `make test` and the TypeScript job on every push to `main` ([docs/guides/development.md](docs/guides/development.md#ci)). A failing CI job blocks the merge by this rule, even though GitHub does not enforce it (see Repository settings).
 
 Whoever adds tooling (a build, linter, test runner, CI workflow) adds its command to this table, and to the verification table in the `create-pr` skill, in the same PR.
 

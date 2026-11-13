@@ -74,7 +74,7 @@ Status: decided (#3)
 
 Implemented in #5.
 
-Core runs in the browser, in Workers, in Electron and in Node (tests, `capture-cli`). Its `tsconfig` has `lib: ["ES2022"]` and `types: []`, so DOM and Node APIs do not compile. An `env.d.ts` declares the short list of APIs that exist everywhere: `TextEncoder`, `TextDecoder`, `console`. Adding to that list is a decision. `CompressionStream`, `crypto`, `WebAssembly` and the DOM are not available in core: deflate comes from `fflate` (MIT, synchronous functions only), CRC32 is our own code, and WASM, if the reconstruction needs it, goes into a separate package. ESLint `no-restricted-imports` blocks `node:*`, `@irvis/ui`, `@irvis/backend-*` and `@irvis/media` in core, and a test checks the dependencies in every package's `package.json`.
+Core runs in the browser, in Workers, in Electron and in Node (tests, `capture-cli`). Its `tsconfig` has `lib: ["ES2022"]` and `types: []`, so DOM and Node APIs do not compile. An `env.d.ts` declares the short list of APIs that exist everywhere: `TextEncoder`, `TextDecoder`, `console`. Adding to that list is a decision. `CompressionStream`, `crypto`, `WebAssembly` and the DOM are not available in core: deflate comes from `fflate` (MIT, synchronous functions only), CRC32 is our own code, and WASM, if the reconstruction needs it, goes into a separate package. ESLint `no-restricted-imports` lets core import only its own files (relative paths) and `fflate`, which keeps out `node:*`, `@irvis/ui`, `@irvis/backend-*`, `@irvis/media` and every package another workspace's dependencies put into the root `node_modules`; tests next to the code may also import `vitest`. A test checks the dependencies in every package's `package.json`.
 
 **Rejected:** the DOM library in core, because then core code would silently use browser-only APIs that fail in Node.
 
@@ -88,7 +88,7 @@ ECMAScript requires `+`, `-`, `*`, `/` and `Math.sqrt` to be correctly rounded, 
 
 In `packages/core/src/{analysis,corrections,cameras,irvis,reconstruction}/**` an ESLint rule allows only these members of `Math`: the functions `abs`, `min`, `max`, `floor`, `ceil`, `round`, `trunc`, `sign`, `sqrt`, `fround`, `imul`, `clz32`, and the constants `PI`, `E`, `SQRT2`, `SQRT1_2`, `LN2`, `LN10`, `LOG2E`, `LOG10E`. It also forbids `**` and access to `Math` through a variable or a computed name. T⁴ in the emissivity correction is computed by multiplication, the fourth root as `sqrt(sqrt(x))`. Readings are then bit-identical in every engine, and the parity test compares them exactly. An exception, such as a camera whose conversion follows the Planck curve, needs its own decision, and the parity test compares those values with a tolerance.
 
-The reconstruction from I420/NV12 (`packages/core/src/reconstruction/`) is inside the rule too. Its output is approximate by nature and is judged by metrics against the exact path, but what it needs (the √|Δ| cost, medians, isotonic regression, R²) fits in the allowed functions, and its output is then the same in every engine. An unavoidable exception in any of these directories is an `eslint-disable` comment that names the decision allowing it.
+The reconstruction from I420/NV12 (`packages/core/src/reconstruction/`) is inside the rule too. Its output is approximate by nature and is judged by metrics against the exact path, but what it needs (the √|Δ| cost, medians, isotonic regression, R²) fits in the allowed functions, and its output is then the same in every engine. An unavoidable exception in any of these directories is an `eslint-disable` comment that names the rules it disables and the decision allowing it; a test, not ESLint, checks that, because an ESLint directive can silence the rule that would check it.
 
 **Rejected:** comparing readings after rounding to the display precision, because values near a rounding boundary still flip. **Rejected:** a list of forbidden functions, because it lets through every approximated function nobody thought of.
 
@@ -96,11 +96,35 @@ The reconstruction from I420/NV12 (`packages/core/src/reconstruction/`) is insid
 
 Status: decided (#3)
 
-Implemented in #17.
+Implemented in #5 (the placeholder page of `apps/web` and its component tests), #17.
 
 The viewer has many panels, settings and measurement overlays. Bundle size does not matter for a desktop app and a static site. What matters is the ecosystem (components, i18n, testing tools) and that the people and agents working on the code know it well. Camera frames at 25 per second bypass the React render cycle: the canvas is drawn directly from an external store, and numeric readouts update about five times a second.
 
 **Rejected:** Preact, because its compatibility layer has edge cases and saving about 40 KB buys nothing here. **Rejected:** no framework, because the amount of UI state would end in a hand-written framework.
+
+## Workspace packages are consumed as TypeScript source
+
+Status: decided (#5)
+
+A package's `exports` point at its TypeScript source (`./src/index.ts`), and there is no build step per package. Vite bundles the source into `apps/web`, Vitest transpiles it in tests, and Node 26 runs it directly with type stripping, which `tools/capture-cli` and the Electron main process need. Two settings make the last one work: relative imports carry their extension (`./frames.ts`, `allowImportingTsExtensions`), because Node does not guess extensions, and `erasableSyntaxOnly` forbids `enum`, `namespace` and constructor parameter properties, which Node cannot strip. `tsc --build` only checks the code; core's library project emits declarations into `node_modules/.tsbuild/`, so that `apps/web` type-checks against core's API under its own `lib` without core's `env.d.ts`.
+
+**Rejected:** compiling every package to `dist/` and exporting the JavaScript, because every change then needs a rebuild in dependency order, a stale `dist/` silently runs old code, and the packages are never published to npm. **Rejected:** extensionless imports, because Node cannot resolve them without a loader or a bundler.
+
+## TypeScript stays on 6.0 until typescript-eslint supports 7
+
+Status: decided (#5)
+
+TypeScript 7.0.2, the native compiler, was the latest release when the toolchain was set up (November 2026), but typescript-eslint 8.72.2 accepts only `typescript` `>=4.8.4 <6.1.0`. Type-aware lint rules matter here: `no-floating-promises` catches a forgotten `await` on `ByteSink.append`, which would lose recording data without an error. The root `package.json` therefore pins `typescript` to `~6.0.3`. Move to 7 when typescript-eslint supports it.
+
+**Rejected:** TypeScript 7 with ESLint rules that need no type information, because the rules that catch asynchronous mistakes are exactly the type-aware ones. **Rejected:** TypeScript 7 for `tsc` and 6.0 for ESLint side by side, because the two compilers would disagree on some code and nobody would know which one is right.
+
+## Frames and state in core are subscriptions
+
+Status: decided (#5)
+
+Core has no `EventTarget`, `ReadableStream` or timers ([its APIs](#core-uses-only-apis-that-browsers-and-node-share)), so the types say how values over time are delivered without them: `Subscribable<T>` (`subscribe`, taking a listener and returning an `Unsubscribe`) for camera frames, and `Store<T>`, which adds `getSnapshot`, for state such as `Player.viewState`. Both are bound function properties, not methods, so that callers can pass `store.subscribe` and `store.getSnapshot` on their own, as `useSyncExternalStore(store.subscribe, store.getSnapshot)` does, without losing `this` and without typescript-eslint's `unbound-method` error. `Store` has the shape React's `useSyncExternalStore` needs, which is how the UI draws 25 frames a second without going through React state ([React decision](#the-ui-is-written-in-react)). A listener that is too slow makes the backend drop frames, because a live view wants the newest frame, not a queue.
+
+**Rejected:** `AsyncIterable<RawFrame>`, because it queues or blocks frames for a slow consumer, and every consumer needs its own loop. **Rejected:** methods, because every caller would have to wrap them in arrow functions (`(cb) => store.subscribe(cb)`) and an unbound method fails at runtime in a class-based implementation. **Rejected:** `EventTarget` or `ReadableStream` in the types, because core cannot use them and Node and the browser differ in details.
 
 ## A camera is a profile, and its conversion is data
 
@@ -165,7 +189,7 @@ Status: decided (#3)
 
 Implemented in #5 (`netlify.toml`, "Promote to release"), #24.
 
-GitHub Pages is not available for private repositories on the current plan. Netlify deploys from a private repository and builds a preview for every pull request, which lets the browser path be tried on each change. On the free plan a month has 300 credits and a production deploy costs 15, so about 20 production deploys a month; previews are free ([Netlify pricing](https://www.netlify.com/pricing/), November 2026). Production therefore publishes only from the `release` branch. A manual workflow, "Promote to release", moves it: it checks that the commit is on `main` (`git merge-base --is-ancestor`) and pushes without `--force`, so only reviewed commits reach production and only by fast-forward. Only that job gets `contents: write`. The site is public even while the repository is private.
+GitHub Pages is not available for private repositories on the current plan. Netlify deploys from a private repository and builds a preview for every pull request, which lets the browser path be tried on each change. On the free plan a month has 300 credits and a production deploy costs 15, so about 20 production deploys a month; previews are free ([Netlify pricing](https://www.netlify.com/pricing/), November 2026). Production therefore publishes only from the `release` branch. A manual workflow, "Promote to release", moves it: it checks that the commit is on `main` (`git merge-base --is-ancestor`) and pushes without `--force`, so only reviewed commits reach production and only by fast-forward. Only that job gets `contents: write`. The guarantee is procedural while `release` cannot be protected on this plan: a direct push to `release`, or a run of a changed copy of the workflow from another branch, gets past it ([details](../guides/development.md#promote-to-release)). The site is public even while the repository is private.
 
 **Rejected:** deploying production on every merge to `main`, because parallel work would use up the credits. **Rejected:** Cloudflare Pages as the first choice; it is the fallback if Netlify's limits or reported deploy blocks get in the way.
 

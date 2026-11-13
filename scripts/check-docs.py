@@ -81,6 +81,26 @@ RULES: List[Rule] = [
         "(or docs/features/docs-contract-user.md, docs/guides/documentation.md), and AGENTS.md if RULES changed",
     ),
     Rule(
+        "F2",
+        r"^packages/core/(?!src/cameras/)",
+        r"^docs/features/core-(user|technical)\.md$",
+        "Core changed: update docs/features/core-technical.md (or docs/features/core-user.md)",
+    ),
+    Rule(
+        "F3",
+        r"^(apps/web/|netlify\.toml$)",
+        r"^docs/features/web-app-(user|technical)\.md$",
+        "Web app or its Netlify configuration changed: update docs/features/web-app-technical.md "
+        "(or docs/features/web-app-user.md)",
+    ),
+    Rule(
+        "F4",
+        r"^packages/core/src/cameras/",
+        r"^docs/features/cameras-(user|technical)\.md$",
+        "Camera registry or profile schema changed: update docs/features/cameras-technical.md "
+        "(or docs/features/cameras-user.md)",
+    ),
+    Rule(
         "C1",
         r"^Makefile$",
         r"^docs/guides/(development|testing)\.md$",
@@ -91,6 +111,13 @@ RULES: List[Rule] = [
         r"^\.github/(?!pull_request_template\.md$)",
         r"^docs/guides/development\.md$",
         "CI or GitHub configuration changed: update docs/guides/development.md",
+    ),
+    Rule(
+        "C3",
+        r"^(package\.json|tsconfig(\.[^/]+)?\.json|(eslint|vitest)\.config\.[cm]?[jt]s|\.prettierrc(\.[^/]+)?|\.prettierignore|\.nvmrc|\.npmrc)$",
+        r"^docs/guides/(development|testing)\.md$",
+        "Root TypeScript configuration changed: update docs/guides/development.md "
+        "(or docs/guides/testing.md for the Vitest configuration)",
     ),
 ]
 

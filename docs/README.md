@@ -17,6 +17,6 @@ Start here to find a document. Each fact is in one place; this table says which.
 | [decisions/README.md](decisions/README.md) | Generated index of all decisions. Read it before deciding anything |
 | `decisions/<domain>.md` | Why things are the way they are: what was decided, what was rejected, what was postponed |
 
-Current features: [documentation contract](features/docs-contract-user.md) ([technical](features/docs-contract-technical.md)).
+Current features: [documentation contract](features/docs-contract-user.md) ([technical](features/docs-contract-technical.md)), [core](features/core-user.md) ([technical](features/core-technical.md)), [cameras](features/cameras-user.md) ([technical](features/cameras-technical.md)), [web app](features/web-app-user.md) ([technical](features/web-app-technical.md)).
 
 Branch, commit and pull request rules are in [CONTRIBUTING.md](../CONTRIBUTING.md); agent instructions are in [AGENTS.md](../AGENTS.md).
