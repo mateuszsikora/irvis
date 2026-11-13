@@ -30,6 +30,7 @@ Every commit and pull request that changes behaviour lands its documentation in 
 
 - Test files and bumps of an Action, a hook or a dependency version need no documentation. Neither do `docs/`, this file, `CONTRIBUTING.md`, the PR template and `.agents/` or `.claude/`; the full list is in [docs/features/README.md](docs/features/README.md#left-out-on-purpose).
 - Verify with `make docs-check` before finishing. `SKIP_DOCS_CHECK=1` works only locally; CI ignores it.
+- Planned work, milestones and acceptance criteria: [docs/roadmap.md](docs/roadmap.md); read it before starting a milestone PR. It is a plan, not a description of the code.
 - Before deciding something, read [docs/decisions/README.md](docs/decisions/README.md). Record a new decision in `docs/decisions/` and run `make decisions-index`.
 - A domain rule that a test enforces goes into [docs/invariants.md](docs/invariants.md) with the test id.
 - In review, a behaviour change without its documentation is a Major finding. The check proves only that a document changed, so also check that what the document says is true of the code.

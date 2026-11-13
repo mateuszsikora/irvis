@@ -133,3 +133,13 @@ Status: decided
 The check is the only code in the repository, it has users (everyone who opens a pull request), messages and exit codes, which is what feature documents are for. Its user and technical documents hold the details; the documentation guide explains how to write documents and links to them for how the check works.
 
 **Rejected:** describing the check only in the documentation guide, because the guide would then mix writing advice with a full list of failure messages, and the catch-all rule would have no example of the feature-document pair.
+
+## Plans and spike reports live in docs/ as marked exceptions
+
+Status: decided (#3)
+
+Everything else in `docs/` says what is true now. Two kinds of document cannot: the [roadmap](../roadmap.md), which says what is planned, and the reports of the hardware spikes in `docs/findings/`, which say what was measured on a camera at one point in time. They live in `docs/` anyway, because agents and contributors in every clone read the repository, and the plan has to change in the same pull requests as the code it describes. Other documents never cite them for what the code does. A decision may also come before its code, as the [architecture decisions](architecture.md) do; such a file says so at the top and names, for each decision, the issues that implement it.
+
+The documentation check fails on a link, or a code span that is exactly a lowercase `docs/<path>.md` path, to a file that does not exist, on every pull request and on every push to `main`. A plan names documents that come later, so it writes them without the `docs/` prefix and with "(planned, M<n>)", for example `irvis-format.md` (planned, M4). The pull request that creates the document turns the mention into a link, and from then on the check guards it. Spike reports have lowercase names (`m1.md`, `m5-checklist.md`), so the check treats them like every other document. Sections are cited by a link to their heading, not with a section sign, because the check reads `<word>` followed by a section sign and a number as a citation of an unknown document.
+
+**Rejected:** a copy of the owner's specification in `docs/`, because the plan departs from it in several places (listed in the roadmap), and two documents would then state different requirements. The roadmap carries the requirements that still hold. **Rejected:** GitHub issues as the only plan, because they are not versioned with the code, and reading them needs network access and `gh`. The issues remain the work items; the roadmap links them. **Rejected:** an exception for the roadmap in the link check, because it needs a change to the script, weakens the check for the most-read document, and hides typos in paths that do exist.

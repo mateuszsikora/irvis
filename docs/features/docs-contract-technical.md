@@ -100,7 +100,7 @@ The make targets that call these scripts are listed in the [development guide](.
 | --- | --- | --- | --- |
 | `SKIP_DOCS_CHECK` | unset | `check-docs.py`, `main` | `1` skips the check and exits 0, unless `CI` is set. Any other value is ignored. |
 | `CI` | unset (GitHub Actions sets `true`) | `check-docs.py`, `main` | Any non-empty value makes `SKIP_DOCS_CHECK` ignored. |
-| `DOMAINS` | `{"docs": "Documentation contract"}` | `decisions-index.py` | Decision file stems and their index titles, in index order. |
+| `DOMAINS` | `{"docs": "Documentation contract", "architecture": "Architecture"}` | `decisions-index.py` | Decision file stems and their index titles, in index order. |
 
 The scripts run git with `-z`, `--no-color` and `--no-ext-diff`, so `core.quotepath`, `color.ui` and external diff drivers do not change their input.
 

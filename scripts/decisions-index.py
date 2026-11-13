@@ -30,6 +30,7 @@ from typing import List, Mapping, Optional, Sequence, Tuple
 # File stem in docs/decisions/ -> section title in the index, in index order.
 DOMAINS = {
     "docs": "Documentation contract",
+    "architecture": "Architecture",
 }
 
 DECISIONS_DIR = "docs/decisions"

@@ -24,3 +24,20 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [CLAUDE.md is a symlink to AGENTS.md](docs.md#claudemd-is-a-symlink-to-agentsmd) | [docs.md](docs.md) | decided |
 | [No path-scoped rule file for agents](docs.md#no-path-scoped-rule-file-for-agents) | [docs.md](docs.md) | decided |
 | [The documentation check is documented as a feature](docs.md#the-documentation-check-is-documented-as-a-feature) | [docs.md](docs.md) | decided |
+| [Plans and spike reports live in docs/ as marked exceptions](docs.md#plans-and-spike-reports-live-in-docs-as-marked-exceptions) | [docs.md](docs.md) | decided (#3) |
+
+## Architecture
+
+| Decision | File | Status |
+| --- | --- | --- |
+| [The code lives in an npm workspaces monorepo](architecture.md#the-code-lives-in-an-npm-workspaces-monorepo) | [architecture.md](architecture.md) | decided (#3) |
+| [Interfaces live in core as types, and apps inject the backends](architecture.md#interfaces-live-in-core-as-types-and-apps-inject-the-backends) | [architecture.md](architecture.md) | decided (#3) |
+| [One UI build serves the web and the desktop app](architecture.md#one-ui-build-serves-the-web-and-the-desktop-app) | [architecture.md](architecture.md) | decided (#3) |
+| [Core uses only APIs that browsers and Node share](architecture.md#core-uses-only-apis-that-browsers-and-node-share) | [architecture.md](architecture.md) | decided (#3) |
+| [Measurement code uses only correctly rounded arithmetic](architecture.md#measurement-code-uses-only-correctly-rounded-arithmetic) | [architecture.md](architecture.md) | decided (#3) |
+| [The UI is written in React](architecture.md#the-ui-is-written-in-react) | [architecture.md](architecture.md) | decided (#3) |
+| [A camera is a profile, and its conversion is data](architecture.md#a-camera-is-a-profile-and-its-conversion-is-data) | [architecture.md](architecture.md) | decided (#3) |
+| [Loading camera profiles from files at runtime](architecture.md#loading-camera-profiles-from-files-at-runtime) | [architecture.md](architecture.md) | postponed (#3) |
+| [Recordings are .irvis files and MP4 is an export](architecture.md#recordings-are-irvis-files-and-mp4-is-an-export) | [architecture.md](architecture.md) | decided (#3) |
+| [The web version is hosted on Netlify and goes to production from release](architecture.md#the-web-version-is-hosted-on-netlify-and-goes-to-production-from-release) | [architecture.md](architecture.md) | decided (#3) |
+| [The desktop app ships its own LGPL ffmpeg build](architecture.md#the-desktop-app-ships-its-own-lgpl-ffmpeg-build) | [architecture.md](architecture.md) | decided (#3) |

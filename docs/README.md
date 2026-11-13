@@ -8,6 +8,8 @@ Start here to find a document. Each fact is in one place; this table says which.
 | `features/<feature>-user.md` | What a user can do with a feature and what they see. No implementation detail |
 | `features/<feature>-technical.md` | How a feature works: data flow, schema, interfaces, configuration, failure modes, tests |
 | `<format>.md` | Specifications of wire or file formats, each with a version number. None yet |
+| [roadmap.md](roadmap.md) | The plan: milestones, their issues and order, acceptance criteria, owner tasks, risks, deviations from the specification. A plan, not a description of the code |
+| `findings/m<n>.md` | Reports of the hardware spikes (instructions, measured results, the decision taken) and the M5 checklist. None yet |
 | [guides/development.md](guides/development.md) | Setup, build targets, hooks, CI |
 | [guides/testing.md](guides/testing.md) | How to run the tests and what each test file needs |
 | [guides/documentation.md](guides/documentation.md) | How to write each kind of document, how the documentation check works, and what it cannot catch |
