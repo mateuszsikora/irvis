@@ -49,9 +49,11 @@ export type JsonValue =
   null | boolean | number | string | readonly JsonValue[] | { readonly [key: string]: JsonValue };
 
 /**
- * View settings by name: `palette`, `range`, `measurements`, `units`,
- * `emissivity`, `reflectedTemperature`, `offset` (draft names, see the
- * specification). A change lists only the settings that changed.
+ * View settings by name. Version 1 fixes no names; the planned ones are
+ * `palette`, `range`, `measurements`, `units`, `emissivity`,
+ * `reflectedCelsius`, `offsetKelvin`, `alarms` and `isotherms`
+ * (docs/irvis-format.md#view-state-records). A change lists only the
+ * settings that changed.
  */
 export type ViewStateValues = Readonly<Record<string, JsonValue>>;
 

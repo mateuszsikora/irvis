@@ -122,7 +122,18 @@ Placing values near the denoised estimate, not at the edge of the tolerance, kee
 
 ## View-state records
 
-The payload is a JSON object `{ "timestamp": <ms>, "values": { … } }`: the view settings that changed at that time, on the frames' clock, and only those. The header's `viewState` holds the settings at the start. Version 1 does not fix the setting names or their values, because the features that own them do not exist yet; the planned names are `palette`, `range`, `measurements`, `units`, `emissivity`, `reflectedTemperature` and `offset` ([#12](https://github.com/mateuszsikora/irvis/issues/12), [#13](https://github.com/mateuszsikora/irvis/issues/13)). TODO(owner): fix the names and their schemas before v1 is frozen in #16.
+The payload is a JSON object `{ "timestamp": <ms>, "values": { … } }`: the view settings that changed at that time, on the frames' clock, and only those. The header's `viewState` holds the settings at the start. Version 1 does not fix the setting names or their values, and `IrvisReader` returns every name and value as written, without checking them. No code writes or reads view settings yet; the viewer will ([#17](https://github.com/mateuszsikora/irvis/issues/17), [#19](https://github.com/mateuszsikora/irvis/issues/19)). The planned names for the corrections follow the fields of core's types ([core](features/core-user.md#correct-readings-show-units-raise-alarms-and-paint-isotherms)), so that a value can be stored as the type holds it:
+
+| Name | Planned value |
+| --- | --- |
+| `units` | `"C"` or `"F"` (`TemperatureUnit`) |
+| `emissivity` | `CorrectionSettings.emissivity`: a number greater than 0 and at most 1 |
+| `reflectedCelsius` | `CorrectionSettings.reflectedCelsius`: °C, above −273.15 |
+| `offsetKelvin` | `CorrectionSettings.offsetKelvin`: kelvin added after the emissivity correction |
+| `alarms` | `AlarmSettings`: `{ "highCelsius", "lowCelsius", "hysteresis" }`, a threshold a number or `null` |
+| `isotherms` | a list of `Isotherm`: `{ "kind": "above" \| "below", "celsius", "color": [r, g, b] }` or `{ "kind": "between", "minCelsius", "maxCelsius", "color" }` |
+
+These are the user's settings. What the camera applied itself is in the chunk's `cameraState` (`emissivity`, `reflected-temperature`), and readings are corrected relative to it ([decision](decisions/architecture.md#the-software-correction-works-relative-to-what-the-camera-applied)). The planned names of [#12](https://github.com/mateuszsikora/irvis/issues/12) are `palette`, `range` and `measurements`. TODO(owner): fix every name and its schema, with code that writes and reads them, before v1 is frozen in #16.
 
 ## Index and trailer
 

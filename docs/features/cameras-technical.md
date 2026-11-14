@@ -30,11 +30,13 @@ The types are in `src/cameras/profile.ts`; each field has a TSDoc comment.
 | `SensorSpec` | `width`, `height`, optional `netd` (`kelvin`), optional `accuracy` (`celsius`, `percent`), `ranges: MeasurementRange[]` (`gain`, `minCelsius`, `maxCelsius`) | positive integer size; `kelvin` > 0; accuracy values ≥ 0; `minCelsius` < `maxCelsius`; each range's `gain` unique and, with an enum state field `gain`, one of its values |
 | `Conversion` | `{ kind: 'linear'; scale; offset }`: °C = raw × scale + offset. `{ kind: 'polynomial'; coefficients }`: °C = c0 + c1·raw + …, by Horner's scheme. `{ kind: 'lut'; firstRaw; celsius }`: °C = celsius[raw − firstRaw] | `scale` finite and not 0, `offset` finite; at least two finite coefficients; `firstRaw` from 0 to 65535, a non-empty table of finite values that ends at or below raw 65535 |
 | `ProfileConversion` | `gain`, `conversion`, provenance | at least one; `gain` unique; with an enum state field `gain`: one conversion for each of its values and none for other values; without it: exactly one conversion |
-| `CameraStateField` | `id`, `label`, `affects` (`data` or `meaning`), `refresh` (`command` or `second`), and `{ kind: 'enum'; values; default }` or `{ kind: 'number'; unit; default }` | ids unique and kebab-case; an enum has unique values and its `default` is one of them; a number's `default` is finite; a field called `gain` is an enum |
+| `CameraStateField` | `id`, `label`, `affects` (`data` or `meaning`), `refresh` (`command` or `second`), and `{ kind: 'enum'; values; default }` or `{ kind: 'number'; unit; default }` | ids unique and kebab-case; an enum has unique values and its `default` is one of them; a number's `default` is finite; a field called `gain` is an enum; `emissivity` and `reflected-temperature` come together, each a number with `affects: 'data'`, unit `''` (default greater than 0 and at most 1) and `°C` (default above −273.15) |
 | `CameraStateSnapshot` | `origin` (`camera`, `declared`, `assumed`), `values` (by field id) | Not part of a profile: what a frame carries |
 | `CameraCommand` | `id`, `label`, `transport`, `changes` (state field ids), provenance | ids unique and kebab-case; `changes` names existing fields |
 | `VendorControlTransport` | `kind: 'vendor-control'`, `requestType`, `request` (0–0xff), `value`, `index` (0–0xffff), `data` | every number in its range, every data byte 0–0xff |
 | `UvcExtensionUnitTransport` | `kind: 'uvc-xu'`, `unit`, `selector` (0–0xff), `data` | the same |
+
+Three state field ids are reserved, because code outside the profile reads them from a frame's `CameraStateSnapshot`: `gain` selects the conversion, and `emissivity` and `reflected-temperature` (`EMISSIVITY_FIELD`, `REFLECTED_TEMPERATURE_FIELD` in `src/cameras/fields.ts`) are the emissivity correction the camera applies to its raw values itself. The software correction starts from them, so it never applies emissivity twice ([decision](../decisions/architecture.md#the-software-correction-works-relative-to-what-the-camera-applied), [core: technical](core-technical.md#data-flow)). A camera that keeps an emissivity only for its own image gives that field another id. No profile has them yet; whether the P2 Pro applies its TPD emissivity to the raw values is measured in #7.
 
 TODO(owner): conversion parameters that change every frame (the sensor temperature) and the encoding of command parameters into the transport are not modelled; #7 adds them once the protocol is known.
 
@@ -63,6 +65,7 @@ Exported from `@irvis/core` (`src/cameras/index.ts`):
 | `findProfile` | `(id: string, profiles = cameraProfiles) => CameraProfile \| undefined` | |
 | `matchProfiles` | `(device: DeviceDescription, profiles = cameraProfiles) => CameraProfile[]` | Order follows `profiles`. See [data flow](#data-flow) |
 | `validateProfile` | `(profile: CameraProfile) => string[]` | One message per problem, empty when the profile is consistent |
+| `EMISSIVITY_FIELD`, `REFLECTED_TEMPERATURE_FIELD` | `'emissivity'`, `'reflected-temperature'` | The reserved state field ids ([schema](#schema)) |
 | `toCelsius` | `(raw: number, conversion: Conversion) => number` | `NaN` for a raw value outside a lookup table |
 | `toCelsiusArray` | `(raw: Uint16Array, conversion: Conversion) => Float64Array` | |
 | types | everything in `src/cameras/profile.ts`, and `DeviceDescription` | |
@@ -89,6 +92,9 @@ Exported from `@irvis/core` (`src/cameras/index.ts`):
 | `state.<id>: no values`, `state.<id>: value '<value>' appears twice`, `state.<id>: default '<value>' is not one of its values` | Enum field |
 | `state.<id>: default must be finite` | Number field |
 | `state.gain: must be an enum, because it selects the conversion` | |
+| `state.emissivity: needs the state field 'reflected-temperature' too`, `state.reflected-temperature: needs the state field 'emissivity' too` | One of the two reserved emissivity fields without the other |
+| `state.emissivity: must be a number field with affects 'data' and unit '', because the emissivity correction reads it`, `state.reflected-temperature: must be a number field with affects 'data' and unit '°C', because the emissivity correction reads it` | A reserved field of another kind, `affects` or unit |
+| `state.emissivity: default must be greater than 0 and at most 1`, `state.reflected-temperature: default must be above -273.15 °C` | |
 | `commands: '<id>' appears twice`, `commands: id '<id>' is not kebab-case` | |
 | `commands.<id>: <field> must be an integer from 0 to <max>` | `<field>` is `requestType`, `request`, `value`, `index`, `unit` or `selector`; `<max>` is 255 or 65535 |
 | `commands.<id>: every data byte must be 0 to 255` | |
@@ -113,7 +119,7 @@ Exported from `@irvis/core` (`src/cameras/index.ts`):
 | File | Covers |
 | --- | --- |
 | `packages/core/src/cameras/index.test.ts` | Every registered profile passes `validateProfile` and the ids are unique ([invariant 18](../invariants.md)); `findProfile`; `matchProfiles` by USB ID, a shared USB ID narrowed by the label, several candidates when the label does not decide, the label alone, and no input |
-| `packages/core/src/cameras/validate.test.ts` | A consistent profile passes; one test per kind of problem: id, version, USB IDs, label pattern, rows past the frame, overlapping rows, thermal size against the sensor, unknown enable command, missing and unselectable conversions, measurement ranges with an unknown or repeated gain, linear scale 0, empty source, unknown state field in a command, transport ranges |
+| `packages/core/src/cameras/validate.test.ts` | A consistent profile passes; one test per kind of problem: id, version, USB IDs, label pattern, rows past the frame, overlapping rows, thermal size against the sensor, unknown enable command, missing and unselectable conversions, measurement ranges with an unknown or repeated gain, linear scale 0, empty source, unknown state field in a command, the reserved emissivity fields (accepted together; alone, of another kind or unit, and with defaults out of range rejected; [invariant 28](../invariants.md)), transport ranges |
 | `packages/core/src/cameras/conversion.test.ts` | `toCelsius` for linear, polynomial and lookup-table conversions, `NaN` outside a table; `toCelsiusArray` |
 | `packages/core/src/cameras/infiray-p2pro/profile.test.ts` | The P2 Pro profile is registered and valid, matches `0x0bda:0x5830`, and a synthetic 256×384 frame (196 608 B) decodes to 22.5 °C and a 35 °C centre |
 | `packages/core/test/profiles.ts` | Not a test: `testProfile(overrides)`, a consistent profile with made-up constants that the tests above change one part at a time |

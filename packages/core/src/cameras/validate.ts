@@ -6,6 +6,7 @@ import type {
   UvcExtensionUnitTransport,
   VendorControlTransport,
 } from './profile.ts';
+import { EMISSIVITY_FIELD, REFLECTED_TEMPERATURE_FIELD } from './fields.ts';
 
 const KEBAB = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const CONFIDENCE = new Set(['confirmed', 'measured', 'reported', 'unverified']);
@@ -55,6 +56,36 @@ function checkConversion(where: string, c: Conversion, out: string[]): void {
         out.push(`${where}: the table goes past raw 65535`);
       if (!c.celsius.every(Number.isFinite)) out.push(`${where}: every table value must be finite`);
       break;
+  }
+}
+
+// The corrections read these two fields from a frame's camera state by id:
+// docs/decisions/architecture.md#the-software-correction-works-relative-to-what-the-camera-applied
+function checkCorrectionFields(profile: CameraProfile, out: string[]): void {
+  const reserved: [string, string, string][] = [
+    [EMISSIVITY_FIELD, '', REFLECTED_TEMPERATURE_FIELD],
+    [REFLECTED_TEMPERATURE_FIELD, '°C', EMISSIVITY_FIELD],
+  ];
+  for (const [id, unit, partner] of reserved) {
+    const field = profile.state.find((f) => f.id === id);
+    if (!field) continue;
+    if (!profile.state.some((f) => f.id === partner)) {
+      out.push(`state.${id}: needs the state field '${partner}' too`);
+    }
+    if (field.kind !== 'number' || field.affects !== 'data' || field.unit !== unit) {
+      out.push(
+        `state.${id}: must be a number field with affects 'data' and unit '${unit}', because the emissivity correction reads it`,
+      );
+      continue;
+    }
+    // A default that is not finite already has its message.
+    if (!Number.isFinite(field.default)) continue;
+    if (id === EMISSIVITY_FIELD && !(field.default > 0 && field.default <= 1)) {
+      out.push(`state.${id}: default must be greater than 0 and at most 1`);
+    }
+    if (id === REFLECTED_TEMPERATURE_FIELD && !(field.default > -273.15)) {
+      out.push(`state.${id}: default must be above -273.15 °C`);
+    }
   }
 }
 
@@ -152,6 +183,8 @@ export function validateProfile(profile: CameraProfile): string[] {
       out.push(`state.${field.id}: default must be finite`);
     }
   }
+
+  checkCorrectionFields(profile, out);
 
   const commandIds = profile.commands.map((c) => c.id);
   for (const id of duplicates(commandIds)) out.push(`commands: '${id}' appears twice`);

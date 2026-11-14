@@ -41,7 +41,7 @@ The parts of a profile, field by field, are in the [technical document](cameras-
 - **Video modes:** resolution, frame rate, pixel format (`yuyv`), the command that must run first if the mode needs one, and where the image rows and the temperature rows are. A mode without temperature data has `layout: null`.
 - **Conversion:** one per gain mode, as data: linear (`raw × scale + offset`), a polynomial, or a lookup table.
 - **Sensor:** resolution, noise (NETD), accuracy, and the temperature range of each gain mode.
-- **Camera state:** settings the camera keeps that change the data or how to read them. A field called `gain` selects the conversion, and its `default` is what the browser assumes until the user declares the mode.
+- **Camera state:** settings the camera keeps that change the data or how to read them. A field called `gain` selects the conversion, and its `default` is what the browser assumes until the user declares the mode. If the camera applies an emissivity and a reflected temperature to its raw values itself, name those fields `emissivity` (a number from greater than 0 to 1) and `reflected-temperature` (°C), both with `affects: 'data'`; irvis then corrects readings from what the camera applied and never applies emissivity twice. Use other ids for settings that change only the camera's own image.
 - **Commands:** what the desktop app can send, over a USB vendor control transfer or a UVC extension unit, and which state fields each one changes.
 
 ## How a camera is recognised

@@ -1,9 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import { testProfile } from '../../test/profiles.ts';
-import type { CameraProfile, VideoMode } from './profile.ts';
+import type { CameraProfile, NumberStateField, VideoMode } from './profile.ts';
 import { validateProfile } from './validate.ts';
 
 const base = testProfile();
+
+const emissivity: NumberStateField = {
+  id: 'emissivity',
+  label: 'Emissivity',
+  kind: 'number',
+  unit: '',
+  default: 0.95,
+  affects: 'data',
+  refresh: 'command',
+};
+const reflected: NumberStateField = {
+  id: 'reflected-temperature',
+  label: 'Reflected temperature',
+  kind: 'number',
+  unit: '°C',
+  default: 25,
+  affects: 'data',
+  refresh: 'command',
+};
 
 function withMode(changes: Partial<VideoMode>): CameraProfile {
   const [first, ...rest] = base.videoModes;
@@ -129,6 +148,42 @@ describe('validateProfile', () => {
     const commands = [{ ...first, changes: ['palette'] }, ...rest];
     expect(validateProfile({ ...base, commands })).toEqual([
       "commands.nuc: changes unknown state field 'palette'",
+    ]);
+  });
+
+  it('accepts the emissivity fields of a camera that applies emissivity itself', () => {
+    const state = [...base.state, emissivity, reflected];
+    expect(validateProfile({ ...base, state })).toEqual([]);
+  });
+
+  it('rejects emissivity fields that the correction cannot read', () => {
+    expect(validateProfile({ ...base, state: [...base.state, emissivity] })).toEqual([
+      "state.emissivity: needs the state field 'reflected-temperature' too",
+    ]);
+    expect(validateProfile({ ...base, state: [...base.state, reflected] })).toEqual([
+      "state.reflected-temperature: needs the state field 'emissivity' too",
+    ]);
+    const meaning = { ...emissivity, affects: 'meaning' as const };
+    const kelvin = { ...reflected, unit: 'K' };
+    expect(validateProfile({ ...base, state: [...base.state, meaning, kelvin] })).toEqual([
+      "state.emissivity: must be a number field with affects 'data' and unit '', because the emissivity correction reads it",
+      "state.reflected-temperature: must be a number field with affects 'data' and unit '°C', because the emissivity correction reads it",
+    ]);
+    const outOfRange = [
+      { ...emissivity, default: 0 },
+      { ...reflected, default: -300 },
+    ];
+    expect(validateProfile({ ...base, state: [...base.state, ...outOfRange] })).toEqual([
+      'state.emissivity: default must be greater than 0 and at most 1',
+      'state.reflected-temperature: default must be above -273.15 °C',
+    ]);
+    const notFinite = [
+      { ...emissivity, default: Number.NaN },
+      { ...reflected, default: Number.NaN },
+    ];
+    expect(validateProfile({ ...base, state: [...base.state, ...notFinite] })).toEqual([
+      'state.emissivity: default must be finite',
+      'state.reflected-temperature: default must be finite',
     ]);
   });
 

@@ -2,7 +2,7 @@
 
 Numbered domain rules, each enforced by the tests listed under it. Cite a rule by number ("invariant 4"). A number is never reused; a rule that stops holding is struck through with the reason. How to add one: [documentation guide](guides/documentation.md#invariants).
 
-Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the architecture of the TypeScript packages, 18 to the camera registry, 19 to the YUYV decoder, 20 and 21 to the capture tool, 22 to 25 to the `.irvis` format.
+Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the architecture of the TypeScript packages, 18 to the camera registry, 19 to the YUYV decoder, 20 and 21 to the capture tool, 22 to 25 to the `.irvis` format, 26 to 28 to the corrections.
 
 - **1.** A changed path that a rule owns fails the check unless some changed path matches that rule's documentation regex.
   - `tools/docs-check/test/rules.test.ts::rules::owned path without doc fails`
@@ -126,3 +126,14 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
   - `packages/core/src/irvis/irvis.test.ts::reencodeIrvis::keeps every value within the new threshold of the measured one`
   - `packages/core/src/irvis/irvis.test.ts::reencodeIrvis::refuses a smaller threshold`
   - `packages/core/src/irvis/irvis.test.ts::reencodeIrvis::skips the rest of a damaged chunk when the index is intact`
+- **26.** The emissivity correction never applies the camera's own correction twice: settings equal to the emissivity and reflected temperature in a frame's camera state return every reading with the same bits, other settings give what they give on the reading without the camera's correction, and the default settings change no reading of a camera that applies no correction itself.
+  - `packages/core/src/corrections/emissivity.test.ts::temperatureCorrection::returns the reading unchanged with the default settings`
+  - `packages/core/src/corrections/emissivity.test.ts::camera correction::changes nothing when the settings equal what the camera applied`
+  - `packages/core/src/corrections/emissivity.test.ts::camera correction::never applies emissivity twice`
+  - `packages/core/src/corrections/emissivity.test.ts::correctFrame::leaves the readings of a camera that applied the same settings unchanged`
+- **27.** Uncertain pixels and pixels without a temperature (NaN) never turn a threshold alarm on and are never painted by an isotherm.
+  - `packages/core/src/corrections/alarms.test.ts::evaluateAlarms::never turns on for uncertain pixels or pixels without a temperature`
+  - `packages/core/src/corrections/isotherms.test.ts::isotherms::never mark uncertain pixels or pixels without a temperature`
+- **28.** A camera profile uses the state field ids `emissivity` and `reflected-temperature` only together, as number fields that affect the raw data, with unit `''` and `°C` and defaults in range.
+  - `packages/core/src/cameras/validate.test.ts::validateProfile::accepts the emissivity fields of a camera that applies emissivity itself`
+  - `packages/core/src/cameras/validate.test.ts::validateProfile::rejects emissivity fields that the correction cannot read`
