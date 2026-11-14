@@ -219,6 +219,11 @@ export interface CameraCommand extends Provenance {
 export interface CameraProfile {
   /** Unique in the registry, kebab-case, equal to the profile's directory name. */
   readonly id: string;
+  /**
+   * A positive integer, raised whenever a constant that changes readings
+   * changes. Every .irvis file records the id and version it was made with.
+   */
+  readonly version: number;
   /** Shown to the user, for example `InfiRay P2 Pro`. */
   readonly name: string;
   readonly identification: CameraIdentification;

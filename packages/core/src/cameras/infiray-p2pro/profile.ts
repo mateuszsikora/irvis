@@ -4,6 +4,7 @@ import type { CameraProfile } from '../profile.ts';
 
 export const profile: CameraProfile = {
   id: 'infiray-p2pro',
+  version: 1,
   name: 'InfiRay P2 Pro',
   identification: {
     // Realtek bridge; the TOPDON TC001 reports the same pair.

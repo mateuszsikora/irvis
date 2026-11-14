@@ -5,3 +5,5 @@ export type * from './player.ts';
 export type * from './store.ts';
 export * from './cameras/index.ts';
 export * from './yuyv.ts';
+export * from './irvis/index.ts';
+export * from './memory.ts';

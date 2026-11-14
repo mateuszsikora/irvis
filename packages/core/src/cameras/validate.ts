@@ -96,6 +96,8 @@ export function validateProfile(profile: CameraProfile): string[] {
   const { identification, sensor } = profile;
 
   if (!KEBAB.test(profile.id)) out.push(`id '${profile.id}' is not kebab-case`);
+  if (!isPositiveInt(profile.version))
+    out.push(`version ${String(profile.version)} is not a positive integer`);
   if (profile.name.trim() === '') out.push('name is empty');
 
   if (identification.usb.length === 0) out.push('identification: no USB ID');

@@ -22,6 +22,15 @@ describe('validateProfile', () => {
     ]);
   });
 
+  it('rejects a version that is not a positive integer', () => {
+    expect(validateProfile({ ...base, version: 0 })).toEqual([
+      'version 0 is not a positive integer',
+    ]);
+    expect(validateProfile({ ...base, version: 1.5 })).toEqual([
+      'version 1.5 is not a positive integer',
+    ]);
+  });
+
   it('rejects USB IDs that are not 16-bit integers', () => {
     const profile = { ...base, identification: { usb: [{ vendorId: 0x10000, productId: 1 }] } };
     expect(validateProfile(profile)).toEqual([

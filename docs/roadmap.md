@@ -134,7 +134,7 @@ Targets for the reconstruction (from the specification): Y matches the low bytes
 | [#11](https://github.com/mateuszsikora/irvis/issues/11) | The feature list of the vendor Android app, from the owner's screenshots |
 | [#12](https://github.com/mateuszsikora/irvis/issues/12) | Six palettes (Iron, White Hot, Black Hot, Rainbow, Red Hot, Cold Blue), render to RGBA, automatic and manual range; min and max with position, point (3×3 mean), line, area, histogram |
 | [#13](https://github.com/mateuszsikora/irvis/issues/13) | Emissivity with reflected temperature, offset, °C and °F, threshold alarms, isotherms |
-| [#14](https://github.com/mateuszsikora/irvis/issues/14) | The `.irvis` container and codec, `irvis-format.md` (planned, M4) |
+| [#14](https://github.com/mateuszsikora/irvis/issues/14) | The `.irvis` container and codec, [irvis-format.md](irvis-format.md) |
 | [#15](https://github.com/mateuszsikora/irvis/issues/15) | Photo export: PNG with the one-frame `.irvis` embedded in a private chunk, CSV |
 | [#17](https://github.com/mateuszsikora/irvis/issues/17) | A minimal `packages/backend-replay` that plays synthetic frames and fixtures from memory; the React viewer on top of it: live view, scale bar, controls generated from capabilities and profile commands, greyed-out hardware features in the browser, uncertain-pixel overlay, i18n (English, Polish skeleton) |
 | [#18](https://github.com/mateuszsikora/irvis/issues/18) | Several points, lines and areas at once; min, max and centre markers |

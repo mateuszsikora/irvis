@@ -30,7 +30,7 @@ Two per feature, in `docs/features/`, and one row per feature in the table in [d
 
 ## Specifications
 
-A wire or file format that other programs read gets its own document at the top level of `docs/`, with a version number near the top (`Version: 1`). A change to the format bumps the version, and the document says what changed between versions. There is none yet; the formats only the documentation check reads are described in its [technical document](../features/docs-contract-technical.md#schema).
+A wire or file format that other programs read gets its own document at the top level of `docs/`, with a version number near the top (`Version: 1`). A change to the format bumps the version, and the document says what changed between versions. The one so far is [irvis-format.md](../irvis-format.md); the formats only the documentation check reads are described in its [technical document](../features/docs-contract-technical.md#schema).
 
 ## Guides
 
