@@ -503,7 +503,7 @@ const yesNo = (v: boolean): string => (v ? 'yes' : 'no');
 export function pixelFormatText(format: string | null): string {
   if (format === null) return 'unknown (ffmpeg.log does not say)';
   if (format === REQUESTED_PIXEL_FORMAT) return `${format}, as requested`;
-  return `${format}, not ${REQUESTED_PIXEL_FORMAT}: the bytes are not in the camera's order, so the values below are wrong`;
+  return `${format}, not ${REQUESTED_PIXEL_FORMAT}: the bytes are reordered or converted, so the values below are wrong`;
 }
 
 /** Whether the upper half is greyscale and how its brightness follows the raw values. */
@@ -672,13 +672,14 @@ export function formatSummary(reports: readonly { name: string; report: CaptureR
     thermal.length > 0 &&
     thermal.every((r) => r.report.frameSize.exact && r.report.temperatures?.plausible);
   const formats = [...new Set(reports.map((r) => r.report.pixelFormat ?? 'unknown'))].join(', ');
+  const swappedFormats = [...new Set(swapped.map((r) => r.report.pixelFormat))].join(', ');
   // With another byte order the lower half cannot look like temperatures, but
   // that says nothing about whether the mode needs a command.
   const answer384 =
     thermal.length === 0
       ? 'not captured'
       : swapped.some((r) => r.report.temperatures !== null)
-        ? `unknown: AVFoundation delivered ${formats}, not ${REQUESTED_PIXEL_FORMAT}, so the bytes were not in the camera's order`
+        ? `unknown: AVFoundation delivered ${swappedFormats}, not ${REQUESTED_PIXEL_FORMAT}, so the bytes were not as the camera sent them`
         : yesNo(works);
   const compared = thermal.filter((r) => r.report.temperatures?.referenceDiff != null);
   const within = compared.filter(

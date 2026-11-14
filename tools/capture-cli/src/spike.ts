@@ -1,5 +1,6 @@
 // `spike` (npm run spike:m1): the M1 scenarios one after another, then the
 // session report. What the owner does at each step: docs/findings/m1.md
+import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
@@ -118,6 +119,7 @@ export async function spike(ffmpeg: string, out: string | undefined): Promise<st
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   let probeText: string;
   let captured = 0;
+  const failures: { id: string; message: string }[] = [];
   const say = (text: string): void => {
     process.stdout.write(`${text}\n`);
   };
@@ -176,6 +178,10 @@ export async function spike(ffmpeg: string, out: string | undefined): Promise<st
       } catch (error) {
         if (!(error instanceof CliError)) throw error;
         say(`\n${error.message}`);
+        // A capture with meta.json gets its own `No report: …` block.
+        if (!existsSync(join(session, s.id, 'meta.json'))) {
+          failures.push({ id: s.id, message: error.message });
+        }
         continue;
       }
       captured++;
@@ -200,9 +206,30 @@ export async function spike(ffmpeg: string, out: string | undefined): Promise<st
     rl.close();
   }
   if (captured === 0) {
-    return `No captures; the probe is in ${join(session, 'probe.txt')}.\n`;
+    return [
+      `No captures; the probe is in ${join(session, 'probe.txt')}.`,
+      '',
+      ...failureLines(failures),
+    ].join('\n');
   }
-  const header = [
+  const header = sessionHeader(session, probeText, failures);
+  const report = await reportCommand(session, undefined, header);
+  return `${report}\nWritten to ${join(session, 'report.md')}. Paste it into the issue; keep the frames local.\n`;
+}
+
+/** The `Failed captures:` lines for captures that left no meta.json; none when there are none. */
+export function failureLines(failures: readonly { id: string; message: string }[]): string[] {
+  if (failures.length === 0) return [];
+  return ['Failed captures:', '', ...failures.map((f) => `- \`${f.id}\`: ${f.message}`), ''];
+}
+
+/** The top of the session report: the session, the probe output folded away, the failed captures. */
+export function sessionHeader(
+  session: string,
+  probeText: string,
+  failures: readonly { id: string; message: string }[],
+): string {
+  return [
     `### M1 spike, session \`${session}\``,
     '',
     '<details><summary>Probe</summary>',
@@ -213,7 +240,6 @@ export async function spike(ffmpeg: string, out: string | undefined): Promise<st
     '',
     '</details>',
     '',
+    ...failureLines(failures),
   ].join('\n');
-  const report = await reportCommand(session, undefined, header);
-  return `${report}\nWritten to ${join(session, 'report.md')}. Paste it into the issue; keep the frames local.\n`;
 }

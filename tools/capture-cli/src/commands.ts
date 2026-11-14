@@ -157,7 +157,7 @@ export function formatWarning(pixelFormat: string | null): string {
   if (pixelFormat === null) {
     return `warning: ffmpeg.log does not say which pixel format AVFoundation delivered\n`;
   }
-  return `warning: AVFoundation delivered ${pixelFormat}, not ${REQUESTED_PIXEL_FORMAT}; the bytes are not in the camera's order\n`;
+  return `warning: AVFoundation delivered ${pixelFormat}, not ${REQUESTED_PIXEL_FORMAT}; its bytes are reordered or converted, not as the camera sent them\n`;
 }
 
 /** Capture directories in `dir`: itself if it has meta.json, else its subdirectories that do. */

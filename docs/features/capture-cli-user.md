@@ -31,7 +31,7 @@ npm run spike:m1 -- --out <dir>      # session in <dir>
    | `mode-192` | 192 | 3 | Anything; checks the 256×192 mode |
 
 4. After `room`, `hand` and `mug` it asks for the Android app's centre reading at the same spot. Type it in °C (`23.5` or `23,5`), or press Enter and add it later with `reference`.
-5. At the end it writes `report.md` into the session directory and prints it: the probe output, the summary and one block per capture. Paste it into the issue.
+5. At the end it writes `report.md` into the session directory and prints it: the probe output, the scenarios whose capture failed (under `Failed captures:`), the summary and one block per capture. Paste it into the issue.
 
 The session directory holds every frame: 4.9 MB a second before gzip, which shrinks it by an amount that depends on the scene. `captures/` is ignored by git; keep long series local or attach them to a GitHub Release.
 
@@ -74,7 +74,7 @@ npm run capture -- capture --device 1 --seconds 10 --mode 384 --out captures/tes
 
 It prints one line, such as `captures/test: 250 frames, the first 812 ms after ffmpeg started; ffmpeg exited with 0`, and leaves in `<dir>` the frames as `frames/000000.yuyv.gz`, … , `meta.json`, `packets.framecrc` and `ffmpeg.log`.
 
-If AVFoundation did not deliver the `yuyv422` format the tool asks for, a second line says so, for example `warning: AVFoundation delivered uyvy422, not yuyv422; the bytes are not in the camera's order`. The frames then have the right size but their bytes in another order, so the temperatures in the report are wrong, and the report and its summary say so instead of concluding that the mode needs a command. Post the warning and `ffmpeg.log` in the issue.
+If AVFoundation did not deliver the `yuyv422` format the tool asks for, a second line says so, for example `warning: AVFoundation delivered uyvy422, not yuyv422; its bytes are reordered or converted, not as the camera sent them`. With `uyvy422` the frames have the right size but their bytes in another order, so the temperatures in the report are wrong, and the report and its summary say so instead of concluding that the mode needs a command. Post the warning and `ffmpeg.log` in the issue.
 
 ## Report
 
@@ -88,12 +88,13 @@ It writes `report.md`, `report.json` and the previews `preview-image.png`, `prev
 
 ```
 - Every frame has the expected size: yes
+- Pixel format AVFoundation delivered: yuyv422
 - The 384 mode delivers temperature data without any command: yes
 - Upper half: greyscale (U and V within 128 ± 2); brightness rises with temperature
 - Agreement with the Android app within ±2 °C: 3 of 3
 ```
 
-Each capture's block has the frame count and whether every frame had the expected size (196 608 B in the 384 mode), the time to the first frame, the frame rate and the spread of the intervals, the minimum, maximum and centre temperature, the upper half's colour and how its brightness follows temperature, the noise in mK, the detected NUC events, and a histogram. What each number means and how it is computed is in the [technical document](capture-cli-technical.md#report).
+Each capture's block has, after the device line, the pixel format AVFoundation delivered, which must read `yuyv422, as requested` for the values to mean anything. Then come the frame count and whether every frame had the expected size (196 608 B in the 384 mode), the time to the first frame, the frame rate and the spread of the intervals, the minimum, maximum and centre temperature, the upper half's colour and how its brightness follows temperature, the noise in mK, the detected NUC events, and a histogram. What each number means and how it is computed is in the [technical document](capture-cli-technical.md#report).
 
 The previews come from the middle frame unless `--frame` says otherwise: `preview-image` is the upper half as the camera sent it, `preview-thermal` the raw values, stretched from the coldest (black) to the hottest (white) pixel in the PNG, and as 16-bit values in the PGM.
 

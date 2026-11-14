@@ -120,10 +120,10 @@ export async function capture(options: CaptureOptions): Promise<CaptureMeta> {
       const write = gzipAsync(frame)
         .then((gz) => writeFile(join(out, file), gz))
         .catch((error: unknown) => {
-          if (writeError === null) {
-            writeError = { index, error };
-            child.kill('SIGINT');
-          }
+          // Writes finish out of order; report the earliest frame that failed.
+          const known = writeError;
+          if (known === null) child.kill('SIGINT');
+          if (known === null || index < known.index) writeError = { index, error };
         });
       writes.push(write);
       options.onFrame?.(index, arrivalMs);

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { FrameSplitter } from './capture.ts';
 import { main, UsageError } from './cli.ts';
 import { pgm, png, stretch } from './image.ts';
-import { chooseDevice, guessDevice, parseCelsius } from './spike.ts';
+import { chooseDevice, guessDevice, parseCelsius, sessionHeader } from './spike.ts';
 import { histogram, quantile, ranks, spearman, summarize } from './stats.ts';
 import { describeConfiguration, guid } from './usb.ts';
 import { formatWarning } from './commands.ts';
@@ -171,7 +171,7 @@ describe('command line', () => {
   it('warns when AVFoundation changed the pixel format', () => {
     expect(formatWarning('yuyv422')).toBe('');
     expect(formatWarning('uyvy422')).toBe(
-      "warning: AVFoundation delivered uyvy422, not yuyv422; the bytes are not in the camera's order\n",
+      'warning: AVFoundation delivered uyvy422, not yuyv422; its bytes are reordered or converted, not as the camera sent them\n',
     );
   });
 
@@ -201,5 +201,32 @@ describe('spike device choice', () => {
     expect(() => chooseDevice('7', null, devices)).toThrow(
       'there is no device [7] in the list above',
     );
+  });
+});
+
+describe('spike session header', () => {
+  it('folds the probe away and lists failed captures', () => {
+    const header = sessionHeader('captures/m1-x', 'ffmpeg: /bin/ffmpeg\n', [
+      { id: 'movement', message: 'captures/m1-x/movement: writing frame 12 failed: ENOSPC' },
+    ]);
+    expect(header).toBe(
+      [
+        '### M1 spike, session `captures/m1-x`',
+        '',
+        '<details><summary>Probe</summary>',
+        '',
+        '```',
+        'ffmpeg: /bin/ffmpeg',
+        '```',
+        '',
+        '</details>',
+        '',
+        'Failed captures:',
+        '',
+        '- `movement`: captures/m1-x/movement: writing frame 12 failed: ENOSPC',
+        '',
+      ].join('\n'),
+    );
+    expect(sessionHeader('s', 'p', [])).not.toContain('Failed captures:');
   });
 });

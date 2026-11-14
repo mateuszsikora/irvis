@@ -122,12 +122,13 @@ describe('report', () => {
       mode: '384',
       pixelFormat: 'uyvy422',
     });
+    await writeSyntheticCapture(join(dir, 'mode-192'), { frames: 5, mode: '192' });
     await mkdir(join(dir, 'broken'));
     await writeFile(join(dir, 'broken', 'meta.json'), '{ not json');
     const markdown = await reportCommand(dir, undefined);
-    expect(markdown).toContain('- Pixel format AVFoundation delivered: uyvy422');
+    expect(markdown).toContain('- Pixel format AVFoundation delivered: yuyv422, uyvy422');
     expect(markdown).toContain(
-      "- The 384 mode delivers temperature data without any command: unknown: AVFoundation delivered uyvy422, not yuyv422, so the bytes were not in the camera's order",
+      '- The 384 mode delivers temperature data without any command: unknown: AVFoundation delivered uyvy422, not yuyv422, so the bytes were not as the camera sent them',
     );
     expect(markdown).toContain('- Pixel format: uyvy422, not yuyv422');
     expect(markdown).toContain(`No report: ${join(dir, 'broken', 'meta.json')} is not valid JSON:`);
