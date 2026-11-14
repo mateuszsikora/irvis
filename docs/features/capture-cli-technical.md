@@ -111,7 +111,7 @@ npm scripts: `npm run capture -- <command>` and `npm run spike:m1` ([development
 
 ## Failure modes
 
-Every error is printed as `capture-cli: <message>`. Usage errors (`UsageError` in `src/cli.ts`) add a blank line and the usage, and exit with 2; `CliError` (`src/errors.ts`) exits with 1; any other error prints its stack and exits with 1.
+Every error is printed as `capture-cli: <message>`. Options are checked before the platform, so a usage error is reported the same way on every system. Usage errors (`UsageError` in `src/cli.ts`) add a blank line and the usage, and exit with 2; `CliError` (`src/errors.ts`) exits with 1; any other error prints its stack and exits with 1.
 
 | Message | Kind | Cause |
 | --- | --- | --- |

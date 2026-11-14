@@ -103,8 +103,8 @@ export async function main(argv: readonly string[]): Promise<string> {
       return formatDevices(await listDevices(findFfmpeg()));
     }
     case 'probe': {
-      requireMacos(command);
       const device = integer('--device', values.device, 0);
+      requireMacos(command);
       return probe(findFfmpeg(), device);
     }
     case 'capture': {
