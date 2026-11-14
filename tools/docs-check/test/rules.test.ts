@@ -224,6 +224,15 @@ describe('TypeScript rules', () => {
     repo.passes();
   });
 
+  it('capture tool needs capture tool doc', () => {
+    repo.write('tools/capture-cli/src/cli.ts', 'export {};\n');
+    repo.commit();
+    const out = repo.fails('F5');
+    expect(out).not.toContain('[F0]');
+    repo.append('docs/features/capture-cli-user.md', '\nTouched.\n');
+    repo.passes();
+  });
+
   it('root configuration needs a guide', () => {
     for (const path of [
       'tsconfig.base.json',

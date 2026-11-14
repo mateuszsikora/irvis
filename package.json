@@ -13,6 +13,8 @@
   "scripts": {
     "docs-check": "node tools/docs-check/src/check-docs.ts",
     "decisions-index": "node tools/docs-check/src/decisions-index.ts",
+    "capture": "node tools/capture-cli/src/cli.ts",
+    "spike:m1": "node tools/capture-cli/src/cli.ts spike",
     "test": "vitest run",
     "build": "npm run build --workspaces --if-present",
     "lint": "eslint --max-warnings 0 .",

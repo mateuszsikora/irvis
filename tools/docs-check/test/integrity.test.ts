@@ -212,7 +212,7 @@ describe('integrity', () => {
 });
 
 describe('Vitest ids', () => {
-  const SPEC = 'packages/core/src/yuyv.test.ts';
+  const SPEC = 'packages/core/src/vitest-ids-fixture.test.ts';
 
   beforeEach(() => {
     repo.write(

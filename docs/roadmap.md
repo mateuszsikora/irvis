@@ -69,7 +69,7 @@ Risks that the spikes settle:
 ## How the work runs
 
 - The implementer has no camera. Every step that needs hardware ends in a script with instructions (`npm run spike:m<n>`) and a result format; the owner runs it and posts the output in the issue.
-- The spikes M1 to M3 end with a report in `findings/m<n>.md` (planned, M1). Work that does not depend on a spike's result goes on in parallel; work that does waits for the owner's decision.
+- The spikes M1 to M3 end with a report in `docs/findings/`, one file per spike, such as [m1.md](findings/m1.md). Work that does not depend on a spike's result goes on in parallel; work that does waits for the owner's decision.
 - Milestones do not run strictly in sequence. The specification asked for one after another; the owner agreed to any order that leads to the finished product.
 - Every uncertain constant (temperature divisor, command codes) lives in the camera profile with a comment on its source and confidence.
 - Code from other projects only under their licence, with attribution in `NOTICE`. The protocol is described in our own words in `protocol.md` (planned, M2).

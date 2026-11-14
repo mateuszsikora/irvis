@@ -4,14 +4,14 @@ How `packages/core` is built, checked and laid out, for whoever changes it. The 
 
 ## Data flow
 
-No frame passes through core yet; the types fix the path that later issues implement:
+No backend delivers frames to core yet; the types fix the path, and the YUYV decoders (step 3) exist:
 
 1. A `CameraBackend` (`src/backend.ts`) lists devices and `open()`s one with an `OpenRequest`: the device id, the `CameraProfile` chosen for it, and a `VideoMode.id` of that profile.
 2. The `CameraSession` it returns publishes `RawFrame`s (`src/frames.ts`) through `frames`, a `Subscribable<RawFrame>` (`src/store.ts`). A listener that is slow makes the backend drop frames; nothing queues them.
-3. A decoder (planned in #6) turns a `YuyvFrame` into a `ThermalFrame` by the profile's `FrameLayout`, and the reconstruction (planned in #8) does the same from a `Yuv420Frame`. A `{ kind: 'thermal' }` frame, from a recording, already is one.
+3. `decodeThermalFrame` (`src/yuyv.ts`) turns a `YuyvFrame` into a `ThermalFrame` by the `FrameLayout` of the profile's `VideoMode`: it checks the frame (`checkYuyvFrame`: an even width, a positive height, width × height × 2 bytes) and that it has the mode's size, then `decodeYuyvRaw` reads the thermal rows as one little-endian 16-bit value per pixel, raw = lo | hi << 8, through a `DataView`, so the result does not depend on the platform's byte order or on the alignment of `data`. The result carries the given `Conversion` and `CameraStateSnapshot` and `uncertain: null`. `decodeYuyvImage` splits other rows into Y (one byte per pixel) and U and V (one byte per pair of pixels), which is how the camera's own image in the upper rows is read. `toCelsius` (`src/cameras/conversion.ts`) evaluates the conversion ([cameras: technical](cameras-technical.md#interfaces)). The reconstruction (planned in #8) does the same from a `Yuv420Frame`. A `{ kind: 'thermal' }` frame, from a recording, already is one.
 4. The `.irvis` codec (planned in #14) writes `ThermalFrame`s to a `ByteSink` (`src/bytes.ts`) and reads them back from a `ByteSource`; a `Player` (`src/player.ts`) drives the playback.
 
-`src/index.ts` re-exports every type and the registry module `src/cameras/index.ts`. It is the package's only entry point (`exports` in `packages/core/package.json` maps `.` to `./src/index.ts`).
+`src/index.ts` re-exports every type, the registry module `src/cameras/index.ts` and `src/yuyv.ts`. It is the package's only entry point (`exports` in `packages/core/package.json` maps `.` to `./src/index.ts`).
 
 ## Schema
 
@@ -54,7 +54,14 @@ Commands to the camera are not part of `CameraBackend` yet; #22 adds them.
 
 ## Interfaces
 
-Everything is exported from `@irvis/core`: the types above, the profile types, and `cameraProfiles`, `findProfile`, `matchProfiles`, `validateProfile` and `DeviceDescription` from the registry ([cameras: technical](cameras-technical.md#interfaces)).
+Everything is exported from `@irvis/core`: the types above, the profile types, `cameraProfiles`, `findProfile`, `matchProfiles`, `validateProfile`, `toCelsius`, `toCelsiusArray` and `DeviceDescription` from the registry ([cameras: technical](cameras-technical.md#interfaces)), and the decoders of `src/yuyv.ts`:
+
+| Name | Signature | Notes |
+| --- | --- | --- |
+| `checkYuyvFrame` | `(frame: YuyvFrame) => void` | Throws unless the width is a positive even integer, the height a positive integer and `data` has width × height × 2 bytes |
+| `decodeYuyvRaw` | `(frame: YuyvFrame, range: RowRange) => Uint16Array` | width × `range.rows` values, row-major; `data` may be a view into a larger buffer at any offset |
+| `decodeYuyvImage` | `(frame: YuyvFrame, range: RowRange) => YuyvImage` | `YuyvImage`: `width`, `height` (= `range.rows`), `y` (width × height), `u` and `v` (width / 2 × height), each a new `Uint8Array` |
+| `decodeThermalFrame` | `(frame: YuyvFrame, mode: VideoMode, conversion: Conversion, cameraState: CameraStateSnapshot) => ThermalFrame` | `width` is the mode's width, `height` its thermal rows, `timestamp` the frame's |
 
 ## Configuration
 
@@ -96,6 +103,18 @@ TypeScript errors are the compiler's own; the ones core code meets are shown in 
 | `The ** operator: engines may …` | `x ** 4`, `x **= 2` |
 | `Core does not load modules with import(); use a static import (docs/decisions/architecture.md#core-uses-only-apis-that-browsers-and-node-share).` | `import('react')` or any other `import()` in core |
 
+The decoders throw an `Error` with one of these messages:
+
+| Message | Cause |
+| --- | --- |
+| `YUYV frame width <width> is not a positive even integer` | YUYV packs two pixels in four bytes |
+| `YUYV frame height <height> is not a positive integer` | |
+| `YUYV frame has <bytes> bytes, expected <expected> for <width>×<height>` | `data` does not hold exactly one frame |
+| `rows must be a positive integer, not <rows>` | The `RowRange` has no rows |
+| `rows <first> to <last> are not inside the <height>-row frame` | The `RowRange` starts before row 0, at a fractional row, or ends past the frame |
+| `video mode '<id>' carries no temperature data` | `decodeThermalFrame` with a mode whose `layout` is `null` |
+| `frame is <width>×<height>, video mode '<id>' is <width>×<height>` | `decodeThermalFrame` with a frame of another size |
+
 The directive test (`eslint-directives.test.ts`) fails with a Vitest diff listing one line per problem:
 
 | Line | Cause |
@@ -113,9 +132,10 @@ The dependency test (`packages/core/test/package-dependencies.test.ts`) fails wi
 | `packages/core/test/package-dependencies.test.ts` | Reads every `package.json` in `packages/*`, `apps/*` and `tools/*`. Every workspace is in `ALLOWED_IRVIS`; its `@irvis/*` dependencies in all four dependency fields are in its row; core depends on nothing outside irvis but `fflate`; only `apps/desktop` lists `electron`. [Invariant 15](../invariants.md). |
 | `packages/core/test/eslint-rules.test.ts` | Runs the repository's ESLint configuration (with type-aware rules off, because the snippets are not files) on snippets placed in core paths: Node modules, irvis packages, hoisted packages (`react`, `vite`, `vitest`), `fflate/node`, dynamic `import()` in and outside measurement code, relative imports, `vitest` in tests only, the `fflate` names ([invariant 16](../invariants.md)); the `Math` allow-list in all five directories and not outside them, and that a disable comment suppresses it ([invariant 17](../invariants.md)). |
 | `packages/core/test/eslint-directives.test.ts` | Every directive comment in `packages/core/src/` names its rules and a decision; accepted and rejected forms, inline configuration, and comments or strings that only look like directives (`// exported …`, `// global …`, `// eslint-disable` in a line comment) ([invariant 17](../invariants.md)). |
-| `packages/core/src/cameras/*.test.ts` | The registry and `validateProfile`: [cameras: technical](cameras-technical.md#tests). |
+| `packages/core/src/yuyv.test.ts` | `decodeYuyvRaw` reads lo and hi bytes, only the given rows, and a frame that is a view into a larger buffer, and rejects rows outside the frame ([invariant 19](../invariants.md)); `decodeYuyvImage` splits Y, U and V; `checkYuyvFrame` rejects a wrong byte count and an odd width; `decodeThermalFrame` decodes the mode's thermal rows and rejects a mode without temperature data and a frame of another size. Synthetic frames only. |
+| `packages/core/src/cameras/*.test.ts`, `packages/core/src/cameras/infiray-p2pro/profile.test.ts` | The registry, `validateProfile`, the conversions and the P2 Pro profile: [cameras: technical](cameras-technical.md#tests). |
 
-Not covered: that the types fit the backends and the codec, which do not exist yet; the TypeScript library settings, which `npm run typecheck` exercises on every run but no test asserts (a file that uses `document` was checked by hand when they were set up). The ESLint test cannot see a rule that type-aware linting would add or change for a real file.
+Not covered: real camera frames (they come with the fixtures in #16); that the types fit the backends and the codec, which do not exist yet; the TypeScript library settings, which `npm run typecheck` exercises on every run but no test asserts (a file that uses `document` was checked by hand when they were set up). The ESLint test cannot see a rule that type-aware linting would add or change for a real file.
 
 ## See also
 

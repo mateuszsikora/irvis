@@ -1,13 +1,15 @@
 // The camera registry. Adding a camera: a directory <id>/ with profile.ts and
 // README.md, and one entry in cameraProfiles below. How:
 // docs/features/cameras-user.md#add-a-camera
+import { profile as infirayP2Pro } from './infiray-p2pro/profile.ts';
 import type { CameraProfile } from './profile.ts';
 
 export type * from './profile.ts';
+export { toCelsius, toCelsiusArray } from './conversion.ts';
 export { validateProfile } from './validate.ts';
 
 /** Every camera irvis supports, compiled into the app. */
-export const cameraProfiles: readonly CameraProfile[] = [];
+export const cameraProfiles: readonly CameraProfile[] = [infirayP2Pro];
 
 /** What a backend knows about a device; the browser usually knows only the label. */
 export interface DeviceDescription {

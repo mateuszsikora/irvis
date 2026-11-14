@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2024"],
+    "types": ["node"],
+    "composite": true,
+    "emitDeclarationOnly": true,
+    "rootDir": "./src",
+    "outDir": "../../node_modules/.tsbuild/capture-cli/lib",
+    "tsBuildInfoFile": "../../node_modules/.tsbuild/capture-cli/lib.tsbuildinfo"
+  },
+  "references": [{ "path": "../../packages/core/tsconfig.lib.json" }],
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
+}

@@ -15,3 +15,6 @@ node_modules/
 dist/
 coverage/
 *.tsbuildinfo
+
+# Local camera captures of the hardware spikes (capture-cli)
+captures/

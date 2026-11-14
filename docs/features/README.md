@@ -10,6 +10,7 @@ This file is for anyone who changes code in this repository. It lists the featur
 | Core | [core-user.md](core-user.md) | [core-technical.md](core-technical.md) | `packages/core/` except `src/cameras/` |
 | Cameras | [cameras-user.md](cameras-user.md) | [cameras-technical.md](cameras-technical.md) | `packages/core/src/cameras/` |
 | Web app | [web-app-user.md](web-app-user.md) | [web-app-technical.md](web-app-technical.md) | `apps/web/`, `netlify.toml` |
+| Capture tool | [capture-cli-user.md](capture-cli-user.md) | [capture-cli-technical.md](capture-cli-technical.md) | `tools/capture-cli/` |
 
 Any path outside the map falls under rule F0 below, so a new package or app has to come with its own feature documents.
 
@@ -26,6 +27,7 @@ A rule fails when a changed path matches its source regex and no changed path ma
 | F2 | `^packages/core/(?!src/cameras/)` | `^docs/features/core-(user\|technical)\.md$` | Core changed: update docs/features/core-technical.md (or docs/features/core-user.md) |
 | F3 | `^(apps/web/\|netlify\.toml$)` | `^docs/features/web-app-(user\|technical)\.md$` | Web app or its Netlify configuration changed: update docs/features/web-app-technical.md (or docs/features/web-app-user.md) |
 | F4 | `^packages/core/src/cameras/` | `^docs/features/cameras-(user\|technical)\.md$` | Camera registry or profile schema changed: update docs/features/cameras-technical.md (or docs/features/cameras-user.md) |
+| F5 | `^tools/capture-cli/` | `^docs/features/capture-cli-(user\|technical)\.md$` | Capture tool changed: update docs/features/capture-cli-technical.md (or docs/features/capture-cli-user.md) |
 | C2 | `^\.github/(?!pull_request_template\.md$)` | `^docs/guides/development\.md$` | CI or GitHub configuration changed: update docs/guides/development.md |
 | C3 | `^(package\.json\|tsconfig(\.[^/]+)?\.json\|(eslint\|vitest)\.config\.[cm]?[jt]s\|\.prettierrc(\.[^/]+)?\|\.prettierignore\|\.nvmrc\|\.npmrc)$` | `^docs/guides/(development\|testing)\.md$` | Root TypeScript configuration changed: update docs/guides/development.md (or docs/guides/testing.md for the Vitest configuration) |
 
@@ -35,7 +37,7 @@ Notes on the rules:
 - F2 and F4 split `packages/core/`: F4 owns `src/cameras/` and F2 everything else in the package, so a change to the registry needs the cameras documents, not the core ones. Core's tests (`*.test.ts`) and `packages/core/test/` are left out (below).
 - F3 owns `netlify.toml` together with `apps/web/`, because the file only configures how the web app is built and deployed.
 - C3 lists the root configuration files by name, because the root has many owners. A new root configuration file matches no rule but F0 until it is added to C3. The root `package.json` falls under C3 unless its change is a version bump; the `package.json` of a workspace falls under that workspace's rule.
-- F1 owns the whole workspace `tools/docs-check/`: the check, the decisions index generator, their shared modules and the workspace's `package.json`, `tsconfig*.json` and `vitest.config.ts`. Its tests (`*.test.ts` and `test/`) are left out (below). Another tool in `tools/` matches no rule but F0, which asks for new feature documents.
+- F1 owns the whole workspace `tools/docs-check/`: the check, the decisions index generator, their shared modules and the workspace's `package.json`, `tsconfig*.json` and `vitest.config.ts`. Its tests (`*.test.ts` and `test/`) are left out (below). F5 owns `tools/capture-cli/` the same way. Another tool in `tools/` matches no rule but F0, which asks for new feature documents.
 - A file with several owners accepts the documents of any of them: a root configuration file passes C3 with either guide, and the check passes F1 with any of four documents. Review checks that the right one changed.
 - There is no C1: it owned the `Makefile`, which was removed in #30 when the npm scripts replaced make.
 - Adding a rule means editing `RULES`, this table and the table in [AGENTS.md](../../AGENTS.md#documentation-contract) in the same change.

@@ -8,6 +8,7 @@ You need:
 
 - Node.js 26 (the current LTS) with the npm it ships. `.nvmrc` holds `26`, so `nvm use` or `fnm use` picks it. `.npmrc` sets `engine-strict=true`: with an older Node, `npm ci` stops with `npm error code EBADENGINE` and `Required: {"node":">=26"}`. The toolchain was set up with Node 26.13.0 and npm 11.20.0.
 - git 2.32 or later, for the documentation check and its tests (they use `GIT_CONFIG_GLOBAL`). They were run with git 2.54.0.
+- Only for the hardware spikes: macOS and ffmpeg (`brew install ffmpeg`), see [the capture tool](../features/capture-cli-user.md#before-the-first-run).
 
 The documentation check runs without `npm ci`: `npm run docs-check` works on a fresh clone, because the check imports only Node built-ins ([decision](../decisions/docs.md#the-check-uses-only-node-built-ins-and-runs-with-node-type-stripping)). Everything else needs `npm ci` first.
 
@@ -27,6 +28,8 @@ Defined in the root [package.json](../../package.json). Run them from the reposi
 | Script | Command | What it does |
 | --- | --- | --- |
 | `npm run docs-check` | `node tools/docs-check/src/check-docs.ts` | Checks that every change on the branch carries its documentation. Options: `--base <ref>` (default `origin/main`, else `main`), `-v`, `--integrity-only`. See [the documentation contract](../features/docs-contract-user.md). Needs no `npm ci`. |
+| `npm run capture` | `node tools/capture-cli/src/cli.ts` | The hardware capture tool; pass the command after `--`, as in `npm run capture -- list`. See [the capture tool](../features/capture-cli-user.md). Needs `npm ci`; `list`, `probe` and `capture` need macOS and ffmpeg. |
+| `npm run spike:m1` | `node tools/capture-cli/src/cli.ts spike` | The interactive M1 spike on the camera ([M1 findings](../findings/m1.md)). Writes into `captures/`, which git ignores. |
 | `npm run decisions-index` | `node tools/docs-check/src/decisions-index.ts` | Rewrites [docs/decisions/README.md](../decisions/README.md) from the files in `docs/decisions/`; with `-- --check` it only reports. Needs no `npm ci`. |
 | `npm test` | `vitest run` | Every Vitest project, the documentation check's tests included; see the [testing guide](testing.md). |
 | `npm run lint` | `eslint --max-warnings 0 .` | ESLint; see [Lint and format](#lint-and-format). |
@@ -39,7 +42,7 @@ npm prints `> <command>` before a script's output.
 
 ## npm workspaces
 
-The root `package.json` declares the workspaces `packages/*`, `apps/*` and `tools/*`; today they are `packages/core` (`@irvis/core`), `apps/web` (`@irvis/web`) and `tools/docs-check` (`@irvis/docs-check`, the documentation check, which depends on nothing). A workspace depends on another with `"@irvis/<name>": "*"`, which npm links to the local directory. Packages export their TypeScript source and have no build step ([decision](../decisions/architecture.md#workspace-packages-are-consumed-as-typescript-source)). Which package may depend on which is enforced by a test ([core: technical](../features/core-technical.md#tests)).
+The root `package.json` declares the workspaces `packages/*`, `apps/*` and `tools/*`; today they are `packages/core` (`@irvis/core`), `apps/web` (`@irvis/web`), `tools/docs-check` (`@irvis/docs-check`, the documentation check, which depends on nothing) and `tools/capture-cli` (`@irvis/capture-cli`, the hardware capture tool, which depends on `@irvis/core` and node-usb, `usb`). A workspace depends on another with `"@irvis/<name>": "*"`, which npm links to the local directory. Packages export their TypeScript source and have no build step ([decision](../decisions/architecture.md#workspace-packages-are-consumed-as-typescript-source)). Which package may depend on which is enforced by a test ([core: technical](../features/core-technical.md#tests)).
 
 The root scripts are listed under [npm scripts](#npm-scripts).
 
@@ -62,8 +65,10 @@ TypeScript 6.0 (`~6.0.3`), not 7: typescript-eslint 8.72 supports TypeScript bel
 | `apps/web/tsconfig.node.json` | `apps/web/vite.config.ts` | ES2024, `node` |
 | `tools/docs-check/tsconfig.lib.json` | the documentation check's `src/` without tests | ES2024, `node` ([documentation contract](../features/docs-contract-technical.md#configuration)) |
 | `tools/docs-check/tsconfig.test.json` | its tests, `test/`, `vitest.config.ts` | ES2024, `node` and `vitest` |
+| `tools/capture-cli/tsconfig.lib.json` | the capture tool's `src/` without tests; references core's library project | ES2024, `node` ([capture tool](../features/capture-cli-technical.md#configuration)) |
+| `tools/capture-cli/tsconfig.test.json` | its tests, `test/`, `vitest.config.ts` | ES2024, `node` and `vitest` |
 
-`packages/core/tsconfig.json`, `apps/web/tsconfig.json` and `tools/docs-check/tsconfig.json` are solution files of their package's projects. Only the library projects of core and of the documentation check emit anything: declarations, into `node_modules/.tsbuild/core/lib/` (which `apps/web` type-checks against) and `node_modules/.tsbuild/docs-check/lib/` (which the check's tests type-check against). Build info files go to `node_modules/.tsbuild/`. Delete that directory if `tsc --build` reports a project as up to date that is not.
+`packages/core/tsconfig.json`, `apps/web/tsconfig.json`, `tools/docs-check/tsconfig.json` and `tools/capture-cli/tsconfig.json` are solution files of their package's projects. Only the library projects of core, the documentation check and the capture tool emit anything: declarations, into `node_modules/.tsbuild/core/lib/` (which `apps/web` and the capture tool type-check against), `node_modules/.tsbuild/docs-check/lib/` and `node_modules/.tsbuild/capture-cli/lib/` (which their tests type-check against). Build info files go to `node_modules/.tsbuild/`. Delete that directory if `tsc --build` reports a project as up to date that is not.
 
 ## Lint and format
 

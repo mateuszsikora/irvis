@@ -16,6 +16,7 @@ npm test
 | `core` | `packages/core/vitest.config.ts` | `node` | `src/**/*.test.ts`, `test/**/*.test.ts` |
 | `web` | `apps/web/vite.config.ts` (`test`) | `jsdom` | `src/**/*.test.{ts,tsx}` |
 | `docs-check` | `tools/docs-check/vitest.config.ts` | `node`, 60 seconds per test | `src/**/*.test.ts`, `test/**/*.test.ts` |
+| `capture-cli` | `tools/capture-cli/vitest.config.ts` | `node`, 60 seconds per test | `src/**/*.test.ts`, `test/**/*.test.ts` |
 
 Vitest prints one line per test file and ends with `Test Files  <n> passed (<n>)` and `Tests  <n> passed (<n>)`, or the failures with a diff. One project, one file, or the tests whose names match a pattern:
 
@@ -37,6 +38,7 @@ Most tests need nothing beyond `npm ci`. The documentation check's tests need mo
 | `tools/docs-check/test/rules.test.ts`, `bumps.test.ts`, `integrity.test.ts`, `paths.test.ts` | git 2.32 or later and `node` on `PATH`, a writable temporary directory | `test/repo.ts` copies this repository's working tree, tracked and untracked files that git does not ignore, into a temporary repository with one commit on `main` and a branch `feature`, and runs the copied `tools/docs-check/src/check-docs.ts` there. Uncommitted changes in your checkout are part of the copy, so a broken document in your working tree fails `this repository::integrity of this repository` and may fail other tests too. |
 | `tools/docs-check/test/decisions-index.test.ts` | a writable temporary directory | Plain files, no git. |
 | `tools/docs-check/test/eslint.test.ts` | `npm ci` | Lints snippets with the repository's ESLint configuration. |
+| `tools/capture-cli/test/report.test.ts`, `tools/capture-cli/src/ffmpeg.test.ts` | a writable temporary directory | Synthetic capture directories and a fake `ffmpeg` file; no camera, no ffmpeg and no macOS. |
 
 `test/repo.ts` runs git with `GIT_CONFIG_GLOBAL=/dev/null` and `GIT_CONFIG_NOSYSTEM=1`, a fixed author and committer, and without `CI`, `SKIP_DOCS_CHECK` and the other `GIT_*` variables. Your git configuration (signing, hooks, default branch) and a `CI` variable in your shell do not affect the results. These tests take most of the run time (about 20 seconds), because each builds a git repository and runs `node`; Vitest runs the test files in parallel.
 

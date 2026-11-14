@@ -116,6 +116,14 @@ export const RULES: readonly Rule[] = [
       '(or docs/features/cameras-user.md)',
   },
   {
+    id: 'F5',
+    source: String.raw`^tools/capture-cli/`,
+    docs: String.raw`^docs/features/capture-cli-(user|technical)\.md$`,
+    message:
+      'Capture tool changed: update docs/features/capture-cli-technical.md ' +
+      '(or docs/features/capture-cli-user.md)',
+  },
+  {
     id: 'C2',
     source: String.raw`^\.github/(?!pull_request_template\.md$)`,
     docs: String.raw`^docs/guides/development\.md$`,
