@@ -92,6 +92,52 @@ The reconstruction from I420/NV12 (`packages/core/src/reconstruction/`) is insid
 
 **Rejected:** comparing readings after rounding to the display precision, because values near a rounding boundary still flip. **Rejected:** a list of forbidden functions, because it lets through every approximated function nobody thought of.
 
+## Emissivity is corrected with the fourth-power law and a reflected temperature
+
+Status: decided (#13)
+
+The sensor receives the radiation of the object and the radiation of the surroundings that the object reflects, and the camera reports it as the temperature of a black body. With temperatures in kelvin and radiation proportional to T⁴ (Stefan–Boltzmann), a reading T_m of an object with emissivity ε that reflects surroundings at R gives the object's temperature as
+
+T⁴ = (T_m⁴ − (1 − ε)·R⁴) / ε
+
+`temperatureCorrection` in `packages/core/src/corrections/emissivity.ts` computes T⁴ by multiplication (`x * x` squared) and the fourth root as `Math.sqrt(Math.sqrt(x))`, so the result is the same in every engine ([why](#measurement-code-uses-only-correctly-rounded-arithmetic)). The temperature offset is added after the emissivity correction, as kelvin, so it shifts the corrected reading by the same amount in °C and °F and does not depend on ε. For a camera that applies nothing itself, emissivity 1 changes nothing, whatever the reflected temperature. A reading at or below 0 K, and one whose T⁴ would come out at or below 0 (the object would be colder than its reflection allows), has no temperature (NaN), like a raw value outside a lookup table.
+
+A real sensor sees a band, not every wavelength, and in the band the radiation grows faster than T⁴ near room temperature. Compared with the Planck radiation integrated over 8–14 µm, a band assumed here because it is typical for these sensors (computed numerically with a bisection on the band integral, not in the repository), the T⁴ law gives for a reflected temperature of 20 °C:
+
+| ε | Reading | T⁴ law | 8–14 µm band | Difference |
+| --- | --- | --- | --- | --- |
+| 0.95 | 35 °C | 35.73 °C | 35.74 °C | −0.01 K |
+| 0.95 | 60 °C | 61.74 °C | 61.80 °C | −0.06 K |
+| 0.95 | 100 °C | 103.00 °C | 103.26 °C | −0.26 K |
+| 0.8 | 60 °C | 68.04 °C | 68.34 °C | −0.30 K |
+| 0.5 | 60 °C | 89.27 °C | 90.99 °C | −1.72 K |
+| 0.95 | 300 °C | 306.90 °C | 310.01 °C | −3.11 K |
+| 0.5 | 300 °C | 402.54 °C | 470.67 °C | −68.14 K |
+
+For ε of 0.8 and more and objects up to 100 °C the difference stays within 0.3 K, well inside the ±2 °C accuracy these cameras are sold with; for low emissivity at high temperatures the T⁴ law underestimates by kelvins. TODO(owner): the P2 Pro's spectral band from its datasheet, and whether the vendor's app agrees with these numbers.
+
+**Rejected:** the Planck band integral, because it needs `Math.exp`, which engines may approximate, and the camera's spectral response, which nobody has measured. **Rejected:** dividing the reading in kelvin by ε^¼ without the reflected term, because it treats the surroundings as 0 K: for ε = 0.95, a reading of 35 °C and surroundings at 20 °C it gives 39.0 °C instead of 35.7 °C. **Postponed:** the atmosphere (distance, humidity, transmission), which #13 does not ask for; the P2 Pro keeps a distance and a transmission among its TPD parameters, and if #7 shows that the camera applies them itself, they belong to the same relative correction. **Postponed:** a band-radiance table in the profile (data, evaluated with table lookups and interpolation, so still the same in every engine) if a measurement shows that the T⁴ law is not good enough for a camera.
+
+## The software correction works relative to what the camera applied
+
+Status: decided (#13)
+
+If the camera applies an emissivity ε_c and a reflected temperature R_c to its raw values itself, as the P2 Pro may do with its TPD parameters (#7 measures it), correcting its readings with the user's ε would apply emissivity twice. `temperatureCorrection` therefore first undoes the camera's correction, W = ε_c·T_c⁴ + (1 − ε_c)·R_c⁴, which is what a sensor without it would have reported, and then applies the user's: T⁴ = (W − (1 − ε)·R⁴) / ε. Both steps are one formula, T⁴ = a·T_c⁴ + b. When the user's ε and R are the same numbers as the camera's, the reading is returned unchanged, so a camera that applies the same correction as the user is not touched at all. `settingsFromCamera` starts the user's settings from the camera's, so that nothing changes until the user does; `DEFAULT_CORRECTION` (ε 1) would undo the camera's correction instead. The comparison is exact, not within a tolerance: a value that differs in the last bit goes through the formula, which moves the reading by about 1e-13 K, far below anything shown, and a tolerance would only move the edge somewhere else.
+
+What the camera applied is read from the frame's `CameraStateSnapshot`, not from the profile, because a `.irvis` chunk stores the snapshot and a recording has to be readable without the profile. The two state field ids `emissivity` and `reflected-temperature` are reserved for this: a profile may only use them for settings the camera applies to the raw values (`affects: 'data'`), and `validateProfile` checks that they come together with the right kind and unit. A state without them means the camera applies nothing (ε_c = 1). In the browser, where the camera state cannot be read, the snapshot holds what the user declared or the profile's defaults, so the same path covers both.
+
+**Rejected:** assuming the camera applies nothing, because if #7 shows that it does, every reading corrected in software would be wrong, and recordings made before the fix could not be corrected later. **Rejected:** a flag in the profile saying that the camera applies emissivity, because a recording stores only the snapshot, so a file would depend on the profile to be read correctly. **Rejected:** a separate field in the `.irvis` chunk record, because the snapshot already holds the camera's settings and two places for one fact can disagree.
+
+## Alarms and isotherms skip uncertain pixels
+
+Status: decided (#13)
+
+Threshold alarms and isotherms work on corrected readings (emissivity, reflected temperature and offset applied), because those are the numbers the user sees and sets thresholds against. A pixel whose `uncertain` value is not 0 never turns an alarm on and is never painted in an isotherm colour, and neither is a pixel without a temperature (NaN). The reconstruction marks a pixel uncertain when it could not recover the raw value, so the value can be off by kelvins; an alarm turned on by such a pixel, or a hot spot painted where there is none, is worse than missing one pixel. Min and max (#12) are to skip them the same way.
+
+An alarm that is on stays on until the hottest (for the high alarm) or coldest (for the low one) pixel is more than a hysteresis past the threshold on the other side, 0.5 K by default, because sensor noise around the threshold would otherwise switch it about every frame. Bounds are included: a pixel exactly at the threshold turns it on, and an isotherm includes both ends of its band.
+
+**Rejected:** alarms and isotherms on uncorrected readings, because the user's threshold would then mean another temperature than the one shown. **Rejected:** no hysteresis, because an alarm sound that switches 25 times a second at the threshold is useless. **Postponed:** alarms over an area instead of the whole frame, until several areas exist (#18).
+
 ## The UI is written in React
 
 Status: decided (#3)
@@ -146,7 +192,7 @@ Adding a camera means a new directory `packages/core/src/cameras/<id>/` (`profil
 
 The conversion is data, not the `toCelsius(raw, mode)` function of the specification, so that a `.irvis` file can be read without the profile. A test suite runs against every registered profile: decoding its fixtures, plausible temperatures, `.irvis` round trip, commands that match the schema.
 
-The browser cannot read the camera state. It assumes high gain and factory settings, says so ("camera mode unknown, readings assume high gain") until the user confirms or declares the mode as a software setting, and warns when the data look inconsistent. If the camera applies emissivity to the raw data itself, the software correction works relative to the camera state and never applies emissivity twice.
+The browser cannot read the camera state. It assumes high gain and factory settings, says so ("camera mode unknown, readings assume high gain") until the user confirms or declares the mode as a software setting, and warns when the data look inconsistent. If the camera applies emissivity to the raw data itself, the software correction works relative to the camera state and never applies emissivity twice ([how](#the-software-correction-works-relative-to-what-the-camera-applied)).
 
 **Rejected:** fixed dimensions and a conversion function in the profile, as in the specification, because the next camera would need code changes outside its directory and recordings would depend on code.
 

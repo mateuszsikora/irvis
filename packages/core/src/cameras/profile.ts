@@ -137,7 +137,11 @@ export interface SensorSpec {
 export type StateRefresh = 'command' | 'second';
 
 interface StateFieldBase {
-  /** Unique in the profile, kebab-case. The field `gain` selects the conversion. */
+  /**
+   * Unique in the profile, kebab-case. Reserved ids: `gain` selects the
+   * conversion; `emissivity` and `reflected-temperature` are what the camera
+   * applies to the raw values itself (see `fields.ts`).
+   */
   readonly id: string;
   readonly label: string;
   /** `data`: the field changes the raw values. `meaning`: it changes how they are read. */

@@ -1,6 +1,6 @@
 # Core
 
-`@irvis/core` (`packages/core`) is the TypeScript package every other part of irvis builds on: the types that connect a camera backend, a recording and the viewer, the camera registry, and the `.irvis` recording format. Its users are the people and agents who write the other packages. It runs unchanged in browsers, Workers, Electron and Node, so it uses only the APIs they all share. The camera registry and the profile schema have their own documents: [cameras](cameras-user.md).
+`@irvis/core` (`packages/core`) is the TypeScript package every other part of irvis builds on: the types that connect a camera backend, a recording and the viewer, the camera registry, the `.irvis` recording format, and the corrections that turn raw values into the readings a user sees (emissivity, offset, °C or °F, alarms, isotherms). Its users are the people and agents who write the other packages. It runs unchanged in browsers, Workers, Electron and Node, so it uses only the APIs they all share. The camera registry and the profile schema have their own documents: [cameras](cameras-user.md).
 
 ## Use core from another package
 
@@ -34,6 +34,7 @@ And these functions:
 | `decodeYuyvRaw(frame, rows)` | The raw 16-bit values packed into some rows of a YUYV frame (`raw = lo \| hi << 8`) |
 | `decodeYuyvImage(frame, rows)` | The Y, U and V bytes of some rows of a YUYV frame, such as the camera's own image |
 | `toCelsius(raw, conversion)`, `toCelsiusArray(raw, conversion)` | Degrees Celsius from raw values with a profile's conversion |
+| `correctFrame(frame, settings)` | Corrected readings in °C, with emissivity, reflected temperature and offset ([below](#correct-readings-show-units-raise-alarms-and-paint-isotherms)) |
 
 ```ts
 const mode = profile.videoModes[0];
@@ -76,6 +77,50 @@ const { frame } = await reader.readFrame(reader.frameAt(5000)); // the frame at 
 - A file whose writing stopped early, after a crash or an unplugged camera, opens anyway: `reader.indexed` is `false`, and `reader.damage` says where reading stopped and why, or is `null` if nothing is missing.
 - `reencodeIrvis(source, sink, 16)` writes a smaller copy with a larger threshold; the threshold can never go down. It also repairs a damaged file: the copy is complete, it leaves out what cannot be decoded (`result.skipped` frames), and `result.damage` says where the first damage was.
 - `npm run bench:irvis` prints the file size per minute and the time per frame for synthetic scenes ([results](../irvis-format.md#benchmark)).
+
+## Correct readings, show units, raise alarms and paint isotherms
+
+The readings a user sees are the frame's temperatures corrected for the object's emissivity, the temperature it reflects and an offset. Alarms and isotherms work on those corrected readings.
+
+```ts
+import {
+  DEFAULT_ALARMS,
+  correctFrame,
+  evaluateAlarms,
+  formatTemperature,
+  paintIsotherms,
+  settingsFromCamera,
+  unitDeltaToCelsius,
+  unitToCelsius,
+  type AlarmState,
+} from '@irvis/core';
+
+// Start from what the camera applied, so that nothing changes until the user does.
+const start = settingsFromCamera(frame.cameraState);
+const settings = { ...start, emissivity: 0.95, reflectedCelsius: 20 };
+const celsius = correctFrame(frame, settings); // one °C reading per pixel of a ThermalFrame
+
+let alarms: AlarmState | null = null;
+alarms = evaluateAlarms(celsius, frame.uncertain, { ...DEFAULT_ALARMS, highCelsius: 60 }, alarms);
+if (alarms.high.active) console.log(`hot: ${formatTemperature(alarms.high.extreme, 'C')}`);
+
+// rgba: the rendered frame, width × height × 4 bytes
+paintIsotherms(rgba, celsius, frame.uncertain, [
+  { kind: 'between', minCelsius: 30, maxCelsius: 37, color: [0, 255, 0] },
+]);
+
+formatTemperature(36.6, 'F'); // '97.9 °F'
+unitToCelsius(140, 'F'); // 60: a threshold the user typed in °F
+unitDeltaToCelsius(0.9, 'F'); // 0.5: an offset typed in °F
+```
+
+- **Emissivity** is from greater than 0 to 1 (1 is a black body), the **reflected temperature** is the °C of the surroundings the object mirrors, and the **offset** (`offsetKelvin`) is a difference in kelvin added at the end. Start the user's settings from `settingsFromCamera(frame.cameraState)`: they change no reading until the user changes them. `DEFAULT_CORRECTION` (ε 1, 20 °C, offset 0) changes nothing only for a camera that applies no emissivity itself; for one that does, ε 1 undoes the camera's correction. The formula is the T⁴ law; how close it is to a real sensor is in the [decision](../decisions/architecture.md#emissivity-is-corrected-with-the-fourth-power-law-and-a-reflected-temperature).
+- **The camera's own correction is never applied twice.** When a frame's camera state holds `emissivity` and `reflected-temperature`, the camera has applied them to the raw values, and `correctFrame` corrects from there: settings equal to the camera's change nothing, and other settings give what they would give on uncorrected data. "Equal" means the same numbers: an R typed in °F and converted back can differ in the last bit and then moves readings by about 1e-13 K. In the browser the state holds what the user declared, or the profile's defaults.
+- **Units:** readings stay in °C in core; convert with `celsiusToUnit` and `unitToCelsius` for temperatures and `celsiusDeltaToUnit` and `unitDeltaToCelsius` for differences (offset, hysteresis). `formatTemperature(value, unit, digits = 1)` gives `36.6 °C`, and `–` for a pixel without a temperature.
+- **Alarms:** `highCelsius` turns on at or above, `lowCelsius` at or below, `null` disables one. Pass the previous `AlarmState` back each frame: an alarm that is on stays on until the hottest (coldest) pixel is more than `hysteresis` (0.5 K by default) past the threshold, so noise does not switch it every frame. Each alarm says how many pixels reach the threshold and where the hottest or coldest pixel is.
+- **Isotherms:** above a temperature, below it, or between two, bounds included, painted over an RGBA image with one pixel per reading; later isotherms paint over earlier ones, and alpha is kept. `isothermMask` gives the pixels as a mask instead.
+- Uncertain pixels (`frame.uncertain`) and pixels without a temperature (NaN, and every reading at or below 0 K, such as a dead pixel at raw 0) never turn an alarm on and are never painted.
+- Invalid settings throw an `Error` such as `invalid correction: emissivity must be greater than 0 and at most 1`; every message is in the [technical document](core-technical.md#failure-modes).
 
 ## Write code in core
 

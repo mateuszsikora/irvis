@@ -6,6 +6,7 @@ import type { CameraProfile } from './profile.ts';
 
 export type * from './profile.ts';
 export { toCelsius, toCelsiusArray } from './conversion.ts';
+export { EMISSIVITY_FIELD, REFLECTED_TEMPERATURE_FIELD } from './fields.ts';
 export { validateProfile } from './validate.ts';
 
 /** Every camera irvis supports, compiled into the app. */

@@ -209,7 +209,7 @@ Targets for the reconstruction (from the specification): Y matches the low bytes
 - The full feature list of the Android app (#11).
 - The factor k in the default recording threshold (k × NETD), after #6.
 - Motion compensation in `.irvis` v1, after the measurements in #16.
-- The emissivity formula, and whether the camera applies emissivity itself (#7).
+- Whether the camera applies emissivity itself (#7); if it does, the P2 Pro profile gets the state fields `emissivity` and `reflected-temperature`. The formula is decided ([decision](decisions/architecture.md#emissivity-is-corrected-with-the-fourth-power-law-and-a-reflected-temperature)).
 - How to know the gain mode without commands: from the data, or only from the user's declaration (#7).
 - The NUC command for the P2 Pro (#7).
 - Does TOPDON TCView on Windows work with the T7 (same PID)? It could serve as a reference.

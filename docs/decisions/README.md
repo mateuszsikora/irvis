@@ -38,6 +38,9 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [One UI build serves the web and the desktop app](architecture.md#one-ui-build-serves-the-web-and-the-desktop-app) | [architecture.md](architecture.md) | decided (#3) |
 | [Core uses only APIs that browsers and Node share](architecture.md#core-uses-only-apis-that-browsers-and-node-share) | [architecture.md](architecture.md) | decided (#3) |
 | [Measurement code uses only correctly rounded arithmetic](architecture.md#measurement-code-uses-only-correctly-rounded-arithmetic) | [architecture.md](architecture.md) | decided (#3) |
+| [Emissivity is corrected with the fourth-power law and a reflected temperature](architecture.md#emissivity-is-corrected-with-the-fourth-power-law-and-a-reflected-temperature) | [architecture.md](architecture.md) | decided (#13) |
+| [The software correction works relative to what the camera applied](architecture.md#the-software-correction-works-relative-to-what-the-camera-applied) | [architecture.md](architecture.md) | decided (#13) |
+| [Alarms and isotherms skip uncertain pixels](architecture.md#alarms-and-isotherms-skip-uncertain-pixels) | [architecture.md](architecture.md) | decided (#13) |
 | [The UI is written in React](architecture.md#the-ui-is-written-in-react) | [architecture.md](architecture.md) | decided (#3) |
 | [Workspace packages are consumed as TypeScript source](architecture.md#workspace-packages-are-consumed-as-typescript-source) | [architecture.md](architecture.md) | decided (#5) |
 | [TypeScript stays on 6.0 until typescript-eslint supports 7](architecture.md#typescript-stays-on-60-until-typescript-eslint-supports-7) | [architecture.md](architecture.md) | decided (#5) |
