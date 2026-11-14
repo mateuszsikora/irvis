@@ -1,6 +1,6 @@
 # Core
 
-`@irvis/core` (`packages/core`) is the TypeScript package every other part of irvis builds on: the types that connect a camera backend, a recording and the viewer, and the camera registry. Its users are the people and agents who write the other packages. It runs unchanged in browsers, Workers, Electron and Node, so it uses only the APIs they all share. The camera registry and the profile schema have their own documents: [cameras](cameras-user.md).
+`@irvis/core` (`packages/core`) is the TypeScript package every other part of irvis builds on: the types that connect a camera backend, a recording and the viewer, the camera registry, and the `.irvis` recording format. Its users are the people and agents who write the other packages. It runs unchanged in browsers, Workers, Electron and Node, so it uses only the APIs they all share. The camera registry and the profile schema have their own documents: [cameras](cameras-user.md).
 
 ## Use core from another package
 
@@ -22,7 +22,8 @@ What core holds today:
 | `RawFrame` | What a backend delivers: `YuyvFrame` (exact bytes), `Yuv420Frame` (the browser's lossy 4:2:0 copy) or `{ kind: 'thermal'; frame: ThermalFrame }` |
 | `ThermalFrame` | Raw sensor values of one frame with the conversion to °C, the camera state and the uncertain-pixel mask |
 | `Player` | Playback controls of a recording: `play`, `pause`, `seek`, `setRate`, and the `viewState` store |
-| `ByteSink`, `ByteSource` | Asynchronous writes (`append`, `flush`, `close`) and random-access reads (`size`, `read`) of a recording |
+| `ByteSink`, `ByteSource` | Asynchronous writes (`append`, `flush`, `close`) and random-access reads (`size`, `read`) of a recording; `MemoryByteSink` and `memoryByteSource` keep the bytes in memory |
+| `IrvisWriter`, `IrvisReader` | Write and read `.irvis` recordings ([below](#record-and-read-irvis-files)) |
 | `Subscribable`, `Store` | Values over time; `Store` has `getSnapshot()` for React's `useSyncExternalStore` |
 
 And these functions:
@@ -43,7 +44,38 @@ const thermal = decodeThermalFrame(frame, mode, profile.conversions[0].conversio
 const centre = toCelsius(thermal.raw[96 * 256 + 128], thermal.conversion);
 ```
 
-A frame of the wrong size, or a mode without temperature data, throws an `Error` with one of the messages in the [technical document](core-technical.md#failure-modes). No backend or codec exists yet; the types are what they will implement. The field-by-field description is in the [technical document](core-technical.md#schema).
+A frame of the wrong size, or a mode without temperature data, throws an `Error` with one of the messages in the [technical document](core-technical.md#failure-modes). No backend exists yet; the types are what they will implement. The field-by-field description is in the [technical document](core-technical.md#schema).
+
+## Record and read .irvis files
+
+A `.irvis` file holds the raw value of every pixel of every frame within a threshold T, with the conversion to °C and the camera state, so it can be read without the camera profile; a snapshot is a file with one frame. The format is specified in [irvis-format.md](../irvis-format.md). T is in raw sensor units (1/64 K on the P2 Pro, so 8 is 0.125 K and 16 is 0.25 K); every value read back is within T of the value written, and T = 0 is lossless.
+
+```ts
+import { IrvisReader, IrvisWriter, reencodeIrvis } from '@irvis/core';
+
+const writer = await IrvisWriter.create(sink, {
+  profile, // a CameraProfile, or { id, version, name }
+  width: 256,
+  height: 192,
+  fps: 25,
+  path: 'exact', // 'reconstructed' for frames from the browser
+  threshold: 8,
+});
+for (const frame of frames) await writer.appendFrame(frame); // ThermalFrames, one call at a time
+await writer.appendViewState(timestamp, { palette: 'iron' }); // only what changed
+await writer.close(); // writes the index; without it the file is still readable
+
+const reader = await IrvisReader.open(source);
+const { frame } = await reader.readFrame(reader.frameAt(5000)); // the frame at 5 s, a ThermalFrame
+```
+
+- `sink` and `source` are a `ByteSink` and a `ByteSource`: an OPFS or picked file, a file written by the desktop app, or `new MemoryByteSink()` and `memoryByteSource(bytes)`.
+- The writer flushes the sink about every second of frames and starts a keyframe about every 10 seconds, after a gain, camera-state or conversion change and after a shutter calibration (NUC) that the data show.
+- Frame timestamps must not go back, and the conversion and camera state may hold no NaN or infinity. A frame the writer rejects for that, or for its size, changes nothing, and writing can go on. When the sink fails (full storage, a broken connection to the desktop app), every later call rejects with `the writer stopped after an earlier error: …`; close the sink yourself. The file keeps every frame the sink accepted.
+- Arrays you get back (`frame.raw`, `frame.uncertain`, `values` from `appendFrame`) are yours to change; the chunk data, the header and the view-state changes are frozen.
+- A file whose writing stopped early, after a crash or an unplugged camera, opens anyway: `reader.indexed` is `false`, and `reader.damage` says where reading stopped and why, or is `null` if nothing is missing.
+- `reencodeIrvis(source, sink, 16)` writes a smaller copy with a larger threshold; the threshold can never go down. It also repairs a damaged file: the copy is complete, it leaves out what cannot be decoded (`result.skipped` frames), and `result.damage` says where the first damage was.
+- `npm run bench:irvis` prints the file size per minute and the time per frame for synthetic scenes ([results](../irvis-format.md#benchmark)).
 
 ## Write code in core
 
@@ -78,10 +110,13 @@ packages/core/src/probe.ts(4,18): error TS2304: Cannot find name 'setTimeout'.
 - any dynamic `import()` in `packages/core/src/`;
 - in the five measurement directories: a `Math` member outside the list, `Math` reached any other way than `Math.<name>`, `**` or `**=`.
 
+A `.irvis` file that cannot be read, or a writer call the format does not allow, throws an `IrvisError` with one of the messages in the [technical document](core-technical.md#failure-modes), for example `not an .irvis file: the signature is missing` or `cannot re-encode to threshold 4: it must be an integer of at least the file's 8`.
+
 `npm test` fails when a lint directive comment in `packages/core/src/` names no rules or no decision, or configures ESLint inline ([invariant 17](../invariants.md)), and when a `package.json` adds a dependency that breaks the direction core ← media ← ui ← apps/web, makes core depend on anything but `fflate`, lists `electron` outside `apps/desktop`, or belongs to a workspace that the dependency table does not list yet ([invariant 15](../invariants.md)).
 
 ## See also
 
 - [Core: technical](core-technical.md)
 - [Cameras](cameras-user.md)
+- [The .irvis format](../irvis-format.md)
 - [Architecture decisions](../decisions/architecture.md)

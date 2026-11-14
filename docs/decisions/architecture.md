@@ -162,7 +162,7 @@ Status: decided (#3)
 
 Implemented in #14 (format and codec), #15 (the PNG photo), #16 (measurements, v1 frozen), #19 (recording, playback, MP4 export).
 
-A recording keeps the temperature of every pixel in every frame, so that measurements, palette and range can change after the fact. A video file keeps a coloured picture; temperatures cannot be read back from it. A recording therefore writes only a `.irvis` file, and MP4 is an export from it, with palette, range, units, overlays and upscaling chosen at export time (by default, as seen live). A snapshot is a `.irvis` file with one frame, and the PNG photo embeds that one-frame `.irvis` in a private ancillary chunk, so there is one temperature format and irvis opens both files the same way. The format specification will be `irvis-format.md` (planned, M4), with a version number.
+A recording keeps the temperature of every pixel in every frame, so that measurements, palette and range can change after the fact. A video file keeps a coloured picture; temperatures cannot be read back from it. A recording therefore writes only a `.irvis` file, and MP4 is an export from it, with palette, range, units, overlays and upscaling chosen at export time (by default, as seen live). A snapshot is a `.irvis` file with one frame, and the PNG photo embeds that one-frame `.irvis` in a private ancillary chunk, so there is one temperature format and irvis opens both files the same way. The format specification is [irvis-format.md](../irvis-format.md), with a version number.
 
 The codec works like a video codec, with a guaranteed error bound: a keyframe about every 10 seconds and after every gain or camera-state change and every detected NUC; 8×8 blocks predicted from the previous decoded frame; per block the encoder picks the cheapest of skip (every pixel within the threshold), resend the block towards a temporally denoised value, or send only the pixels outside the threshold; an escape code for large residuals; deflate at the end. For every pixel and frame, |measured − stored| ≤ T. The threshold T comes from the camera profile (a multiple of the sensor noise, NETD, not of its accuracy: noise sets which detail is real), can be set per file before recording, and T = 0 is lossless. A file can be re-encoded to a larger threshold, never to a smaller one.
 
@@ -177,11 +177,59 @@ Estimates from a simulation on synthetic data (256×192 at 25 fps, random noise 
 | T = 0.25 °C, only pixels outside T | 0.81 MB/min | 3.0 MB/min |
 | H.264 video of the same scene | about 0.1 MB/min | about 0.1 MB/min |
 
-Neither block mode wins everywhere, which is why the encoder chooses per block. The simulation has no drift, dead pixels or shutter events.
+Neither block mode wins everywhere, which is why the encoder chooses per block. The simulation has no drift, dead pixels or shutter events. The TypeScript benchmark that replaces the simulation, and its first results on synthetic data, are in the [specification](../irvis-format.md#benchmark).
 
 Writing survives crashes: Electron writes with `fs` in the main process and syncs about every second; the browser writes to OPFS through `createSyncAccessHandle()` in a Worker, flushes about every second, asks for persistent storage and checks the free space first, and offers to recover unfinished recordings at start. A crash, an unplugged camera or a closed tab loses at most about one second. MP4 export uses WebCodecs and an existing muxer, without ffmpeg.
 
 **Rejected:** recording MP4 next to `.irvis`, because the data would be stored twice and the palette fixed in advance. **Rejected:** storing in `.irvis` only the correction to the decoded MP4, because in simulation it saved 0–20% (and lost at T = 0.125 °C), while tying `.irvis` to a bit-exact copy of one MP4 in greyscale without a palette; re-encoding the video, as messengers do, would destroy the data. **Rejected:** a lossless default, because the sensor noise makes lossless data about 38 MB/min.
+
+## The .irvis codec stores values near a denoised estimate
+
+Status: decided (#14)
+
+Issue #14 lists three block modes: skip, resend the block towards a temporally denoised value, and send a mask with only the pixels outside T. The encoder has all three, and the frame body stores a quantised residual for every value it sends, keyframes included. Every value it sends lies within h = ⌊T/4⌋ of a target, and the target is the per-pixel denoised estimate clamped to within T − h of the measured value, so |measured − stored| ≤ T still holds ([how](../irvis-format.md#how-irvis-encodes)). Values therefore land near the noise-free level of the pixel, and the next frame's noise rarely takes them outside T, so the blocks of a still scene stay skipped.
+
+On the benchmark's synthetic scenes ([results](../irvis-format.md#benchmark)), the alternative of storing each sent value at the nearest point within T of the measured one (step 2T + 1) took 8.31 MB/min for a static scene at T = 8 raw and 4.56 MB/min at T = 16, against 1.05 and 0.11 MB/min now, because its values sit anywhere in ±T and half of them fall out with the next frame's noise. Coding the targets exactly (h = 0) took 7.05 and 5.03 MB/min for the moving hand at T = 8 and 16, against 4.72 and 2.72. The quantiser step is stored in each chunk record, so the encoder's settings (h, the weight of the estimate, the choice between the modes) can change without a format change; #16 tunes them on real frames.
+
+**Rejected:** quantising around the measured value with step 2T + 1, for the sizes above. **Rejected:** coding every sent value exactly (h = 0), for the sizes above.
+
+## Each .irvis frame is a record of its own, deflated alone
+
+Status: decided (#14)
+
+A frame record carries its own length and CRC-32, and its body is deflated on its own. A file cut anywhere is then readable up to the last whole frame; a damaged byte costs the rest of its chunk when the index is intact and everything after it when the file has to be scanned, and nothing before it; and a writer appends a frame with one `ByteSink.append` and needs no state from the deflate of earlier frames. The 9 bytes of framing and the few bytes of a fresh deflate block cost about 0.4 KB/s at 25 fps, which is under 0.03 MB/min.
+
+**Rejected:** one deflate stream per chunk with a sync flush after every frame, because a reader would need streaming inflate across records and a damaged record would break the rest of the chunk's stream; whether the shared history would compress better is not measured (TODO(owner): measure in #16 if the deflate share of the files matters). **Rejected:** a CRC per chunk only, because a crash would lose up to 10 s instead of about 1 s.
+
+## .irvis metadata is JSON and frame data are binary
+
+Status: decided (#14)
+
+The header, the chunk records and the view-state records are JSON objects inside CRC-checked records; frame records and the index are binary. Metadata are written once per file, once per chunk (about every 10 s) or when the user changes a setting, so their size does not matter, and JSON keeps them readable with any tool, holds the profile's `Conversion` and `CameraStateSnapshot` as they are, and takes a new field without a new parser. Frames are 25 a second, so they are binary.
+
+**Rejected:** a binary header, because every field added before v1 is frozen would need its own encoding. **Rejected:** JSON for the index, because a one-hour file has 90 000 entries.
+
+## The .irvis threshold is in raw units
+
+Status: decided (#14)
+
+T is an integer number of raw sensor units, and the guarantee is |measured raw − stored raw| ≤ T, checked exactly in integers. A file can hold chunks with different conversions (a gain change), and a conversion can be a polynomial or a table, so one temperature bound would mean different raw bounds in different places and could not be met exactly. The UI converts a bound in kelvin to raw units with the profile's conversion, as the benchmark does with 1/64 K per unit for the P2 Pro.
+
+**Rejected:** T in kelvin in the header, because the codec would then work with a bound that holds only approximately for non-linear conversions.
+
+## Camera profiles carry a version
+
+Status: decided (#14)
+
+`CameraProfile.version` is a positive integer that a profile raises whenever a constant that changes readings changes, and every `.irvis` header records the profile's id and version. A recording keeps its own conversion and needs no profile to be read, but the version tells later which constants it was made with, for example when a conversion is corrected after a measurement.
+
+**Rejected:** recording only the profile id, because a corrected conversion would be indistinguishable from the old one. **Rejected:** a content hash of the profile, because it changes with every edit that changes no reading, such as a corrected source link.
+
+## Motion compensation in .irvis is postponed
+
+Status: postponed (#14)
+
+Predicting a block from a shifted block of the previous frame would help a moving camera or a moving object, but whether it pays off depends on real frames: their noise, how often the camera moves, and how much of a block motion compensation could match within T. Issue #14 asks to decide after measurements on real frames, which come with the fixtures in #16. Version 1 has no motion vectors; adding them needs a new block mode or a new format version.
 
 ## The web version is hosted on Netlify and goes to production from release
 

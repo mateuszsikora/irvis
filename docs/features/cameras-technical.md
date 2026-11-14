@@ -22,7 +22,7 @@ The types are in `src/cameras/profile.ts`; each field has a TSDoc comment.
 
 | Type | Fields | Rules `validateProfile` checks |
 | --- | --- | --- |
-| `CameraProfile` | `id`, `name`, `identification`, `videoModes`, `sensor`, `conversions`, `state`, `commands` | `id` kebab-case; `name` not blank |
+| `CameraProfile` | `id`, `version`, `name`, `identification`, `videoModes`, `sensor`, `conversions`, `state`, `commands` | `id` kebab-case; `version` a positive integer, raised whenever a constant that changes readings changes (every `.irvis` header records it, [decision](../decisions/architecture.md#camera-profiles-carry-a-version)); `name` not blank |
 | `Provenance` | `source`, `confidence` (`confirmed`, `measured`, `reported`, `unverified`) | `source` not blank; `confidence` one of the four. Part of every `ProfileConversion`, `MeasurementRange`, `CameraCommand`, `sensor.netd` and `sensor.accuracy` |
 | `CameraIdentification` | `usb: UsbId[]` (`vendorId`, `productId`), optional `labelPattern` (regular expression source) | at least one USB ID, each an integer from 0 to 0xffff; the pattern compiles |
 | `VideoMode` | `id`, `width`, `height`, `fps`, `pixelFormat: 'yuyv'`, optional `enableCommand`, `layout: FrameLayout \| null` | ids unique and kebab-case; positive integer size; `fps` > 0; `enableCommand` names a command of the profile |
@@ -44,6 +44,7 @@ TODO(owner): conversion parameters that change every frame (the sensor temperatu
 
 | Part | Value |
 | --- | --- |
+| `version` | 1 |
 | `identification` | USB `0x0bda:0x5830`, no `labelPattern` (the name macOS shows is not known yet) |
 | `videoModes` | `yuyv-256x384`, 25 fps, `image` rows 0–191, `thermal` rows 192–383 `u16le`, no `enableCommand`; `yuyv-256x192`, 25 fps, `layout: null` |
 | `sensor` | 256×192, no `netd` or `accuracy`, `ranges` empty |
@@ -73,6 +74,7 @@ Exported from `@irvis/core` (`src/cameras/index.ts`):
 | Message | Cause |
 | --- | --- |
 | `id '<id>' is not kebab-case` | The profile id |
+| `version <version> is not a positive integer` | |
 | `name is empty` | |
 | `identification: no USB ID` | |
 | `identification: USB ID <vendorId>:<productId> is not two 16-bit integers` | |
@@ -111,7 +113,7 @@ Exported from `@irvis/core` (`src/cameras/index.ts`):
 | File | Covers |
 | --- | --- |
 | `packages/core/src/cameras/index.test.ts` | Every registered profile passes `validateProfile` and the ids are unique ([invariant 18](../invariants.md)); `findProfile`; `matchProfiles` by USB ID, a shared USB ID narrowed by the label, several candidates when the label does not decide, the label alone, and no input |
-| `packages/core/src/cameras/validate.test.ts` | A consistent profile passes; one test per kind of problem: id, USB IDs, label pattern, rows past the frame, overlapping rows, thermal size against the sensor, unknown enable command, missing and unselectable conversions, measurement ranges with an unknown or repeated gain, linear scale 0, empty source, unknown state field in a command, transport ranges |
+| `packages/core/src/cameras/validate.test.ts` | A consistent profile passes; one test per kind of problem: id, version, USB IDs, label pattern, rows past the frame, overlapping rows, thermal size against the sensor, unknown enable command, missing and unselectable conversions, measurement ranges with an unknown or repeated gain, linear scale 0, empty source, unknown state field in a command, transport ranges |
 | `packages/core/src/cameras/conversion.test.ts` | `toCelsius` for linear, polynomial and lookup-table conversions, `NaN` outside a table; `toCelsiusArray` |
 | `packages/core/src/cameras/infiray-p2pro/profile.test.ts` | The P2 Pro profile is registered and valid, matches `0x0bda:0x5830`, and a synthetic 256×384 frame (196 608 B) decodes to 22.5 °C and a 35 °C centre |
 | `packages/core/test/profiles.ts` | Not a test: `testProfile(overrides)`, a consistent profile with made-up constants that the tests above change one part at a time |

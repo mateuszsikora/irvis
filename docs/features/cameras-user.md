@@ -12,6 +12,7 @@ irvis supports a camera model through a camera profile: data that says how to re
 
    export const profile: CameraProfile = {
      id: 'infiray-p2pro',
+     version: 1, // raise it whenever a constant that changes readings changes
      name: 'InfiRay P2 Pro',
      // identification, videoModes, sensor, conversions, state, commands
    };
@@ -35,6 +36,7 @@ Every constant carries a `source` (where it comes from, in words a reader can fo
 
 The parts of a profile, field by field, are in the [technical document](cameras-technical.md#schema). In short:
 
+- **Version:** a positive integer, raised whenever a constant that changes readings changes. Every recording stores the profile's id and version, so it is clear later which constants it was made with.
 - **Identification:** one or more USB vendor and product IDs, and optionally a pattern for the device name. When two models share a USB ID (the TOOLTOP T7 and the TOPDON TC001 both use product ID 0x5830), the name pattern decides; when it cannot, the user chooses.
 - **Video modes:** resolution, frame rate, pixel format (`yuyv`), the command that must run first if the mode needs one, and where the image rows and the temperature rows are. A mode without temperature data has `layout: null`.
 - **Conversion:** one per gain mode, as data: linear (`raw × scale + offset`), a polynomial, or a lookup table.

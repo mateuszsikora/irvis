@@ -45,6 +45,12 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [A camera is a profile, and its conversion is data](architecture.md#a-camera-is-a-profile-and-its-conversion-is-data) | [architecture.md](architecture.md) | decided (#3) |
 | [Loading camera profiles from files at runtime](architecture.md#loading-camera-profiles-from-files-at-runtime) | [architecture.md](architecture.md) | postponed (#3) |
 | [Recordings are .irvis files and MP4 is an export](architecture.md#recordings-are-irvis-files-and-mp4-is-an-export) | [architecture.md](architecture.md) | decided (#3) |
+| [The .irvis codec stores values near a denoised estimate](architecture.md#the-irvis-codec-stores-values-near-a-denoised-estimate) | [architecture.md](architecture.md) | decided (#14) |
+| [Each .irvis frame is a record of its own, deflated alone](architecture.md#each-irvis-frame-is-a-record-of-its-own-deflated-alone) | [architecture.md](architecture.md) | decided (#14) |
+| [.irvis metadata is JSON and frame data are binary](architecture.md#irvis-metadata-is-json-and-frame-data-are-binary) | [architecture.md](architecture.md) | decided (#14) |
+| [The .irvis threshold is in raw units](architecture.md#the-irvis-threshold-is-in-raw-units) | [architecture.md](architecture.md) | decided (#14) |
+| [Camera profiles carry a version](architecture.md#camera-profiles-carry-a-version) | [architecture.md](architecture.md) | decided (#14) |
+| [Motion compensation in .irvis is postponed](architecture.md#motion-compensation-in-irvis-is-postponed) | [architecture.md](architecture.md) | postponed (#14) |
 | [The web version is hosted on Netlify and goes to production from release](architecture.md#the-web-version-is-hosted-on-netlify-and-goes-to-production-from-release) | [architecture.md](architecture.md) | decided (#3) |
 | [The desktop app ships its own LGPL ffmpeg build](architecture.md#the-desktop-app-ships-its-own-lgpl-ffmpeg-build) | [architecture.md](architecture.md) | decided (#3) |
 | [The capture tool runs on Node type stripping, without tsx](architecture.md#the-capture-tool-runs-on-node-type-stripping-without-tsx) | [architecture.md](architecture.md) | decided (#6) |

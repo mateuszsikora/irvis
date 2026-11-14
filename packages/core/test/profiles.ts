@@ -8,6 +8,7 @@ export function testProfile(overrides: Partial<CameraProfile> = {}): CameraProfi
   const source = 'test data';
   return {
     id: 'test-camera',
+    version: 1,
     name: 'Test camera',
     identification: { usb: [{ vendorId: 0x0bda, productId: 0x5830 }], labelPattern: 'test' },
     videoModes: [

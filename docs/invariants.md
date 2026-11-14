@@ -2,7 +2,7 @@
 
 Numbered domain rules, each enforced by the tests listed under it. Cite a rule by number ("invariant 4"). A number is never reused; a rule that stops holding is struck through with the reason. How to add one: [documentation guide](guides/documentation.md#invariants).
 
-Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the architecture of the TypeScript packages, 18 to the camera registry, 19 to the YUYV decoder, 20 and 21 to the capture tool.
+Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the architecture of the TypeScript packages, 18 to the camera registry, 19 to the YUYV decoder, 20 and 21 to the capture tool, 22 to 25 to the `.irvis` format.
 
 - **1.** A changed path that a rule owns fails the check unless some changed path matches that rule's documentation regex.
   - `tools/docs-check/test/rules.test.ts::rules::owned path without doc fails`
@@ -104,3 +104,25 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
   - `tools/capture-cli/src/ffmpeg.test.ts::captureArgs::stream-copies YUYV to stdout and lists packets`
 - **21.** When AVFoundation delivered another pixel format than `yuyv422` for a capture with temperature data, the session report does not answer whether the 384 mode needs a command, and says which format arrived.
   - `tools/capture-cli/test/report.test.ts::report::does not answer the 384 question when AVFoundation changed the format`
+- **22.** Every raw value a `.irvis` reader decodes is within the file's threshold T of the value that was written, in every frame and through temperature jumps, dead pixels at 0 and 65535 and a NUC, also when the sink failed during writing or the caller changed an array it got back; at T = 0 the values are equal.
+  - `packages/core/src/irvis/codec.test.ts::frame codec::is lossless at tolerance 0`
+  - `packages/core/src/irvis/codec.test.ts::frame codec::keeps every value within the tolerance`
+  - `packages/core/src/irvis/codec.test.ts::frame codec::keeps the guarantee through temperature jumps, dead pixels and a NUC`
+  - `packages/core/src/irvis/irvis.test.ts::irvis round trip::reads back every frame within the threshold, with its metadata`
+  - `packages/core/src/irvis/irvis.test.ts::irvis round trip::is lossless at threshold 0`
+  - `packages/core/src/irvis/codec.test.ts::frame codec::returns arrays that the encoder and decoder do not use again`
+  - `packages/core/src/irvis/irvis.test.ts::irvis writer failures::refuses every call after the sink fails, and the file keeps its guarantee`
+  - `packages/core/src/irvis/irvis.test.ts::irvis writer failures::does not let a change to a returned array reach the next frame`
+  - `packages/core/src/irvis/irvis.test.ts::irvis writer failures::rejects encoder settings and intervals that would break the guarantee`
+- **23.** A `.irvis` writer starts a chunk, whose first frame is a keyframe, at the first frame, when the gain, the camera state or the conversion changes, after a NUC that the data show, and after the keyframe interval; every frame is read back with its chunk's conversion and camera state, and a frame whose conversion or camera state JSON cannot hold is rejected instead of written.
+  - `packages/core/src/irvis/irvis.test.ts::irvis round trip::starts a chunk at the start, every interval, after a gain, camera-state or conversion change and after a NUC`
+  - `packages/core/src/irvis/irvis.test.ts::irvis writer input::rejects a conversion or camera state that JSON cannot hold, and stays usable`
+- **24.** A `.irvis` file cut at any byte, or without its index, is read up to its last valid record with the same frames as the complete file; a damaged record stops reading there and loses nothing before it.
+  - `packages/core/src/irvis/irvis.test.ts::irvis recovery::reads a file cut at any byte up to its last valid record`
+  - `packages/core/src/irvis/irvis.test.ts::irvis recovery::rebuilds the frame table that the index holds`
+  - `packages/core/src/irvis/irvis.test.ts::irvis recovery::stops at a damaged record`
+  - `packages/core/src/irvis/irvis.test.ts::irvis recovery::stops at a chunk record that another chunk record follows`
+- **25.** Re-encoding a `.irvis` file to a threshold T2 keeps every value within T2 of the measured one and records the earlier threshold; a threshold below the file's is refused; with an intact index, a damaged frame costs only the rest of its chunk.
+  - `packages/core/src/irvis/irvis.test.ts::reencodeIrvis::keeps every value within the new threshold of the measured one`
+  - `packages/core/src/irvis/irvis.test.ts::reencodeIrvis::refuses a smaller threshold`
+  - `packages/core/src/irvis/irvis.test.ts::reencodeIrvis::skips the rest of a damaged chunk when the index is intact`
