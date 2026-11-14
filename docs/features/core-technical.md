@@ -4,7 +4,7 @@ How `packages/core` is built, checked and laid out, for whoever changes it. The 
 
 ## Data flow
 
-No backend delivers frames to core yet; the types fix the path, and the YUYV decoders (step 3), the `.irvis` codec (steps 4 and 5) and the corrections (step 6) exist:
+No backend delivers frames to core yet; the types fix the path, and the YUYV decoders (step 3), the `.irvis` codec (steps 4 and 5), the corrections (step 6) and the palettes and measurements (step 7) exist:
 
 1. A `CameraBackend` (`src/backend.ts`) lists devices and `open()`s one with an `OpenRequest`: the device id, the `CameraProfile` chosen for it, and a `VideoMode.id` of that profile.
 2. The `CameraSession` it returns publishes `RawFrame`s (`src/frames.ts`) through `frames`, a `Subscribable<RawFrame>` (`src/store.ts`). A listener that is slow makes the backend drop frames; nothing queues them.
@@ -12,8 +12,9 @@ No backend delivers frames to core yet; the types fix the path, and the YUYV dec
 4. `IrvisWriter` (`src/irvis/writer.ts`) writes `ThermalFrame`s to a `ByteSink` (`src/bytes.ts`) as a `.irvis` file ([specification](../irvis-format.md)). `create` checks the options and appends the signature and the header. Each `appendFrame` feeds the frame to `NucDetector` (`src/irvis/nuc.ts`), decides whether the frame starts a chunk (first frame, a forced reason, a changed `gain`, camera state or conversion, a NUC, 10 s since the chunk started), encodes it with `FrameEncoder` (`src/irvis/codec.ts`), deflates the body with `fflate`'s `deflateSync`, frames it as a record with its CRC-32 (`src/irvis/crc32.ts`, `src/irvis/format.ts`), and appends the chunk and frame records in one `append`; it flushes the sink at the first frame and then after every 1 s of frame time. Everything a call can reject (the frame's size, its fields, a timestamp that is not finite or goes back) is checked before anything changes; the chunk, the frame table, the offset and the last timestamp move on only after the sink accepted the bytes. A rejection by the sink, or an error after encoding started, puts the writer in a failed state in which every call rejects, because the detector and the encoder have already moved on to a frame that may not be in the file. `close` appends the index and the trailer and closes the sink.
 5. `IrvisReader.open` (`src/irvis/reader.ts`) reads a `ByteSource`: the signature and the header, then the frame table from the index, or, when the trailer or the index is missing or does not fit, by scanning the records in 1 MiB windows up to the last valid one. `readFrame(i)` reads the byte range of frame i's chunk once, decodes from its keyframe with `FrameDecoder`, and continues from there when the next call asks for a later frame of the same chunk; calls run one after another. Opening through the index reads exactly the header, trailer, index and view-state records, not the 1 MiB window. `reencodeIrvis` (`src/irvis/reencode.ts`) pipes a reader into a writer with a larger threshold. A `Player` (`src/player.ts`) will drive playback over the reader (#19).
 6. The corrections (`src/corrections/`) turn a `ThermalFrame` into the readings the user sees. `correctFrame(frame, settings)` evaluates `toCelsiusArray` on the raw values with the frame's conversion and passes each reading through `correctionFor(settings, frame.cameraState)`: `cameraCorrection` reads the emissivity and reflected temperature the camera applied from the state fields `emissivity` and `reflected-temperature` (null when the state has neither), and `temperatureCorrection` builds a function of one reading that undoes the camera's correction and applies the user's, T⁴ = a·T_c⁴ + b in kelvin with a = ε_c / ε and b = ((1 − ε_c)·R_c⁴ − (1 − ε)·R⁴) / ε, then adds the offset ([formula](../decisions/architecture.md#emissivity-is-corrected-with-the-fourth-power-law-and-a-reflected-temperature), [relative to the camera](../decisions/architecture.md#the-software-correction-works-relative-to-what-the-camera-applied)). When ε_c and R_c are equal (`===`) to ε and R, or ε_c = ε = 1, the function skips the formula and only adds the offset, so with offset 0 the readings keep their bits; a value that differs in the last bit (an R typed in °F and converted back) goes through the formula and differs by about 1e-13 K. On both paths a reading at or below 0 K (raw 0 on the P2 Pro) or NaN gives NaN. `settingsFromCamera(state)` copies ε_c and R_c into the settings exactly, so settings started from it change no reading of frames in that state. `evaluateAlarms` and `paintIsotherms` take the corrected readings and the frame's `uncertain` mask; both skip uncertain pixels and NaN ([decision](../decisions/architecture.md#alarms-and-isotherms-skip-uncertain-pixels)). The functions of `src/corrections/units.ts` convert °C to °F and back only for display and input; every reading in core stays in °C.
+7. The analysis (`src/analysis/`) works on a `CelsiusImage`: the corrected readings with the frame's width, height and `uncertain` mask, which `celsiusImage(frame, settings)` builds with `correctFrame`. `measureFrame` gives min, max (with their pixel) and mean of the frame; `measurePoint` the mean of the 3×3 pixels around a point, clipped at the image's edge; `measureLine` the Bresenham profile between two pixels; `measureArea` the same statistics for a rectangle; `histogram` the counts per bin over a range. All of them skip a pixel whose `uncertain` value is not 0 and a reading that is NaN ([decision](../decisions/architecture.md#alarms-and-isotherms-skip-uncertain-pixels)), sum in row-major order (a line in its own order) and take the first pixel on a tie. `autoRange` is the range from the coldest to the hottest counted pixel, and `renderPalette` maps each reading to entry floor((v − min) × 256 / (max − min)), clamped, of one of six 256-entry tables that `palettes.ts` builds from colour stops when the module loads, into an RGBA image with alpha 255, NaN as (0, 0, 0, 0) ([decision](../decisions/architecture.md#palettes-are-256-colour-ramps-defined-by-stops)); `paintIsotherms` paints over that image.
 
-`src/index.ts` re-exports every type, the registry module `src/cameras/index.ts`, the corrections module `src/corrections/index.ts`, `src/yuyv.ts`, the codec module `src/irvis/index.ts` and `src/memory.ts`. It is the package's only entry point (`exports` in `packages/core/package.json` maps `.` to `./src/index.ts`).
+`src/index.ts` re-exports every type, the registry module `src/cameras/index.ts`, the analysis module `src/analysis/index.ts` (everything but the internal `lutOf` and `counts`), the corrections module `src/corrections/index.ts`, `src/yuyv.ts`, the codec module `src/irvis/index.ts` and `src/memory.ts`. It is the package's only entry point (`exports` in `packages/core/package.json` maps `.` to `./src/index.ts`).
 
 ## Schema
 
@@ -66,6 +67,33 @@ Commands to the camera are not part of `CameraBackend` yet; #22 adds them.
 | `AlarmState` | `high`, `low`: `AlarmLevel` each | Passed back as `previous` with the next frame |
 | `AlarmLevel` | `active`, `pixels` (at or past the threshold), `extreme` (hottest for `high`, coldest for `low`, NaN when no pixel counts), `index` (row-major index of the first pixel at `extreme`, −1 when none) | |
 | `Isotherm` | `{ kind: 'above' \| 'below'; celsius; color }` or `{ kind: 'between'; minCelsius; maxCelsius; color }` | Bounds included; `color` an `Rgb`, three integers from 0 to 255 |
+
+**Analysis** (`src/analysis/`):
+
+| Type | Fields | Notes |
+| --- | --- | --- |
+| `CelsiusImage` | `width`, `height`, `celsius` (`Float64Array`, width × height, row-major), `uncertain` (`Uint8Array` or `null`) | The input of every measurement; `checkImage` checks that the lengths agree |
+| `PixelReading` | `x`, `y`, `index` (y × width + x), `celsius` | A pixel and its reading |
+| `PixelPoint` | `x`, `y` | Integers inside the image |
+| `PixelArea` | `x`, `y` (top-left pixel), `width`, `height` | Integers, at least 1 × 1, inside the image |
+| `RegionStats` | `pixels` (in the region), `counted` (certain, with a temperature), `mean` (NaN when `counted` is 0), `min`, `max` (`PixelReading` or `null` when `counted` is 0) | |
+| `LineProfile` | `x`, `y` (`Int32Array`), `celsius` (`Float64Array`, uncertain samples included), `uncertain` (`Uint8Array`, 1 per uncertain sample), `stats` (`RegionStats` of the samples) | One sample per pixel from the start to the end |
+| `Histogram` | `minCelsius`, `maxCelsius`, `counts` (`Uint32Array`, one per bin), `below`, `above` (counted pixels outside the range), `skipped` (pixels that do not count) | Bin k from min + k × w (included) to min + (k + 1) × w, w = (max − min) / bins; the last bin also holds max |
+| `TemperatureRange` | `minCelsius`, `maxCelsius` | Finite, min below max |
+| `PaletteId` | `'iron' \| 'white-hot' \| 'black-hot' \| 'rainbow' \| 'red-hot' \| 'cold-blue'` | `PALETTE_IDS` lists them in this order |
+| `Palette` | `id`, `name` (`Iron`, `White Hot`, `Black Hot`, `Rainbow`, `Red Hot`, `Cold Blue`), `stops` | `PALETTES` holds the six, frozen |
+| `PaletteStop` | `index` (0 to 255), `color` (three integers from 0 to 255) | The first stop at 0, the last at 255, indexes rising |
+
+The stops of the six palettes:
+
+| Palette | Stops (index: red, green, blue) |
+| --- | --- |
+| Iron | 0: 0, 0, 0; 40: 32, 0, 112; 88: 128, 0, 160; 136: 208, 40, 72; 176: 240, 112, 0; 216: 255, 192, 0; 255: 255, 255, 255 |
+| White Hot | 0: 0, 0, 0; 255: 255, 255, 255 |
+| Black Hot | 0: 255, 255, 255; 255: 0, 0, 0 |
+| Rainbow | 0: 0, 0, 96; 40: 0, 0, 255; 88: 0, 200, 255; 128: 0, 224, 0; 168: 255, 240, 0; 212: 255, 96, 0; 255: 255, 0, 0 |
+| Red Hot | 0: 0, 0, 0; 96: 200, 0, 0; 176: 255, 160, 0; 255: 255, 255, 255 |
+| Cold Blue | 0: 0, 0, 0; 96: 0, 32, 160; 176: 0, 160, 255; 255: 255, 255, 255 |
 
 **Values over time** (`src/store.ts`): `Subscribable<T>` has `subscribe: (listener) => Unsubscribe`; `Store<T>` adds `getSnapshot: () => T`, which returns the same object until the value changes. Both are function properties, not methods: an implementation binds them (or uses arrow functions), so `useSyncExternalStore(store.subscribe, store.getSnapshot)` works and passes typescript-eslint's `unbound-method`. Calling an `Unsubscribe` twice does nothing. [Why subscriptions](../decisions/architecture.md#frames-and-state-in-core-are-subscriptions).
 
@@ -126,6 +154,28 @@ The corrections (`src/corrections/`). Temperatures are °C, differences kelvin:
 | `formatTemperature` | `(celsius: number, unit: TemperatureUnit, digits = 1) => string` | `toFixed(digits)` of the value in `unit`, a space and the symbol (`36.6 °C`); a result that rounds to zero has no minus sign; `–` (en dash) for a value that is not finite |
 
 Constant: `KELVIN_OFFSET` (273.15). Everything in `src/corrections/` uses only the `Math` members the measurement rule allows: T⁴ is `x * x` squared and the fourth root `Math.sqrt(Math.sqrt(x))`.
+
+The analysis (`src/analysis/`). Temperatures are °C:
+
+| Name | Signature | Notes |
+| --- | --- | --- |
+| `celsiusImage` | `(frame: ThermalFrame, settings: CorrectionSettings) => CelsiusImage` | `correctFrame(frame, settings)` with the frame's `width`, `height` and `uncertain` (the same array, not a copy) |
+| `checkImage` | `(image: CelsiusImage) => void` | Throws unless width and height are positive integers, `celsius` has width × height readings and `uncertain`, when given, as many values |
+| `measureFrame` | `(image: CelsiusImage) => RegionStats` | Min and max with their position, and the mean, of the whole frame |
+| `measurePoint` | `(image: CelsiusImage, point: PixelPoint) => RegionStats` | The 3×3 pixels around `point`, of those inside the image: 9, 6 along an edge, 4 in a corner. `mean` is the point's reading |
+| `measureLine` | `(image: CelsiusImage, from: PixelPoint, to: PixelPoint) => LineProfile` | Bresenham's line, both ends included: max(\|Δx\|, \|Δy\|) + 1 samples, neighbouring samples at most one pixel apart in each direction |
+| `measureArea` | `(image: CelsiusImage, area: PixelArea) => RegionStats` | Row-major over the rectangle |
+| `checkArea` | `(image: CelsiusImage, area: PixelArea) => void` | Throws unless `area` is inside the image |
+| `histogram` | `(image: CelsiusImage, range: TemperatureRange, bins: number, area: PixelArea \| null = null) => Histogram` | `bins` an integer from 1 to 65 536; the whole frame, or only `area`. A reading v goes to bin floor((v − min) × bins / (max − min)) |
+| `autoRange` | `(image: CelsiusImage) => TemperatureRange \| null` | From `measureFrame`'s min to its max; `FLAT_RANGE_SPAN` (1 K) centred on the reading when they are equal; `null` when no pixel counts |
+| `rangeProblems`, `checkRange` | `(range: TemperatureRange) => string[]`, `=> void` | `checkRange` throws on what `rangeProblems` lists |
+| `paletteIndex` | `(celsius: number, range: TemperatureRange) => number` | floor((v − min) × 256 / (max − min)), clamped to 0 and 255; −1 for NaN |
+| `renderPalette` | `(celsius: Float64Array, range: TemperatureRange, palette: PaletteId, out: Uint8ClampedArray \| null = null) => Uint8ClampedArray` | 4 bytes per reading, row-major, as `ImageData`: the palette entry of `paletteIndex` and alpha 255; (0, 0, 0, 0) for NaN. Uncertain pixels are coloured like the others. Writes into `out` when given and returns it |
+| `paletteLut` | `(id: PaletteId) => Uint8Array` | A new copy of the palette's 768 bytes: red, green, blue of entry 0 (coldest) to 255 (hottest), for a scale bar |
+| `findPalette` | `(id: PaletteId) => Palette` | Throws for an unknown id |
+| `buildLut`, `stopsProblems` | `(stops: readonly PaletteStop[]) => Uint8Array`, `=> string[]` | The table from stops: each channel linear between two stops, `Math.round` (halves up) |
+
+Constants: `PALETTE_SIZE` (256), `FLAT_RANGE_SPAN` (1). Everything in `src/analysis/` uses only the `Math` members the measurement rule allows (`floor`, `round`, `min`, `max`, `abs`), so the tables, the colours and every measurement are the same in every engine. A mean depends on the order of the sum, which is fixed: row-major for a frame, an area and a point, the line's own order for a line.
 
 In memory (`src/memory.ts`), for tests and for a one-frame `.irvis` that is not a file:
 
@@ -224,6 +274,19 @@ The corrections throw an `Error` with one of these messages:
 | `RGBA image has <n> bytes, expected <n>` | `paintIsotherms` with an image that is not 4 bytes per reading |
 | `digits must be an integer from 0 to 3, not <digits>` | `formatTemperature` |
 
+The analysis throws an `Error` with one of these messages:
+
+| Message | Cause |
+| --- | --- |
+| `image size <w>×<h> is not two positive integers`, `image has <n> readings, expected <n>`, `uncertain mask has <n> values, expected <n>` | A `CelsiusImage` whose size and arrays disagree, in any measurement or in `checkImage` |
+| `point (<x>, <y>) is not a pixel of the <w>×<h> image`, `line start (<x>, <y>) …`, `line end (<x>, <y>) …` (the same text) | `measurePoint` or `measureLine` with a position outside the image or between pixels |
+| `area <w>×<h> at (<x>, <y>) is not inside the <W>×<H> image` | `measureArea`, `histogram` or `checkArea` with a rectangle that leaves the image, is empty or is not whole pixels |
+| `invalid range: <problems>` | `paletteIndex`, `renderPalette` or `histogram` with `minCelsius and maxCelsius must be finite numbers` or `minCelsius must be below maxCelsius` |
+| `bins must be an integer from 1 to 65536, not <bins>` | `histogram` |
+| `RGBA image has <n> bytes, expected <n>` | `renderPalette` with an `out` that is not 4 bytes per reading |
+| `unknown palette '<id>'` | `findPalette` or `paletteLut` with an id outside `PALETTE_IDS` (only from untyped input) |
+| `invalid palette stops: <problems>` | `buildLut` with `a palette needs at least two stops`, `the first stop must be at index 0`, `the last stop must be at index 255`, `stop indexes must be integers that rise` or `every stop color must be three integers from 0 to 255` |
+
 The directive test (`eslint-directives.test.ts`) fails with a Vitest diff listing one line per problem:
 
 | Line | Cause |
@@ -249,11 +312,14 @@ The dependency test (`packages/core/test/package-dependencies.test.ts`) fails wi
 | `packages/core/src/corrections/alarms.test.ts` | Thresholds with their bounds included; both alarms off; uncertain pixels and NaN never turn an alarm on ([invariant 27](../invariants.md)); the hysteresis keeps an alarm on and does not switch one on; an alarm that was on turns off when every pixel is uncertain; invalid settings and a mask of another size |
 | `packages/core/src/corrections/isotherms.test.ts` | Bounds included and NaN outside every band; uncertain pixels and NaN never painted, alpha kept, counts per band ([invariant 27](../invariants.md)); a later isotherm over an earlier one; invalid isotherms (a colour of 2 or 4 values included), images and masks |
 | `packages/core/src/corrections/units.test.ts` | °C to °F and back at −40, 0, 37 and 100 °C; differences; the symbols; `formatTemperature` with rounding, no minus sign on zero, NaN and invalid digits |
+| `packages/core/src/analysis/palettes.test.ts` | The six ids and names, 768 bytes each; each table at its stops; White Hot as a grey ramp and Black Hot its reverse; luminance rising for Iron, White Hot, Red Hot and Cold Blue and falling for Black Hot; an FNV-1a hash of the six tables (`7c4558a4`) and one Iron entry, so that a change of a stop or of the interpolation shows ([invariant 30](../invariants.md)); `paletteLut` returns a copy; interpolation with a half rounded up; invalid stops and unknown ids |
+| `packages/core/src/analysis/render.test.ts` | `paletteIndex` at the bounds, inside, outside, at ±Infinity and for NaN ([invariant 30](../invariants.md)); invalid ranges; `autoRange` over counted pixels only, on a flat frame and on one without counted pixels ([invariant 29](../invariants.md)); `renderPalette` colours, alpha, NaN transparent, an uncertain pixel coloured, `out` reused and of the wrong size, and that rising readings never get a colder entry with readings that are not exact in binary |
+| `packages/core/src/analysis/measurements.test.ts` | `measureFrame` min and max with position, the first pixel on a tie, uncertain and NaN pixels skipped, no pixel counted ([invariant 29](../invariants.md)); `measurePoint` 3×3 mean, 4 and 6 pixels at a corner and an edge, a 1×1 image, skipped pixels, invalid points; `measureLine` samples, backwards and vertical lines, a single pixel, the end reached in all 81 directions of a 9×9 grid, uncertain samples kept in the profile and left out of the statistics; `measureArea` statistics, skipped pixels, invalid rectangles; `histogram` bins with the top of the range in the last, below, above and skipped, an area; `celsiusImage` and `checkImage` |
 | `packages/core/test/irvis-scenes.ts` | Not a test: seeded synthetic scenes (static, moving hand, hot tip, dead pixels, NUC) for the tests and the benchmark |
 | `packages/core/test/benchmark/irvis.ts` | Not a test: `npm run bench:irvis`, with `-- --level <0-9>` for another deflate level ([benchmark](../irvis-format.md#benchmark)) |
 | `packages/core/src/cameras/*.test.ts`, `packages/core/src/cameras/infiray-p2pro/profile.test.ts` | The registry, `validateProfile`, the conversions and the P2 Pro profile: [cameras: technical](cameras-technical.md#tests). |
 
-Not covered: real camera frames (they come with the fixtures in #16), so the codec's sizes and the NUC heuristics are known only for synthetic data; whether the P2 Pro applies emissivity to its raw values (#7) and how the T⁴ law compares with the vendor's app on a real object; that the types fit the backends, which do not exist yet; files larger than memory, whose 1 MiB scanning windows only the cut-file test exercises at a small size; bit-identical decoding in browsers (#21); the TypeScript library settings, which `npm run typecheck` exercises on every run but no test asserts (a file that uses `document` was checked by hand when they were set up). The ESLint test cannot see a rule that type-aware linting would add or change for a real file.
+Not covered: real camera frames (they come with the fixtures in #16), so the codec's sizes and the NUC heuristics are known only for synthetic data; whether the P2 Pro applies emissivity to its raw values (#7) and how the T⁴ law compares with the vendor's app on a real object; that the types fit the backends, which do not exist yet; files larger than memory, whose 1 MiB scanning windows only the cut-file test exercises at a small size; bit-identical decoding, palette tables and measurements in browsers (#21; the tests run in Node only); whether the palettes look like the vendor app's (#11); the TypeScript library settings, which `npm run typecheck` exercises on every run but no test asserts (a file that uses `document` was checked by hand when they were set up). The ESLint test cannot see a rule that type-aware linting would add or change for a real file.
 
 ## See also
 

@@ -41,6 +41,7 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [Emissivity is corrected with the fourth-power law and a reflected temperature](architecture.md#emissivity-is-corrected-with-the-fourth-power-law-and-a-reflected-temperature) | [architecture.md](architecture.md) | decided (#13) |
 | [The software correction works relative to what the camera applied](architecture.md#the-software-correction-works-relative-to-what-the-camera-applied) | [architecture.md](architecture.md) | decided (#13) |
 | [Alarms and isotherms skip uncertain pixels](architecture.md#alarms-and-isotherms-skip-uncertain-pixels) | [architecture.md](architecture.md) | decided (#13) |
+| [Palettes are 256-colour ramps defined by stops](architecture.md#palettes-are-256-colour-ramps-defined-by-stops) | [architecture.md](architecture.md) | decided (#12) |
 | [The UI is written in React](architecture.md#the-ui-is-written-in-react) | [architecture.md](architecture.md) | decided (#3) |
 | [Workspace packages are consumed as TypeScript source](architecture.md#workspace-packages-are-consumed-as-typescript-source) | [architecture.md](architecture.md) | decided (#5) |
 | [TypeScript stays on 6.0 until typescript-eslint supports 7](architecture.md#typescript-stays-on-60-until-typescript-eslint-supports-7) | [architecture.md](architecture.md) | decided (#5) |
