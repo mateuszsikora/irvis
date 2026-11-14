@@ -2,7 +2,7 @@
 
 Numbered domain rules, each enforced by the tests listed under it. Cite a rule by number ("invariant 4"). A number is never reused; a rule that stops holding is struck through with the reason. How to add one: [documentation guide](guides/documentation.md#invariants).
 
-Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the architecture of the TypeScript packages, 18 to the camera registry.
+Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the architecture of the TypeScript packages, 18 to the camera registry, 19 to the YUYV decoder, 20 and 21 to the capture tool.
 
 - **1.** A changed path that a rule owns fails the check unless some changed path matches that rule's documentation regex.
   - `tools/docs-check/test/rules.test.ts::rules::owned path without doc fails`
@@ -94,3 +94,13 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
 - **18.** Every profile in the camera registry passes `validateProfile`, and no two share an id.
   - `packages/core/src/cameras/index.test.ts::camera registry::holds only valid profiles`
   - `packages/core/src/cameras/index.test.ts::camera registry::has unique profile ids`
+- **19.** The thermal rows of a YUYV frame decode as one little-endian 16-bit value per pixel (raw = lo | hi << 8), only from the given rows, wherever the frame's bytes lie in their buffer; rows outside the frame and frames of the wrong size are rejected.
+  - `packages/core/src/yuyv.test.ts::decodeYuyvRaw::reads lo and hi bytes`
+  - `packages/core/src/yuyv.test.ts::decodeYuyvRaw::reads only the given rows`
+  - `packages/core/src/yuyv.test.ts::decodeYuyvRaw::reads a frame that is a view into a larger buffer`
+  - `packages/core/src/yuyv.test.ts::decodeYuyvRaw::rejects rows outside the frame`
+  - `packages/core/src/yuyv.test.ts::checkYuyvFrame::rejects a frame with the wrong byte count`
+- **20.** The capture tool never lets ffmpeg convert pixels: it asks AVFoundation for `yuyv422` and stream-copies the video to stdout and to the packet list, without `-pix_fmt`.
+  - `tools/capture-cli/src/ffmpeg.test.ts::captureArgs::stream-copies YUYV to stdout and lists packets`
+- **21.** When AVFoundation delivered another pixel format than `yuyv422` for a capture with temperature data, the session report does not answer whether the 384 mode needs a command, and says which format arrived.
+  - `tools/capture-cli/test/report.test.ts::report::does not answer the 384 question when AVFoundation changed the format`

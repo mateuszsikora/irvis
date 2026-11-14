@@ -15,4 +15,23 @@ the material, in this form:
 Third-party npm packages are not listed here; their licences ship with them
 in node_modules and in the release packages.
 
-No third-party material yet.
+LeoDJ/P2Pro-Viewer (https://github.com/LeoDJ/P2Pro-Viewer)
+Copyright (c) 2023 LeoDJ
+Licence: MIT
+Used in: packages/core/src/cameras/infiray-p2pro/
+What: protocol knowledge, no code: the USB ID 0x0bda:0x5830, the 256x384
+  mode at 25 fps, and the split of the frame into an image half and a
+  16-bit temperature half.
+
+atomic14/InfiRayCapture (https://github.com/atomic14/InfiRayCapture)
+Copyright (c) 2025 atomic14
+Licence: MIT
+Used in: packages/core/src/cameras/infiray-p2pro/
+What: a fact, no code: the conversion raw / 64 - 273.2, which confirms
+  the divisor 64 (irvis uses the offset 273.15).
+
+alufers/thermal-cat (https://github.com/alufers/thermal-cat)
+Licence: none stated in the repository; only facts were taken, no code
+Used in: packages/core/src/cameras/infiray-p2pro/
+What: the raw value in 1/64 K (raw / 64 in kelvin), the 256x192 mode
+  without temperature data, and the USB IDs.

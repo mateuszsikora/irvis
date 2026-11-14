@@ -8,7 +8,7 @@ Add `"@irvis/core": "*"` to the package's `dependencies` (npm links the workspac
 
 ```ts
 import type { CameraBackend, RawFrame, ThermalFrame, ByteSink } from '@irvis/core';
-import { cameraProfiles, matchProfiles } from '@irvis/core';
+import { cameraProfiles, decodeThermalFrame, matchProfiles, toCelsius } from '@irvis/core';
 ```
 
 There is no build step: the package exports its TypeScript source (`src/index.ts`), which Vite, Vitest and Node 26 load directly. Which package may depend on which is fixed; see [what fails](#what-fails).
@@ -25,7 +25,25 @@ What core holds today:
 | `ByteSink`, `ByteSource` | Asynchronous writes (`append`, `flush`, `close`) and random-access reads (`size`, `read`) of a recording |
 | `Subscribable`, `Store` | Values over time; `Store` has `getSnapshot()` for React's `useSyncExternalStore` |
 
-No backend, decoder or codec exists yet; the types are what they will implement. The field-by-field description is in the [technical document](core-technical.md#schema).
+And these functions:
+
+| Function | What it does |
+| --- | --- |
+| `decodeThermalFrame(frame, mode, conversion, cameraState)` | The `ThermalFrame` in a `YuyvFrame` of a video mode: the raw values of the mode's temperature rows |
+| `decodeYuyvRaw(frame, rows)` | The raw 16-bit values packed into some rows of a YUYV frame (`raw = lo \| hi << 8`) |
+| `decodeYuyvImage(frame, rows)` | The Y, U and V bytes of some rows of a YUYV frame, such as the camera's own image |
+| `toCelsius(raw, conversion)`, `toCelsiusArray(raw, conversion)` | Degrees Celsius from raw values with a profile's conversion |
+
+```ts
+const mode = profile.videoModes[0];
+const thermal = decodeThermalFrame(frame, mode, profile.conversions[0].conversion, {
+  origin: 'assumed',
+  values: {},
+});
+const centre = toCelsius(thermal.raw[96 * 256 + 128], thermal.conversion);
+```
+
+A frame of the wrong size, or a mode without temperature data, throws an `Error` with one of the messages in the [technical document](core-technical.md#failure-modes). No backend or codec exists yet; the types are what they will implement. The field-by-field description is in the [technical document](core-technical.md#schema).
 
 ## Write code in core
 

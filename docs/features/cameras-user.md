@@ -1,6 +1,6 @@
 # Cameras
 
-irvis supports a camera model through a camera profile: data that says how to recognise the camera, which video modes it offers, where the temperatures are in a frame, how raw values become degrees Celsius, what the sensor can do, which settings the camera keeps, and which commands it accepts. A new model is a new profile, with no change to the UI, the backends or the recording format. This document is for whoever adds or changes a profile. No camera is registered yet; the first profile, the InfiRay P2 Pro, comes with #6.
+irvis supports a camera model through a camera profile: data that says how to recognise the camera, which video modes it offers, where the temperatures are in a frame, how raw values become degrees Celsius, what the sensor can do, which settings the camera keeps, and which commands it accepts. A new model is a new profile, with no change to the UI, the backends or the recording format. This document is for whoever adds or changes a profile. One camera is registered: the InfiRay P2 Pro ([supported cameras](#supported-cameras)).
 
 ## Add a camera
 
@@ -60,7 +60,11 @@ Every message is listed in the [technical document](cameras-technical.md#failure
 
 ## Supported cameras
 
-None yet.
+| Profile | Camera | Modes | What works |
+| --- | --- | --- | --- |
+| `infiray-p2pro` | InfiRay P2 Pro, also sold as the TOOLTOP T7 (USB `0x0bda:0x5830`) | 256×384 at 25 fps with temperature data in the lower half; 256×192 at 25 fps without | Temperatures in high gain only, °C = raw / 64 − 273.15, from other projects and not yet checked on a camera. No commands yet |
+
+Where each constant of the P2 Pro profile comes from: [its README](../../packages/core/src/cameras/infiray-p2pro/README.md). The TOPDON TC001 reports the same USB ID; it has no profile, so it would be matched as a P2 Pro.
 
 ## See also
 

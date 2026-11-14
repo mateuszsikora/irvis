@@ -43,7 +43,7 @@ In `docs/guides/`: development, testing, this guide, and any how-to for users. A
 ```md
 - **7.** A deleted owned file needs its documentation.
   - `tools/docs-check/test/rules.test.ts::rules::deletion needs doc`
-  - `packages/core/src/yuyv.test.ts::decodeYUYV::reads lo and hi bytes`
+  - `packages/core/src/yuyv.test.ts::decodeYuyvRaw::reads lo and hi bytes`
 ```
 
 A test id is `<path>::<describe>::...::<it>`, with the names exactly as Vitest shows them, that is the values of the string literals in `describe("...")` and `it("...")` or `test("...")` with escapes resolved; give such a test a plain literal name, not a template literal or `it.each`.

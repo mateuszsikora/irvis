@@ -1,0 +1,10 @@
+{
+  "name": "@irvis/capture-cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@irvis/core": "*",
+    "usb": "^3.3.0"
+  }
+}

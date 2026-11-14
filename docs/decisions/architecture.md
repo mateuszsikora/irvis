@@ -202,3 +202,19 @@ Implemented in #23.
 The desktop app needs ffmpeg only to read raw YUYV bytes from the operating system's camera API (AVFoundation, V4L2, DirectShow) and write them to a pipe. A minimal build with just those inputs, the rawvideo output, no `--enable-gpl` and no codecs is LGPL and a few megabytes. The package carries the LGPL text, the build script is in the repository, and the source tarball goes into each GitHub Release. `IRVIS_FFMPEG` points the app at another ffmpeg, which until the release milestone is the only way: the system ffmpeg.
 
 **Rejected:** `ffmpeg-static`, because its builds are GPL (the sources of the exact binary must be offered), contain codecs covered by patents, and weigh about 70–80 MB per platform. **Rejected:** ffmpeg compiled to WASM, because WASM cannot reach the camera APIs of the operating system, and `getUserMedia` delivers the lossy 4:2:0 frames the exact path exists to avoid.
+
+## The capture tool runs on Node type stripping, without tsx
+
+Status: decided (#6)
+
+Issue #6 asked for `tools/capture-cli` as "Node with tsx". Node 26 runs TypeScript itself by stripping the types, which the [decision on TypeScript source](#workspace-packages-are-consumed-as-typescript-source) already relies on for this tool and which the documentation check uses. `npm run spike:m1` is therefore `node tools/capture-cli/src/cli.ts spike`, and `@irvis/core` is imported as source through the workspace link: Node resolves the link to `packages/core/src/`, outside `node_modules`, where it strips types.
+
+**Rejected:** tsx, because it adds a dependency and a second way of running TypeScript whose transforms (for example `enum`) would accept code that Node, Vitest and `erasableSyntaxOnly` reject.
+
+## Captures keep the camera's bytes with an ffmpeg stream copy
+
+Status: decided (#6)
+
+The exact path depends on the bytes reaching irvis as the camera sent them. `capture-cli` asks AVFoundation for `yuyv422` and passes the packets on with `-c:v copy` to a `rawvideo` output on stdout, plus a second stream copy to `framecrc`, which lists the size and the pts of every packet ([how](../features/capture-cli-technical.md#capture)). ffmpeg then never decodes or converts a pixel, so what AVFoundation delivered is not hidden by a conversion. A format with another size per pixel (`nv12`, `bgr0`) or padded rows shows in the packet sizes. A format of the same size, such as `uyvy422`, does not: every packet still has 196 608 B, so the capture reads the format ffmpeg's input stream has from its log and stores it in `meta.json`, and the report says when it is not `yuyv422`. The Electron backend (#20) is expected to use the same arguments, once M1 shows that they work on the camera.
+
+**Rejected:** `-f rawvideo -pix_fmt yuyv422` without the copy, because ffmpeg would silently convert from whatever AVFoundation chose, and every frame would still have the expected size. **Rejected:** cutting the stream by size alone, because a padded or converted frame would pass unnoticed, and a reordered one (`uyvy422`) passes even the packet sizes.
