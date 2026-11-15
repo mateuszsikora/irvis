@@ -366,3 +366,11 @@ Status: decided (#8)
 The hint fits weighted isotonic regression to per-brightness medians of paired-row raw estimates. Median absolute deviations set its tolerance; clipped squared residuals against a median baseline set R². Fewer than 32 samples, fewer than four brightness levels, or R² below 0.7 disables it. Only pairs with brightness difference at most two train the mapping, to reduce edge contamination. Brightness must increase with raw value and the image must be spatially registered; inverted palettes are not supported.
 
 A final local cost margin of at least four marks both pixels confident. This is a heuristic within the candidate set, not proof of exact recovery; large errors can remain confident. Full uncertainty calibration and real browser transfer models need measured fixtures. No browser integration is included here.
+
+## Functional test timeouts allow shared runner contention
+
+Status: decided (#8)
+
+Core uses a 60-second per-test and per-hook timeout, matching the existing long-test budget in the documentation checker. CI's shared runner exceeded the default five-second limit in both planar reconstruction and exhaustive `.irvis` recovery, without reporting incorrect values. The timeout guards against hangs; performance remains a separate, non-gating benchmark result.
+
+**Rejected:** shrinking deterministic coverage, weakening assertions or retrying until an idle interval happens to pass. Those approaches hide the scheduling dependency instead of giving functional checks sufficient headroom.

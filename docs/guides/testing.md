@@ -13,7 +13,7 @@ npm test
 
 | Project | Config | Environment | Files |
 | --- | --- | --- | --- |
-| `core` | `packages/core/vitest.config.ts` | `node` | `src/**/*.test.ts`, `test/**/*.test.ts` |
+| `core` | `packages/core/vitest.config.ts` | `node`, 60 seconds per test and hook | `src/**/*.test.ts`, `test/**/*.test.ts` |
 | `web` | `apps/web/vite.config.ts` (`test`) | `jsdom` | `src/**/*.test.{ts,tsx}` |
 | `docs-check` | `tools/docs-check/vitest.config.ts` | `node`, 60 seconds per test | `src/**/*.test.ts`, `test/**/*.test.ts` |
 | `capture-cli` | `tools/capture-cli/vitest.config.ts` | `node`, 60 seconds per test | `src/**/*.test.ts`, `test/**/*.test.ts` |
@@ -50,6 +50,12 @@ Most tests need nothing beyond `npm ci`. The documentation check's tests need mo
 - For the documentation check, use `Repo` from `tools/docs-check/test/repo.ts` and its helpers: `write`, `append`, `replace`, `read`, `commit`, `git`, `check`, `passes`, `fails(<rule id>)`, `integrityFails(<text>)`; create the template once per file with `makeTemplate` in `beforeAll`.
 - Test fixtures that contain a broken reference must not put it in a comment of the test file itself, or the integrity check of the real repository fails on the test file. Build such strings from parts, as `tools/docs-check/test/integrity.test.ts` does.
 - A new package gets a Vitest project by having a `vitest.config.ts` (or a `test` section in its `vite.config.ts`) with a `name`; without one, Vitest still runs the package's `*.test.*` files with its defaults (environment `node`). Either way, add the package to `ALLOWED_IRVIS` in `packages/core/test/package-dependencies.test.ts`, or that test fails.
+
+## Shared runner load
+
+The self-hosted CI runner can be busy with other work. Functional tests must assert results, not elapsed wall-clock time. Core allows 60 seconds per test and hook, including the synthetic reconstruction sweep and exhaustive `.irvis` truncation recovery test. This is a hang guard, not a performance target. Keep deterministic coverage when a loaded runner exceeds Vitest's default five-second timeout; do not fix it by skipping cases, weakening assertions or adding retries.
+
+Use fake timers or explicit synchronization for timer-driven behaviour instead of short real sleeps. Record algorithm timing in the separate non-gating benchmarks with the machine identity and workload. A runtime measured on an idle development machine is not a reliable CI timeout budget.
 
 ## React component tests
 
