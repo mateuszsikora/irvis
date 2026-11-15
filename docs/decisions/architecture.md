@@ -332,3 +332,19 @@ Use `-c:v rawvideo -pix_fmt + -fps_mode passthrough -enc_time_base demux` for st
 The packet-size check intentionally still reports a mismatch when the original packets are padded. Saved image payloads and source packet sizes answer different questions; a successful normalized capture must not be presented as proof that the original packets were exactly 196608 bytes.
 
 **Rejected:** silently trimming a fixed 512 bytes from every packet, because this observed allocation size is not a camera protocol guarantee. **Rejected:** automatic conversion to `yuyv422`, because it could alter the raw temperature bytes.
+
+## USB spike uses explicit transfer sequences without claiming UVC
+
+Status: decided (#7)
+
+The P2 Pro gain commands carry an initial vendor transfer and ordered `followUp` transfers. The spike checks camera readiness around the sequence; it does not treat the first packet as a complete command. Normal access leaves interfaces unclaimed. Explicit detach and an IOKit DeviceRequest helper are diagnostic alternatives, with separate logs.
+
+Rejected: automatic kernel-driver detachment, because it could interrupt video and would not establish desktop coexistence. Rejected: inventing a NUC opcode or low-gain conversion from another camera model; those remain pending evidence. Experimental state reads retain raw values and errors rather than asserting verified software-correction defaults.
+
+## The USB spike uses node-usb 2.x for unclaimed EP0 transfers
+
+Status: decided (#7)
+
+Use `usb` 2.x, which exports the legacy `getDeviceList` API as well as `webusb.getDevices`. Installed version 3.3.0 exposes only WebUSB and cannot run the implemented unclaimed-control-transfer path. The M1 descriptor probe creates a `WebUSB` instance with explicit allowed IDs (or all devices for an empty list) and automatic driver detachment disabled; M2 uses legacy devices. The default WebUSB singleton does not authorize any device in a fresh process. Integration tests verify the installed exports and exercise the real authorization filter with synthetic discovery results, while transport mocks preserve numeric OUT results.
+
+Rejected: treating TypeScript structural casts and transport mocks as proof of compatibility with a native package. The connected-camera run exposed both the missing export and the different callback result types.

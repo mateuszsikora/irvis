@@ -9,6 +9,7 @@
  * Commands, options, output and exit codes: docs/features/capture-cli-user.md
  * How it works: docs/features/capture-cli-technical.md
  */
+import { usbCommand } from './usb-command.ts';
 import { parseArgs } from 'node:util';
 import {
   captureCommand,
@@ -27,6 +28,8 @@ import { parseCelsius, spike } from './spike.ts';
 export const USAGE = `Usage: capture-cli <command> [options]
 
 Commands:
+  usb [list|state|gain high|low|tpd <id> <raw>|palette <1..11>|watch|nuc] [options]
+                                        M2 USB diagnostics; see docs/findings/m2.md
   list                                  AVFoundation video devices and their indexes
   probe --device <index>                modes and pixel formats from AVFoundation, USB descriptors from node-usb
   capture --device <index> --seconds <s> --mode 384|192 --out <dir> [--label <text>] [--reference <°C>]
@@ -76,6 +79,7 @@ export async function main(argv: readonly string[]): Promise<string> {
   if (command === undefined || command === '--help' || command === '-h' || command === 'help') {
     return USAGE;
   }
+  if (command === 'usb') return usbCommand(rest);
   if (command === 'reference') return referenceCommand(rest);
   let parsed;
   try {

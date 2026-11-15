@@ -32,13 +32,13 @@ The types are in `src/cameras/profile.ts`; each field has a TSDoc comment.
 | `ProfileConversion` | `gain`, `conversion`, provenance | at least one; `gain` unique; with an enum state field `gain`: one conversion for each of its values and none for other values; without it: exactly one conversion |
 | `CameraStateField` | `id`, `label`, `affects` (`data` or `meaning`), `refresh` (`command` or `second`), and `{ kind: 'enum'; values; default }` or `{ kind: 'number'; unit; default }` | ids unique and kebab-case; an enum has unique values and its `default` is one of them; a number's `default` is finite; a field called `gain` is an enum; `emissivity` and `reflected-temperature` come together, each a number with `affects: 'data'`, unit `''` (default greater than 0 and at most 1) and `°C` (default above −273.15) |
 | `CameraStateSnapshot` | `origin` (`camera`, `declared`, `assumed`), `values` (by field id) | Not part of a profile: what a frame carries |
-| `CameraCommand` | `id`, `label`, `transport`, `changes` (state field ids), provenance | ids unique and kebab-case; `changes` names existing fields |
+| `CameraCommand` | `id`, `label`, `transport`, optional `followUp` (ordered vendor transfers), `changes` (state field ids), provenance | ids unique and kebab-case; `changes` names existing fields |
 | `VendorControlTransport` | `kind: 'vendor-control'`, `requestType`, `request` (0–0xff), `value`, `index` (0–0xffff), `data` | every number in its range, every data byte 0–0xff |
 | `UvcExtensionUnitTransport` | `kind: 'uvc-xu'`, `unit`, `selector` (0–0xff), `data` | the same |
 
 Three state field ids are reserved, because code outside the profile reads them from a frame's `CameraStateSnapshot`: `gain` selects the conversion, and `emissivity` and `reflected-temperature` (`EMISSIVITY_FIELD`, `REFLECTED_TEMPERATURE_FIELD` in `src/cameras/fields.ts`) are the emissivity correction the camera applies to its raw values itself. The software correction starts from them, so it never applies emissivity twice ([decision](../decisions/architecture.md#the-software-correction-works-relative-to-what-the-camera-applied), [core: technical](core-technical.md#data-flow)). A camera that keeps an emissivity only for its own image gives that field another id. No profile has them yet; whether the P2 Pro applies its TPD emissivity to the raw values is measured in #7.
 
-TODO(owner): conversion parameters that change every frame (the sensor temperature) and the encoding of command parameters into the transport are not modelled; #7 adds them once the protocol is known.
+Gain commands encode fixed values as transfer sequences. TODO(owner): measure camera state effects and sensor-temperature encoding before modelling conversion parameters that change every frame.
 
 ## infiray-p2pro
 
@@ -51,7 +51,7 @@ TODO(owner): conversion parameters that change every frame (the sensor temperatu
 | `videoModes` | `yuyv-256x384`, 25 fps, `image` rows 0–191, `thermal` rows 192–383 `u16le`, no `enableCommand`; `yuyv-256x192`, 25 fps, `layout: null` |
 | `sensor` | 256×192, no `netd` or `accuracy`, `ranges` empty |
 | `conversions` | One, `gain: 'high'`: linear, `scale` 1/64, `offset` −273.15, confidence `reported` |
-| `state`, `commands` | Empty; #7 adds gain, the camera state and the commands |
+| `state`, `commands` | State unconfirmed; reported `gain-high` and `gain-low` commands |
 
 With no `gain` state field, the validator requires exactly one conversion, so the low-gain conversion waits for #7. The M1 spike checks the modes and the conversion on a camera ([findings](../findings/m1.md)).
 
@@ -130,3 +130,7 @@ Not covered: every message in the table above has its check in `validate.ts`, bu
 
 - [Cameras](cameras-user.md)
 - [Core: technical](core-technical.md)
+
+## Experimental USB commands
+
+`CameraCommand.followUp` optionally holds vendor transfers sent after `transport`, in order, before checking readiness. `validateProfile` validates their fields like the first transport. The P2 Pro profile declares `gain-high` and `gain-low`; its exported `usbProtocol` holds TPD limits, selectors and transfer constants, plus the explicitly hypothetical sensor-temperature reply length. EMS/TAU accept raw 128 to restore the initial values observed on the T7; their ratio scaling remains unverified. See [protocol](../protocol.md) for provenance and confidence. The CLI rereads all probe state after commands independently of `changes`, which stays empty because the profile has no verified state defaults or low-gain conversion.

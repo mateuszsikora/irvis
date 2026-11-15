@@ -100,8 +100,9 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
   - `packages/core/src/yuyv.test.ts::decodeYuyvRaw::reads a frame that is a view into a larger buffer`
   - `packages/core/src/yuyv.test.ts::decodeYuyvRaw::rejects rows outside the frame`
   - `packages/core/src/yuyv.test.ts::checkYuyvFrame::rejects a frame with the wrong byte count`
-- **20.** The capture tool never lets ffmpeg convert pixels: it asks AVFoundation for `yuyv422` and packs the input pixel format with `-c:v rawvideo -pix_fmt +`, disabling automatic pixel conversion. Frame timing passes through, and the packet list remains a stream copy of the original input.
+- **20.** The capture tool never lets ffmpeg convert pixels: it asks AVFoundation for `yuyv422` and packs the input pixel format with `-c:v rawvideo -pix_fmt +`, disabling automatic pixel conversion. Frame timing passes through, and the packet list remains a stream copy of the original input. The M2 video observer also passes timestamps through without synthesizing duplicate frames.
   - `tools/capture-cli/src/ffmpeg.test.ts::captureArgs::packs pixels without conversion and lists original packets`
+  - `tools/capture-cli/src/usb-video.test.ts::USB video observation::preserves timestamp gaps and rejects a live process that stops producing frames`
 - **21.** When AVFoundation delivered another pixel format than `yuyv422` for a capture with temperature data, the session report does not answer whether the 384 mode needs a command, and says which format arrived. A packet-size mismatch also gives an unknown answer rather than implying a USB command is needed.
   - `tools/capture-cli/test/report.test.ts::report::does not answer the 384 question when AVFoundation changed the format`
   - `tools/capture-cli/test/report.test.ts::report::flags packets of the wrong size`
@@ -148,3 +149,15 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
 - **30.** A palette range maps its bottom reading to entry 0, its top reading to entry 255 and finite readings outside it to the nearer end, a reading that is not finite to no entry; the six palette tables are built with the same bytes every time.
   - `packages/core/src/analysis/render.test.ts::paletteIndex::maps the range onto 256 entries and clamps outside it`
   - `packages/core/src/analysis/palettes.test.ts::palettes::are built with the same bytes every time`
+
+- **31.** P2 Pro gain selection sends the command and continuation in order, with the selector and value big-endian, before checking completion. TPD reads decode the two-byte reply big-endian and reject short replies.
+  - `tools/capture-cli/src/usb-protocol.test.ts::USB protocol::encodes gain as two ordered vendor transfers before polling completion`
+  - `tools/capture-cli/src/usb-protocol.test.ts::USB protocol::reads TPD with big endian selector, length and response`
+  - `tools/capture-cli/src/usb-protocol.test.ts::USB protocol::rejects malformed responses and camera status errors`
+
+- **32.** USB diagnostics must allow restoring the T7's observed raw emissivity value 128 without assuming a temperature-correction ratio.
+  - `tools/capture-cli/src/usb-protocol.test.ts::USB protocol::can restore the raw emissivity value 128 observed on the T7`
+
+- **33.** USB descriptor probing authorizes requested IDs before WebUSB filters discovery results; an empty ID list includes all discovered devices. Devices outside a nonempty ID list are not opened.
+  - `tools/capture-cli/src/usb-runtime.test.ts::authorizes the requested camera before WebUSB filtering and reads its descriptors`
+  - `tools/capture-cli/src/usb-runtime.test.ts::authorizes all devices for an empty probe ID list`

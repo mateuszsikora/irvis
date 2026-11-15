@@ -193,6 +193,7 @@ export function validateProfile(profile: CameraProfile): string[] {
     if (!KEBAB.test(command.id)) out.push(`commands: id '${command.id}' is not kebab-case`);
     checkProvenance(where, command, out);
     checkTransport(where, command.transport, out);
+    for (const transfer of command.followUp ?? []) checkTransport(where, transfer, out);
     for (const id of command.changes) {
       if (!stateIds.includes(id)) out.push(`${where}: changes unknown state field '${id}'`);
     }

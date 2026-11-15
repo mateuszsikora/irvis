@@ -1,0 +1,3 @@
+# Local active desktop users may access these cameras without detaching UVC.
+SUBSYSTEM=="usb", ATTR{idVendor}=="0bda", ATTR{idProduct}=="5830", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0bda", ATTR{idProduct}=="5840", TAG+="uaccess"

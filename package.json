@@ -14,6 +14,7 @@
     "docs-check": "node tools/docs-check/src/check-docs.ts",
     "decisions-index": "node tools/docs-check/src/decisions-index.ts",
     "capture": "node tools/capture-cli/src/cli.ts",
+    "spike:m2": "node tools/capture-cli/src/cli.ts usb",
     "spike:m1": "node tools/capture-cli/src/cli.ts spike",
     "bench:irvis": "node packages/core/test/benchmark/irvis.ts",
     "test": "vitest run",

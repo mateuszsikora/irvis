@@ -179,7 +179,11 @@ interface UsbDeviceLike {
 }
 
 interface UsbModule {
-  readonly usb: { getDevices(): Promise<UsbDeviceLike[]> };
+  readonly WebUSB: new (options: {
+    readonly allowedDevices: UsbProbeOptions['ids'];
+    readonly allowAllDevices: boolean;
+    readonly autoDetachKernelDriver: boolean;
+  }) => { getDevices(): Promise<UsbDeviceLike[]> };
 }
 
 const USB_PACKAGE = 'usb';
@@ -200,7 +204,12 @@ export async function probeUsb(options: UsbProbeOptions): Promise<string[]> {
   const lines: string[] = [];
   let devices: UsbDeviceLike[];
   try {
-    devices = await usbModule.usb.getDevices();
+    const webusb = new usbModule.WebUSB({
+      allowedDevices: options.ids,
+      allowAllDevices: options.ids.length === 0,
+      autoDetachKernelDriver: false,
+    });
+    devices = await webusb.getDevices();
   } catch (error) {
     return [`listing USB devices failed: ${String(error)}`];
   }
