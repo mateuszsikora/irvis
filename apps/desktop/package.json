@@ -1,0 +1,20 @@
+{
+  "name": "@irvis/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "esbuild src/main.js --bundle --platform=node --external:electron --outfile=dist/main.cjs && esbuild src/preload.cjs --bundle --platform=node --external:electron --outfile=dist/preload.cjs",
+    "start": "electron .",
+    "test:smoke": "node test/smoke.mjs"
+  },
+  "dependencies": {
+    "@irvis/core": "*"
+  },
+  "devDependencies": {
+    "electron": "^45.3.2",
+    "esbuild": "^0.28.2",
+    "playwright": "^1.65.1"
+  }
+}

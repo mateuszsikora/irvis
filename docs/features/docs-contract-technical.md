@@ -243,3 +243,5 @@ Rule F6 owns `packages/backend-browser/` and requires its user or technical feat
 - [Documentation guide](../guides/documentation.md), including its [known limits](../guides/documentation.md#known-limits)
 - [Decisions about the contract](../decisions/docs.md)
 - [Invariants](../invariants.md)
+
+The ownership map includes F7 for `apps/desktop/` and F8 for `packages/backend-electron/`; each requires its corresponding desktop or backend-electron feature document.

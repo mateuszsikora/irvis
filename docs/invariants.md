@@ -173,3 +173,7 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
   - `packages/backend-browser/test/frame.test.ts::browser capture::requests profile dimensions without resizing and the selected device`
   - `packages/backend-browser/test/frame.test.ts::browser capture::rejects mismatched dimensions and RGB frames before copying bytes`
   - `packages/backend-browser/test/frame.test.ts::browser capture::copies the full coded rectangle without requesting format conversion`
+
+- **37.** Desktop simulation compares only profile thermal rows; unsynchronized live pairs never claim bit-exact or flat-region match metrics.
+  - `apps/web/src/Comparison.test.tsx::desktop comparison::compares only thermal rows against the exact reference`
+  - `apps/web/src/Comparison.test.tsx::desktop comparison::does not claim bit-exact metrics for unsynchronized live frames`

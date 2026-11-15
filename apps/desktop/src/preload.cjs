@@ -1,0 +1,21 @@
+const { contextBridge, ipcRenderer } = require('electron');
+contextBridge.exposeInMainWorld('irvisDesktop', {
+  start: (options) => ipcRenderer.invoke('capture:start', options),
+  stop: () => ipcRenderer.invoke('capture:stop'),
+  subscribe: (frame, error) => {
+    const receive = (_event, value) => {
+      try {
+        frame(value);
+      } finally {
+        ipcRenderer.send('capture:ack');
+      }
+    };
+    const fail = (_event, message) => error(message);
+    ipcRenderer.on('capture:frame', receive);
+    ipcRenderer.on('capture:error', fail);
+    return () => {
+      ipcRenderer.removeListener('capture:frame', receive);
+      ipcRenderer.removeListener('capture:error', fail);
+    };
+  },
+});
