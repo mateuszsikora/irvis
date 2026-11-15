@@ -1,6 +1,6 @@
 # Core
 
-`@irvis/core` (`packages/core`) is the TypeScript package every other part of irvis builds on: the types that connect a camera backend, a recording and the viewer, the camera registry, the `.irvis` recording format, and the corrections that turn raw values into the readings a user sees (emissivity, offset, °C or °F, alarms, isotherms). Its users are the people and agents who write the other packages. It runs unchanged in browsers, Workers, Electron and Node, so it uses only the APIs they all share. The camera registry and the profile schema have their own documents: [cameras](cameras-user.md).
+`@irvis/core` (`packages/core`) is the TypeScript package every other part of irvis builds on: the types that connect a camera backend, a recording and the viewer, the camera registry, the `.irvis` recording format, the corrections that turn raw values into the readings a user sees (emissivity, offset, °C or °F, alarms, isotherms), and the palettes and measurements on those readings (min and max, point, line, area, histogram). Its users are the people and agents who write the other packages. It runs unchanged in browsers, Workers, Electron and Node, so it uses only the APIs they all share. The camera registry and the profile schema have their own documents: [cameras](cameras-user.md).
 
 ## Use core from another package
 
@@ -35,6 +35,7 @@ And these functions:
 | `decodeYuyvImage(frame, rows)` | The Y, U and V bytes of some rows of a YUYV frame, such as the camera's own image |
 | `toCelsius(raw, conversion)`, `toCelsiusArray(raw, conversion)` | Degrees Celsius from raw values with a profile's conversion |
 | `correctFrame(frame, settings)` | Corrected readings in °C, with emissivity, reflected temperature and offset ([below](#correct-readings-show-units-raise-alarms-and-paint-isotherms)) |
+| `renderPalette(celsius, range, palette)`, `measureFrame(image)` and the other measurements | An RGBA image in one of six palettes, and min, max, point, line, area and histogram readings ([below](#render-a-palette-and-measure)) |
 
 ```ts
 const mode = profile.videoModes[0];
@@ -119,8 +120,47 @@ unitDeltaToCelsius(0.9, 'F'); // 0.5: an offset typed in °F
 - **Units:** readings stay in °C in core; convert with `celsiusToUnit` and `unitToCelsius` for temperatures and `celsiusDeltaToUnit` and `unitDeltaToCelsius` for differences (offset, hysteresis). `formatTemperature(value, unit, digits = 1)` gives `36.6 °C`, and `–` for a pixel without a temperature.
 - **Alarms:** `highCelsius` turns on at or above, `lowCelsius` at or below, `null` disables one. Pass the previous `AlarmState` back each frame: an alarm that is on stays on until the hottest (coldest) pixel is more than `hysteresis` (0.5 K by default) past the threshold, so noise does not switch it every frame. Each alarm says how many pixels reach the threshold and where the hottest or coldest pixel is.
 - **Isotherms:** above a temperature, below it, or between two, bounds included, painted over an RGBA image with one pixel per reading; later isotherms paint over earlier ones, and alpha is kept. `isothermMask` gives the pixels as a mask instead.
-- Uncertain pixels (`frame.uncertain`) and pixels without a temperature (NaN, and every reading at or below 0 K, such as a dead pixel at raw 0) never turn an alarm on and are never painted.
+- Uncertain pixels (`frame.uncertain`) and pixels without a temperature (NaN, and every reading at or below 0 K, such as a dead pixel at raw 0; also ±Infinity in readings you build yourself) never turn an alarm on and are never painted.
 - Invalid settings throw an `Error` such as `invalid correction: emissivity must be greater than 0 and at most 1`; every message is in the [technical document](core-technical.md#failure-modes).
+
+## Render a palette and measure
+
+The viewer shows corrected readings in a palette and measures them. Every function here takes a `CelsiusImage`, the corrected readings with the frame's size and uncertain mask, or its `celsius` array:
+
+```ts
+import {
+  autoRange,
+  celsiusImage,
+  histogram,
+  measureArea,
+  measureFrame,
+  measureLine,
+  measurePoint,
+  paletteLut,
+  renderPalette,
+} from '@irvis/core';
+
+const image = celsiusImage(frame, settings); // correctFrame with width, height and frame.uncertain
+
+// Automatic range (null when no pixel has a certain temperature), or the user's own.
+const range = autoRange(image) ?? { minCelsius: 20, maxCelsius: 40 };
+const rgba = renderPalette(image.celsius, range, 'iron'); // Uint8ClampedArray<ArrayBuffer>, as ImageData wants
+ctx.putImageData(new ImageData(rgba, image.width, image.height), 0, 0);
+const scale = paletteLut('iron'); // 256 colours, coldest first, for the scale bar
+
+const { min, max } = measureFrame(image); // { x, y, index, celsius } each, or null
+const centre = measurePoint(image, { x: 128, y: 96 }).mean; // the 3×3 mean
+const profile = measureLine(image, { x: 10, y: 96 }, { x: 245, y: 96 }); // profile.celsius per pixel
+const box = measureArea(image, { x: 100, y: 70, width: 56, height: 52 }); // box.min, box.max, box.mean
+const bins = histogram(image, range, 64); // bins.counts: 64 counts from range.minCelsius to maxCelsius
+```
+
+- **Palettes:** `iron`, `white-hot`, `black-hot`, `rainbow`, `red-hot` and `cold-blue` (`PALETTE_IDS`; names for the UI in `PALETTES`), each 256 colours from cold to hot.
+- **Range:** the readings from `minCelsius` to `maxCelsius` are split into 256 equal steps; the bottom gets the first colour, the top the last, and readings outside the range get the first or last colour. `autoRange` spans the coldest to the hottest pixel of the frame; a frame where every pixel reads the same gets 1 K around that reading. A manual range needs `minCelsius` below `maxCelsius`.
+- **Pixels without a temperature** (NaN, such as a dead pixel at raw 0, and ±Infinity in an image you build yourself) are transparent in the image. Uncertain pixels are coloured by their value; mark them with the overlay.
+- **Uncertain pixels and pixels without a temperature count in no measurement:** min and max never land on them, a point, line or area averages only the others (`counted` says how many), and the histogram lists them as `skipped`. When nothing counts, `mean` is NaN and `min` and `max` are `null`. A line profile still holds every sample, with `profile.uncertain` marking the uncertain ones.
+- **Point:** the mean of the 3×3 pixels around it; at the edge of the image only the neighbours inside it. When the point's own pixel is uncertain or has no temperature, `centreCounted` is `false` and the mean is its neighbours' only: show that, not a plain reading. **Line:** one sample per pixel from start to end, both included. **Area:** a rectangle of whole pixels inside the image. Positions are whole pixels; a position outside the image throws, for example `point (256, 0) is not a pixel of the 256×192 image`.
+- Colours and measurements use only arithmetic that every engine rounds the same way, so a recording gives the same readings in every browser and in Node (#21 will test this in Chromium and WebKit).
 
 ## Write code in core
 

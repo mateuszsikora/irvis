@@ -60,7 +60,8 @@ export function alarmProblems(settings: AlarmSettings): string[] {
 
 /**
  * The alarms for one frame of corrected readings (`correctFrame`). Pixels
- * whose `uncertain` value is not 0, and readings that are NaN, are skipped.
+ * whose `uncertain` value is not 0, and readings that are not finite (NaN,
+ * ±Infinity: no temperature), are skipped.
  * An alarm turns on when at least one pixel reaches its threshold. An alarm
  * that was on in `previous` stays on until the extreme pixel is more than
  * `hysteresis` past the threshold on the other side, or no pixel counts.
@@ -88,7 +89,7 @@ export function evaluateAlarms(
   for (let i = 0; i < celsius.length; i++) {
     if (uncertain && uncertain[i] !== 0) continue;
     const value = celsius[i] ?? Number.NaN;
-    if (Number.isNaN(value)) continue;
+    if (!Number.isFinite(value)) continue;
     if (hottestAt < 0 || value > hottest) {
       hottest = value;
       hottestAt = i;

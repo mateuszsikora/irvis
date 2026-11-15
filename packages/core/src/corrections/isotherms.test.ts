@@ -43,6 +43,14 @@ describe('isotherms', () => {
       ...[0, 255, 0, 7],
       ...[0, 0, 255, 7],
     ]);
+
+    // ±Infinity has no temperature either, as in the measurements of src/analysis/.
+    const infinite = Float64Array.from([Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]);
+    expect(Array.from(isothermMask(infinite, null, hot))).toEqual([0, 0]);
+    expect(Array.from(isothermMask(infinite, null, cold))).toEqual([0, 0]);
+    expect(paintIsotherms(new Uint8ClampedArray(8), infinite, null, [hot, cold, skin])).toEqual([
+      0, 0, 0,
+    ]);
   });
 
   it('paint a later isotherm over an earlier one', () => {

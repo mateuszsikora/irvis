@@ -133,7 +133,7 @@ The payload is a JSON object `{ "timestamp": <ms>, "values": { … } }`: the vie
 | `alarms` | `AlarmSettings`: `{ "highCelsius", "lowCelsius", "hysteresis" }`, a threshold a number or `null` |
 | `isotherms` | a list of `Isotherm`: `{ "kind": "above" \| "below", "celsius", "color": [r, g, b] }` or `{ "kind": "between", "minCelsius", "maxCelsius", "color" }` |
 
-These are the user's settings. What the camera applied itself is in the chunk's `cameraState` (`emissivity`, `reflected-temperature`), and readings are corrected relative to it ([decision](decisions/architecture.md#the-software-correction-works-relative-to-what-the-camera-applied)). The planned names of [#12](https://github.com/mateuszsikora/irvis/issues/12) are `palette`, `range` and `measurements`. TODO(owner): fix every name and its schema, with code that writes and reads them, before v1 is frozen in #16.
+These are the user's settings. What the camera applied itself is in the chunk's `cameraState` (`emissivity`, `reflected-temperature`), and readings are corrected relative to it ([decision](decisions/architecture.md#the-software-correction-works-relative-to-what-the-camera-applied)). The planned names of [#12](https://github.com/mateuszsikora/irvis/issues/12) follow its types in the same way: `palette`, a `PaletteId` (`"iron"`, `"white-hot"`, `"black-hot"`, `"rainbow"`, `"red-hot"` or `"cold-blue"`); `range`, `"auto"` or a `TemperatureRange` `{ "minCelsius", "maxCelsius" }`; and `measurements`, whose schema waits for several measurements at once (#18). TODO(owner): fix every name and its schema, with code that writes and reads them, before v1 is frozen in #16.
 
 ## Index and trailer
 

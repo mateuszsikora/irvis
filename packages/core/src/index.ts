@@ -4,6 +4,7 @@ export type * from './frames.ts';
 export type * from './player.ts';
 export type * from './store.ts';
 export * from './cameras/index.ts';
+export * from './analysis/index.ts';
 export * from './corrections/index.ts';
 export * from './yuyv.ts';
 export * from './irvis/index.ts';
