@@ -345,6 +345,6 @@ Rejected: automatic kernel-driver detachment, because it could interrupt video a
 
 Status: decided (#7)
 
-Use `usb` 2.x, which exports the legacy `getDeviceList` API as well as `webusb.getDevices`. Installed version 3.3.0 exposes only WebUSB and cannot run the implemented unclaimed-control-transfer path. The M1 descriptor probe uses the explicit `webusb` export; M2 uses legacy devices. An import-only integration test verifies the real installed exports, while transport mocks preserve numeric OUT results.
+Use `usb` 2.x, which exports the legacy `getDeviceList` API as well as `webusb.getDevices`. Installed version 3.3.0 exposes only WebUSB and cannot run the implemented unclaimed-control-transfer path. The M1 descriptor probe creates a `WebUSB` instance with explicit allowed IDs (or all devices for an empty list) and automatic driver detachment disabled; M2 uses legacy devices. The default WebUSB singleton does not authorize any device in a fresh process. Integration tests verify the installed exports and exercise the real authorization filter with synthetic discovery results, while transport mocks preserve numeric OUT results.
 
 Rejected: treating TypeScript structural casts and transport mocks as proof of compatibility with a native package. The connected-camera run exposed both the missing export and the different callback result types.

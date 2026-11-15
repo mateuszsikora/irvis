@@ -157,3 +157,7 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
 
 - **32.** USB diagnostics must allow restoring the T7's observed raw emissivity value 128 without assuming a temperature-correction ratio.
   - `tools/capture-cli/src/usb-protocol.test.ts::USB protocol::can restore the raw emissivity value 128 observed on the T7`
+
+- **33.** USB descriptor probing authorizes requested IDs before WebUSB filters discovery results; an empty ID list includes all discovered devices. Devices outside a nonempty ID list are not opened.
+  - `tools/capture-cli/src/usb-runtime.test.ts::authorizes the requested camera before WebUSB filtering and reads its descriptors`
+  - `tools/capture-cli/src/usb-runtime.test.ts::authorizes all devices for an empty probe ID list`
