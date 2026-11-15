@@ -9,7 +9,10 @@ export interface CelsiusImage {
   readonly width: number;
   /** Rows. */
   readonly height: number;
-  /** width × height readings in °C, row-major; NaN where a pixel has no temperature. */
+  /**
+   * width × height readings in °C, row-major; NaN where a pixel has no
+   * temperature. ±Infinity is treated like NaN.
+   */
   readonly celsius: Float64Array;
   /** 1 where the value is uncertain, 0 elsewhere; null when every value is exact. */
   readonly uncertain: Uint8Array | null;
@@ -58,8 +61,11 @@ export function checkImage(image: CelsiusImage): void {
   }
 }
 
-/** The pixel counts: its `uncertain` value is 0 (or there is no mask) and it has a temperature. */
+/**
+ * The pixel counts: its `uncertain` value is 0 (or there is no mask) and it
+ * has a temperature, a finite reading (NaN and ±Infinity have none).
+ */
 export function counts(image: CelsiusImage, index: number): boolean {
   if (image.uncertain && image.uncertain[index] !== 0) return false;
-  return !Number.isNaN(image.celsius[index] ?? Number.NaN);
+  return Number.isFinite(image.celsius[index] ?? Number.NaN);
 }

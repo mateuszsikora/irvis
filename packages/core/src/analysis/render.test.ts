@@ -24,13 +24,16 @@ describe('paletteIndex', () => {
     expect(paletteIndex(20 + 20 / 256 - 1e-9, range)).toBe(0);
     expect(paletteIndex(-100, range)).toBe(0);
     expect(paletteIndex(1000, range)).toBe(255);
-    expect(paletteIndex(Number.POSITIVE_INFINITY, range)).toBe(255);
-    expect(paletteIndex(Number.NEGATIVE_INFINITY, range)).toBe(0);
     expect(paletteIndex(Number.NaN, range)).toBe(-1);
+    expect(paletteIndex(Number.POSITIVE_INFINITY, range)).toBe(-1);
+    expect(paletteIndex(Number.NEGATIVE_INFINITY, range)).toBe(-1);
   });
 
   it('rejects a range that is empty or not finite', () => {
     expect(rangeProblems(range)).toEqual([]);
+    expect(rangeProblems({ minCelsius: -1e308, maxCelsius: 1e308 })).toEqual([
+      'the span from minCelsius to maxCelsius must be finite',
+    ]);
     expect(rangeProblems({ minCelsius: 30, maxCelsius: 30 })).toEqual([
       'minCelsius must be below maxCelsius',
     ]);
@@ -50,6 +53,10 @@ describe('autoRange', () => {
       maxCelsius: 31,
     });
     expect(autoRange(image([25, 90, 31]))).toEqual({ minCelsius: 25, maxCelsius: 90 });
+    const infinite = [Number.POSITIVE_INFINITY, 25, Number.NEGATIVE_INFINITY, 31];
+    const auto = autoRange(image(infinite));
+    expect(auto).toEqual({ minCelsius: 25, maxCelsius: 31 });
+    expect(rangeProblems(auto ?? range)).toEqual([]);
   });
 
   it('centres 1 K on a flat frame and gives null when no pixel counts', () => {
@@ -79,8 +86,32 @@ describe('renderPalette', () => {
   });
 
   it('leaves pixels without a temperature transparent and colours uncertain ones', () => {
-    const rgba = renderPalette(Float64Array.from([Number.NaN, 30]), range, 'white-hot');
-    expect(Array.from(rgba)).toEqual([0, 0, 0, 0, 128, 128, 128, 255]);
+    const values = [Number.NaN, 30, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY];
+    const rgba = renderPalette(Float64Array.from(values), range, 'white-hot');
+    expect(Array.from(rgba)).toEqual([
+      ...[0, 0, 0, 0],
+      ...[128, 128, 128, 255],
+      ...[0, 0, 0, 0],
+      ...[0, 0, 0, 0],
+    ]);
+  });
+
+  it('returns an array that ImageData accepts', () => {
+    // ImageData (lib.dom) takes Uint8ClampedArray<ArrayBuffer>, not the
+    // default Uint8ClampedArray<ArrayBufferLike>; core has no lib.dom, so
+    // npm run typecheck checks the assignment here instead.
+    const rgba: Uint8ClampedArray<ArrayBuffer> = renderPalette(new Float64Array(1), range, 'iron');
+    const out: Uint8ClampedArray<ArrayBuffer> = new Uint8ClampedArray(4);
+    const reused: Uint8ClampedArray<ArrayBuffer> = renderPalette(
+      new Float64Array(1),
+      range,
+      'iron',
+      out,
+    );
+    const lut: Uint8Array<ArrayBuffer> = paletteLut('iron');
+    expect(rgba.buffer).toBeInstanceOf(ArrayBuffer);
+    expect(reused).toBe(out);
+    expect(lut.buffer).toBeInstanceOf(ArrayBuffer);
   });
 
   it('writes into a given image and rejects one of another size', () => {

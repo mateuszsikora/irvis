@@ -101,7 +101,7 @@ export const PALETTES: readonly Palette[] = Object.freeze(
  * integer (halves up). Throws on stops that do not start at 0, end at 255
  * and rise, or that hold a colour outside 0 to 255.
  */
-export function buildLut(stops: readonly PaletteStop[]): Uint8Array {
+export function buildLut(stops: readonly PaletteStop[]): Uint8Array<ArrayBuffer> {
   const problems = stopsProblems(stops);
   if (problems.length > 0) throw new Error(`invalid palette stops: ${problems.join('; ')}`);
   const lut = new Uint8Array(PALETTE_SIZE * 3);
@@ -125,6 +125,9 @@ export function buildLut(stops: readonly PaletteStop[]): Uint8Array {
 export function stopsProblems(stops: readonly PaletteStop[]): string[] {
   const out: string[] = [];
   if (stops.length < 2) return ['a palette needs at least two stops'];
+  if (!stops.every((s) => typeof s === 'object' && s !== null)) {
+    return ['every stop must be an object with an index and a color'];
+  }
   if (stops[0]?.index !== 0) out.push('the first stop must be at index 0');
   if (stops[stops.length - 1]?.index !== PALETTE_SIZE - 1) {
     out.push('the last stop must be at index 255');
@@ -137,10 +140,14 @@ export function stopsProblems(stops: readonly PaletteStop[]): string[] {
       break;
     }
   }
-  const colors = stops.map((s): readonly number[] => s.color);
+  // Untyped input (a palette from a file) may hold holes or stops without a colour.
+  const colors = stops.map((s): unknown => (s as Partial<PaletteStop> | undefined)?.color);
   if (
     !colors.every(
-      (c) => c.length === 3 && c.every((v) => Number.isInteger(v) && v >= 0 && v <= 255),
+      (c) =>
+        Array.isArray(c) &&
+        c.length === 3 &&
+        c.every((v) => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 255),
     )
   ) {
     out.push('every stop color must be three integers from 0 to 255');
@@ -148,7 +155,7 @@ export function stopsProblems(stops: readonly PaletteStop[]): string[] {
   return out;
 }
 
-const LUTS: ReadonlyMap<PaletteId, Uint8Array> = new Map(
+const LUTS: ReadonlyMap<PaletteId, Uint8Array<ArrayBuffer>> = new Map(
   PALETTES.map((p) => [p.id, buildLut(p.stops)]),
 );
 
@@ -160,7 +167,7 @@ export function findPalette(id: PaletteId): Palette {
 }
 
 /** The table `renderPalette` uses for this palette; core keeps it, so do not change it. */
-export function lutOf(id: PaletteId): Uint8Array {
+export function lutOf(id: PaletteId): Uint8Array<ArrayBuffer> {
   const lut = LUTS.get(id);
   if (!lut) throw new Error(`unknown palette '${String(id)}'`);
   return lut;
@@ -170,6 +177,6 @@ export function lutOf(id: PaletteId): Uint8Array {
  * A copy of a palette's table: 256 × 3 bytes, red, green and blue of index 0
  * (coldest) to 255 (hottest), for a scale bar.
  */
-export function paletteLut(id: PaletteId): Uint8Array {
+export function paletteLut(id: PaletteId): Uint8Array<ArrayBuffer> {
   return lutOf(id).slice();
 }

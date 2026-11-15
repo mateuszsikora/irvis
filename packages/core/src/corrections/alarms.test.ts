@@ -39,6 +39,14 @@ describe('evaluateAlarms', () => {
     );
     expect(empty.high).toEqual({ active: false, pixels: 0, extreme: Number.NaN, index: -1 });
     expect(empty.low).toEqual({ active: false, pixels: 0, extreme: Number.NaN, index: -1 });
+    // ±Infinity has no temperature either, as in the measurements of src/analysis/.
+    const infinite = evaluateAlarms(
+      Float64Array.from([20, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, 30]),
+      null,
+      alarms({ highCelsius: 50, lowCelsius: 0 }),
+    );
+    expect(infinite.high).toEqual({ active: false, pixels: 0, extreme: 30, index: 3 });
+    expect(infinite.low).toEqual({ active: false, pixels: 0, extreme: 20, index: 0 });
   });
 
   it('stays on within the hysteresis', () => {

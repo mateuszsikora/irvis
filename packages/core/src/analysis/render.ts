@@ -24,7 +24,7 @@ export function autoRange(image: CelsiusImage): TemperatureRange | null {
 /**
  * The palette entry of a reading: floor((v − min) × 256 / (max − min)),
  * clamped to 0 below the range and 255 above it, so the range's top reading
- * gets 255. −1 for NaN.
+ * gets 255. −1 for a reading that is not finite (NaN, ±Infinity).
  */
 export function paletteIndex(celsius: number, range: TemperatureRange): number {
   checkRange(range);
@@ -32,7 +32,7 @@ export function paletteIndex(celsius: number, range: TemperatureRange): number {
 }
 
 function indexIn(celsius: number, min: number, span: number): number {
-  if (Number.isNaN(celsius)) return -1;
+  if (!Number.isFinite(celsius)) return -1;
   const index = Math.floor(((celsius - min) * PALETTE_SIZE) / span);
   return index < 0 ? 0 : index >= PALETTE_SIZE ? PALETTE_SIZE - 1 : index;
 }
@@ -40,7 +40,8 @@ function indexIn(celsius: number, min: number, span: number): number {
 /**
  * The readings as an RGBA image (4 bytes per reading, row-major, as
  * `ImageData`), coloured by `paletteIndex` in the palette, alpha 255. A
- * reading without a temperature (NaN) is transparent black (0, 0, 0, 0).
+ * reading without a temperature (NaN or ±Infinity) is transparent black
+ * (0, 0, 0, 0).
  * Uncertain pixels are coloured like the others; the viewer marks them.
  * Writes into `out` when given (its length must be 4 × the readings) and
  * returns it.
@@ -49,8 +50,8 @@ export function renderPalette(
   celsius: Float64Array,
   range: TemperatureRange,
   palette: PaletteId,
-  out: Uint8ClampedArray | null = null,
-): Uint8ClampedArray {
+  out: Uint8ClampedArray<ArrayBuffer> | null = null,
+): Uint8ClampedArray<ArrayBuffer> {
   checkRange(range);
   const lut = lutOf(palette);
   const rgba = out ?? new Uint8ClampedArray(celsius.length * 4);

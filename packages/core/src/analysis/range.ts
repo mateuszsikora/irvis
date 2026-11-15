@@ -13,7 +13,11 @@ export function rangeProblems(range: TemperatureRange): string[] {
   if (!Number.isFinite(min) || !Number.isFinite(max)) {
     return ['minCelsius and maxCelsius must be finite numbers'];
   }
-  return min < max ? [] : ['minCelsius must be below maxCelsius'];
+  if (!(min < max)) return ['minCelsius must be below maxCelsius'];
+  // -1e308 to 1e308 is finite at both ends, but its span overflows to Infinity.
+  return Number.isFinite(max - min)
+    ? []
+    : ['the span from minCelsius to maxCelsius must be finite'];
 }
 
 /** Throws on a range that `rangeProblems` rejects. */

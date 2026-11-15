@@ -131,19 +131,19 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
   - `packages/core/src/corrections/emissivity.test.ts::camera correction::changes nothing when the settings equal what the camera applied`
   - `packages/core/src/corrections/emissivity.test.ts::camera correction::never applies emissivity twice`
   - `packages/core/src/corrections/emissivity.test.ts::correctFrame::leaves the readings of a camera that applied the same settings unchanged`
-- **27.** Uncertain pixels and pixels without a temperature (NaN) never turn a threshold alarm on and are never painted by an isotherm.
+- **27.** Uncertain pixels and pixels without a temperature (NaN or ±Infinity) never turn a threshold alarm on and are never painted by an isotherm.
   - `packages/core/src/corrections/alarms.test.ts::evaluateAlarms::never turns on for uncertain pixels or pixels without a temperature`
   - `packages/core/src/corrections/isotherms.test.ts::isotherms::never mark uncertain pixels or pixels without a temperature`
 - **28.** A camera profile uses the state field ids `emissivity` and `reflected-temperature` only together, as number fields that affect the raw data, with unit `''` and `°C` and defaults in range.
   - `packages/core/src/cameras/validate.test.ts::validateProfile::accepts the emissivity fields of a camera that applies emissivity itself`
   - `packages/core/src/cameras/validate.test.ts::validateProfile::rejects emissivity fields that the correction cannot read`
-- **29.** Uncertain pixels and pixels without a temperature (NaN) count in no measurement: they are never the min or the max, are left out of the mean of a frame, point, line and area and out of the histogram bins, and do not widen the automatic palette range.
+- **29.** Uncertain pixels and pixels without a temperature (NaN or ±Infinity) count in no measurement: they are never the min or the max, are left out of the mean of a frame, point, line and area and out of the histogram bins, and do not widen the automatic palette range.
   - `packages/core/src/analysis/measurements.test.ts::measureFrame::skips uncertain pixels and pixels without a temperature`
   - `packages/core/src/analysis/measurements.test.ts::measurePoint::skips uncertain pixels and pixels without a temperature`
   - `packages/core/src/analysis/measurements.test.ts::measureLine::marks uncertain samples and leaves them out of its statistics`
   - `packages/core/src/analysis/measurements.test.ts::measureArea::skips uncertain pixels and pixels without a temperature`
   - `packages/core/src/analysis/measurements.test.ts::histogram::counts readings outside the range apart and skips uncertain ones`
   - `packages/core/src/analysis/render.test.ts::autoRange::spans the counted pixels only`
-- **30.** A palette range maps its bottom reading to entry 0, its top reading to entry 255 and readings outside it to the nearer end, NaN to no entry; the six palette tables are built with the same bytes every time.
+- **30.** A palette range maps its bottom reading to entry 0, its top reading to entry 255 and finite readings outside it to the nearer end, a reading that is not finite to no entry; the six palette tables are built with the same bytes every time.
   - `packages/core/src/analysis/render.test.ts::paletteIndex::maps the range onto 256 entries and clamps outside it`
   - `packages/core/src/analysis/palettes.test.ts::palettes::are built with the same bytes every time`

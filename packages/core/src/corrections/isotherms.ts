@@ -40,8 +40,9 @@ export function isothermProblems(isotherm: Isotherm): string[] {
   return out;
 }
 
-/** The reading is inside the band. False for NaN. */
+/** The reading is inside the band. False for a reading that is not finite (NaN, ±Infinity). */
 export function inIsotherm(celsius: number, isotherm: Isotherm): boolean {
+  if (!Number.isFinite(celsius)) return false;
   switch (isotherm.kind) {
     case 'above':
       return celsius >= isotherm.celsius;

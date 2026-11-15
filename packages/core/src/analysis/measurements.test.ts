@@ -56,6 +56,12 @@ describe('measureFrame', () => {
     expect(stats.max).toEqual({ x: 2, y: 1, index: 5, celsius: 35 });
     expect(stats.counted).toBe(3);
     expect(stats.mean).toBe(30);
+
+    // ±Infinity has no temperature either.
+    const infinite = grid(4, 1, (x) => [Infinity, 20, -Infinity, 30][x] ?? 0);
+    expect(measureFrame(infinite)).toMatchObject({ pixels: 4, counted: 2, mean: 25 });
+    expect(measureFrame(infinite).max?.index).toBe(3);
+    expect(measureFrame(infinite).min?.index).toBe(1);
   });
 
   it('gives no min or max when no pixel counts', () => {
@@ -100,7 +106,14 @@ describe('measurePoint', () => {
       (x, y) => (x === 1 && y === 1 ? 500 : x === 0 && y === 0 ? NaN_ : 20),
       (x, y) => x === 1 && y === 1,
     );
-    expect(measurePoint(image, { x: 1, y: 1 })).toMatchObject({ pixels: 9, counted: 7, mean: 20 });
+    expect(measurePoint(image, { x: 1, y: 1 })).toMatchObject({
+      pixels: 9,
+      counted: 7,
+      mean: 20,
+      centreCounted: false,
+    });
+    expect(measurePoint(image, { x: 0, y: 0 }).centreCounted).toBe(false);
+    expect(measurePoint(image, { x: 2, y: 2 })).toMatchObject({ counted: 3, centreCounted: true });
     const lost = grid(
       1,
       1,
@@ -170,6 +183,12 @@ describe('measureLine', () => {
     expect(Array.from(line.uncertain)).toEqual([0, 1, 0, 0]);
     expect(line.stats).toMatchObject({ pixels: 4, counted: 2, mean: 15 });
     expect(line.stats.max?.celsius).toBe(20);
+
+    // A sample that is not finite has no temperature: NaN in the profile.
+    const infinite = grid(3, 1, (x) => [20, Infinity, -Infinity][x] ?? 0);
+    const profile = measureLine(infinite, { x: 0, y: 0 }, { x: 2, y: 0 });
+    expect(Array.from(profile.celsius)).toEqual([20, NaN_, NaN_]);
+    expect(profile.stats).toMatchObject({ pixels: 3, counted: 1, mean: 20 });
   });
 
   it('rejects ends outside the image', () => {
@@ -225,14 +244,14 @@ describe('histogram', () => {
 
   it('counts readings outside the range apart and skips uncertain ones', () => {
     const image = grid(
-      6,
+      7,
       1,
-      (x) => [10, 21, 35, 40, NaN_, 22][x] ?? 0,
+      (x) => [10, 21, 35, 40, NaN_, 22, Infinity][x] ?? 0,
       (x) => x === 5,
     );
     const h = histogram(image, { minCelsius: 20, maxCelsius: 30 }, 10);
     expect(Array.from(h.counts)).toEqual([0, 1, 0, 0, 0, 0, 0, 0, 0, 0]);
-    expect(h).toMatchObject({ below: 1, above: 2, skipped: 2 });
+    expect(h).toMatchObject({ below: 1, above: 2, skipped: 3 });
   });
 
   it('covers only an area when given one', () => {

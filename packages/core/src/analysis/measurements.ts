@@ -32,13 +32,26 @@ export interface RegionStats {
   readonly max: PixelReading | null;
 }
 
+/** A point's reading: the statistics of its 3×3 neighbourhood. */
+export interface PointStats extends RegionStats {
+  /**
+   * The point's own pixel counts. When it does not (uncertain, or without a
+   * temperature), `mean` comes from its neighbours only, and the viewer
+   * should say so instead of showing it as the point's reading.
+   */
+  readonly centreCounted: boolean;
+}
+
 /** The pixels a line passes through and their readings. */
 export interface LineProfile {
   /** Column of each sample, from the line's start to its end. */
   readonly x: Int32Array;
   /** Row of each sample. */
   readonly y: Int32Array;
-  /** The reading of each sample in °C, uncertain pixels included, NaN where none. */
+  /**
+   * The reading of each sample in °C, uncertain pixels included; NaN where
+   * the pixel has no temperature (a reading that is not finite).
+   */
   readonly celsius: Float64Array;
   /** 1 where the sample's pixel is uncertain, 0 elsewhere. */
   readonly uncertain: Uint8Array;
@@ -147,16 +160,18 @@ export function measureFrame(image: CelsiusImage): RegionStats {
 /**
  * The reading at a pixel: the mean of the 3×3 pixels around it, of those
  * that count. At the edge of the image only the neighbours inside it are
- * taken (4 in a corner, 6 along an edge).
+ * taken (4 in a corner, 6 along an edge). `centreCounted` says whether the
+ * pixel itself is among them.
  */
-export function measurePoint(image: CelsiusImage, point: PixelPoint): RegionStats {
+export function measurePoint(image: CelsiusImage, point: PixelPoint): PointStats {
   checkImage(image);
   checkPoint(image, point, 'point');
   const x0 = Math.max(0, point.x - 1);
   const y0 = Math.max(0, point.y - 1);
   const x1 = Math.min(image.width - 1, point.x + 1);
   const y1 = Math.min(image.height - 1, point.y + 1);
-  return areaStats(image, { x: x0, y: y0, width: x1 - x0 + 1, height: y1 - y0 + 1 });
+  const stats = areaStats(image, { x: x0, y: y0, width: x1 - x0 + 1, height: y1 - y0 + 1 });
+  return { ...stats, centreCounted: counts(image, point.y * image.width + point.x) };
 }
 
 /** Min, max and mean of the pixels of an area, in row-major order. */
@@ -192,7 +207,8 @@ export function measureLine(image: CelsiusImage, from: PixelPoint, to: PixelPoin
     const index = y * image.width + x;
     xs[i] = x;
     ys[i] = y;
-    celsius[i] = image.celsius[index] ?? Number.NaN;
+    const value = image.celsius[index] ?? Number.NaN;
+    celsius[i] = Number.isFinite(value) ? value : Number.NaN;
     uncertain[i] = image.uncertain && image.uncertain[index] !== 0 ? 1 : 0;
     acc.add(index);
     const e2 = 2 * err;
@@ -214,16 +230,18 @@ export interface Histogram {
   readonly minCelsius: number;
   readonly maxCelsius: number;
   /**
-   * Pixels per bin. Bin k holds the readings from minCelsius + k × w
-   * (included) to minCelsius + (k + 1) × w, with w = (max − min) / bins; the
-   * last bin also holds maxCelsius.
+   * Pixels per bin. A reading v in the range goes to bin
+   * min(bins − 1, floor((v − min) × bins / (max − min))): roughly from
+   * min + k × w to min + (k + 1) × w with w = (max − min) / bins, maxCelsius
+   * in the last bin. The formula is the definition: a reading computed as
+   * min + k × w can round into bin k − 1.
    */
   readonly counts: Uint32Array;
   /** Counted pixels below minCelsius. */
   readonly below: number;
   /** Counted pixels above maxCelsius. */
   readonly above: number;
-  /** Pixels skipped: uncertain, or without a temperature. */
+  /** Pixels skipped: uncertain, or without a temperature (NaN, ±Infinity). */
   readonly skipped: number;
 }
 

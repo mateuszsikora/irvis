@@ -125,6 +125,15 @@ describe('palettes', () => {
       'stop indexes must be integers that rise',
       'every stop color must be three integers from 0 to 255',
     ]);
+    // Untyped input, such as a palette read from a file, is reported, not thrown on.
+    const holes = [{ index: 0, color: [0, 0, 0] }, undefined] as unknown as PaletteStop[];
+    expect(stopsProblems(holes)).toEqual([
+      'every stop must be an object with an index and a color',
+    ]);
+    const colourless = [{ index: 0 }, { index: 255, color: [0, 0, 0] }] as unknown as PaletteStop[];
+    expect(stopsProblems(colourless)).toEqual([
+      'every stop color must be three integers from 0 to 255',
+    ]);
     expect(() => buildLut(ok.slice(0, 1))).toThrow(
       'invalid palette stops: a palette needs at least two stops',
     );
