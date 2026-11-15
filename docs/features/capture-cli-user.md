@@ -8,6 +8,8 @@
 2. ffmpeg: `brew install ffmpeg`. The tool runs the first `ffmpeg` on `PATH`, or the file that `IRVIS_FFMPEG` names, such as `IRVIS_FFMPEG=/usr/local/bin/ffmpeg npm run spike:m1`.
 3. Camera permission for the terminal app: macOS asks the first time ffmpeg opens a camera. If you said no, allow it in System Settings → Privacy & Security → Camera and restart the terminal.
 
+If a capture launched by an agent app produces no frames and no camera permission prompt, run the command from the standalone macOS Terminal app. Grant camera access to Terminal when prompted. Permission for Terminal does not grant it to the agent app.
+
 Run the tool from the repository root, as `npm run capture -- <command> [options]` or `node tools/capture-cli/src/cli.ts <command> [options]`. `npm run capture -- --help` prints the usage.
 
 ## Run the M1 spike
@@ -55,7 +57,7 @@ The number in brackets is the `--device` index of the other commands. It can cha
 npm run capture -- probe --device 1
 ```
 
-Prints the ffmpeg version, the device name, the modes AVFoundation reports (`256x384 at 25 to 25 fps`), the pixel formats it offers at 256×384 (or the first mode), and what node-usb sees of every USB device with the profile's ID `0x0bda:0x5830`: names, version, interfaces and endpoints, and the configuration descriptor with the UVC formats, frame sizes and extension units. If the device cannot be opened for the descriptor, the line says why; that is itself a result for the USB command spike.
+Prints the ffmpeg version, the device name, the modes AVFoundation reports (`256x384 at 25 to 25 fps`), the pixel formats it offers at 256×384 (or the first mode), and what node-usb sees of every USB device with the profile's IDs `0x0bda:0x5830` and `0x0bda:0x5840`: names, version, interfaces and endpoints, and the configuration descriptor with the UVC formats, frame sizes and extension units. If the device cannot be opened for the descriptor, the line says why; that is itself a result for the USB command spike.
 
 ## Capture
 
@@ -73,6 +75,8 @@ npm run capture -- capture --device 1 --seconds 10 --mode 384 --out captures/tes
 | `--reference <°C>` | The Android app's centre reading at the same spot; a negative one as `--reference=-5` |
 
 It prints one line, such as `captures/test: 250 frames, the first 812 ms after ffmpeg started; ffmpeg exited with 0`, and leaves in `<dir>` the frames as `frames/000000.yuyv.gz`, … , `meta.json`, `packets.framecrc` and `ffmpeg.log`.
+
+The saved frames exclude packet allocation padding without converting pixels. The report still shows original packet sizes: on macOS a 256×384 YUYV packet can have 197120 B even though its packed image has 196608 B. In this case the packet-size check says `no`; it does not mean the newly saved frames are shifted. The automatic answer about the 384 mode is `unknown: input packet sizes or frame boundaries differ from the expected layout`; inspect the capture before drawing a conclusion about USB commands. Captures made with the earlier stream-copy implementation must be repeated.
 
 If AVFoundation did not deliver the `yuyv422` format the tool asks for, a second line says so, for example `warning: AVFoundation delivered uyvy422, not yuyv422; its bytes are reordered or converted, not as the camera sent them`. With `uyvy422` the frames have the right size but their bytes in another order, so the temperatures in the report are wrong, and the report and its summary say so instead of concluding that the mode needs a command. Post the warning and `ffmpeg.log` in the issue.
 

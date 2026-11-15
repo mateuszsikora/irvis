@@ -12,8 +12,9 @@ describe('infiray-p2pro profile', () => {
     expect(validateProfile(profile)).toEqual([]);
   });
 
-  it('matches the Realtek USB ID', () => {
+  it('matches the Realtek USB IDs', () => {
     expect(matchProfiles({ vendorId: 0x0bda, productId: 0x5830 })).toEqual([profile]);
+    expect(matchProfiles({ vendorId: 0x0bda, productId: 0x5840 })).toEqual([profile]);
   });
 
   it('decodes a synthetic 256x384 frame to temperatures', () => {

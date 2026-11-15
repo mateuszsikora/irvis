@@ -47,7 +47,7 @@ TODO(owner): conversion parameters that change every frame (the sensor temperatu
 | Part | Value |
 | --- | --- |
 | `version` | 1 |
-| `identification` | USB `0x0bda:0x5830`, no `labelPattern` (the name macOS shows is not known yet) |
+| `identification` | USB `0x0bda:0x5830` and `0x0bda:0x5840`, no `labelPattern` (`USB Camera` is not specific enough to identify a model) |
 | `videoModes` | `yuyv-256x384`, 25 fps, `image` rows 0–191, `thermal` rows 192–383 `u16le`, no `enableCommand`; `yuyv-256x192`, 25 fps, `layout: null` |
 | `sensor` | 256×192, no `netd` or `accuracy`, `ranges` empty |
 | `conversions` | One, `gain: 'high'`: linear, `scale` 1/64, `offset` −273.15, confidence `reported` |
@@ -121,7 +121,7 @@ Exported from `@irvis/core` (`src/cameras/index.ts`):
 | `packages/core/src/cameras/index.test.ts` | Every registered profile passes `validateProfile` and the ids are unique ([invariant 18](../invariants.md)); `findProfile`; `matchProfiles` by USB ID, a shared USB ID narrowed by the label, several candidates when the label does not decide, the label alone, and no input |
 | `packages/core/src/cameras/validate.test.ts` | A consistent profile passes; one test per kind of problem: id, version, USB IDs, label pattern, rows past the frame, overlapping rows, thermal size against the sensor, unknown enable command, missing and unselectable conversions, measurement ranges with an unknown or repeated gain, linear scale 0, empty source, unknown state field in a command, the reserved emissivity fields (accepted together; alone, of another kind or unit, and with defaults out of range rejected; [invariant 28](../invariants.md)), transport ranges |
 | `packages/core/src/cameras/conversion.test.ts` | `toCelsius` for linear, polynomial and lookup-table conversions, `NaN` outside a table; `toCelsiusArray` |
-| `packages/core/src/cameras/infiray-p2pro/profile.test.ts` | The P2 Pro profile is registered and valid, matches `0x0bda:0x5830`, and a synthetic 256×384 frame (196 608 B) decodes to 22.5 °C and a 35 °C centre |
+| `packages/core/src/cameras/infiray-p2pro/profile.test.ts` | The P2 Pro profile is registered and valid, matches `0x0bda:0x5830` and `0x0bda:0x5840`, and a synthetic 256×384 frame (196 608 B) decodes to 22.5 °C and a 35 °C centre |
 | `packages/core/test/profiles.ts` | Not a test: `testProfile(overrides)`, a consistent profile with made-up constants that the tests above change one part at a time |
 
 Not covered: every message in the table above has its check in `validate.ts`, but not every one has a test. No test uses a real frame of the camera; #16 adds fixtures.

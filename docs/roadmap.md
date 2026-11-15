@@ -99,7 +99,9 @@ The three pull requests go in this order, because #3 and #4 change the same file
 
 **Acceptance (from the specification):** every frame has 196 608 B; the lower half gives sensible temperatures (room about 20–25 °C, hand about 30–35 °C) that agree with the Android app within ±2 °C; the report says whether the 384 mode works without commands, what the upper half looks like, the latency and the fps stability.
 
-**Owner:** install ffmpeg (Homebrew; the app ships its own build only from #23), run `npm run spike:m1` on macOS, note the Android app's readings at the same spots, keep the long series locally or attach them to a GitHub Release.
+**Scope update (owner, 15 Nov 2026):** the Android comparison is waived for #6. The spike records plausible temperatures without claiming reference accuracy; conversion confidence stays reported. Original AVFoundation packets have 512 allocation bytes beyond the 196608-byte image; the capture packs image pixels without conversion and retains source packet sizes in its report ([measured results](findings/m1.md)).
+
+**Owner:** install ffmpeg (Homebrew; the app ships its own build only from #23), run `npm run spike:m1` on macOS (Android readings are optional under the scope update above), keep the long series locally or attach them to a GitHub Release.
 
 ### M2. Spike: USB commands
 

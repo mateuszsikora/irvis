@@ -100,10 +100,11 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
   - `packages/core/src/yuyv.test.ts::decodeYuyvRaw::reads a frame that is a view into a larger buffer`
   - `packages/core/src/yuyv.test.ts::decodeYuyvRaw::rejects rows outside the frame`
   - `packages/core/src/yuyv.test.ts::checkYuyvFrame::rejects a frame with the wrong byte count`
-- **20.** The capture tool never lets ffmpeg convert pixels: it asks AVFoundation for `yuyv422` and stream-copies the video to stdout and to the packet list, without `-pix_fmt`.
-  - `tools/capture-cli/src/ffmpeg.test.ts::captureArgs::stream-copies YUYV to stdout and lists packets`
-- **21.** When AVFoundation delivered another pixel format than `yuyv422` for a capture with temperature data, the session report does not answer whether the 384 mode needs a command, and says which format arrived.
+- **20.** The capture tool never lets ffmpeg convert pixels: it asks AVFoundation for `yuyv422` and packs the input pixel format with `-c:v rawvideo -pix_fmt +`, disabling automatic pixel conversion. Frame timing passes through, and the packet list remains a stream copy of the original input.
+  - `tools/capture-cli/src/ffmpeg.test.ts::captureArgs::packs pixels without conversion and lists original packets`
+- **21.** When AVFoundation delivered another pixel format than `yuyv422` for a capture with temperature data, the session report does not answer whether the 384 mode needs a command, and says which format arrived. A packet-size mismatch also gives an unknown answer rather than implying a USB command is needed.
   - `tools/capture-cli/test/report.test.ts::report::does not answer the 384 question when AVFoundation changed the format`
+  - `tools/capture-cli/test/report.test.ts::report::flags packets of the wrong size`
 - **22.** Every raw value a `.irvis` reader decodes is within the file's threshold T of the value that was written, in every frame and through temperature jumps, dead pixels at 0 and 65535 and a NUC, also when the sink failed during writing or the caller changed an array it got back; at T = 0 the values are equal.
   - `packages/core/src/irvis/codec.test.ts::frame codec::is lossless at tolerance 0`
   - `packages/core/src/irvis/codec.test.ts::frame codec::keeps every value within the tolerance`

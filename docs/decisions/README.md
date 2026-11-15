@@ -58,4 +58,5 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [The web version is hosted on Netlify and goes to production from release](architecture.md#the-web-version-is-hosted-on-netlify-and-goes-to-production-from-release) | [architecture.md](architecture.md) | decided (#3) |
 | [The desktop app ships its own LGPL ffmpeg build](architecture.md#the-desktop-app-ships-its-own-lgpl-ffmpeg-build) | [architecture.md](architecture.md) | decided (#3) |
 | [The capture tool runs on Node type stripping, without tsx](architecture.md#the-capture-tool-runs-on-node-type-stripping-without-tsx) | [architecture.md](architecture.md) | decided (#6) |
-| [Captures keep the camera's bytes with an ffmpeg stream copy](architecture.md#captures-keep-the-cameras-bytes-with-an-ffmpeg-stream-copy) | [architecture.md](architecture.md) | decided (#6) |
+| [Captures keep the camera's bytes with an ffmpeg stream copy](architecture.md#captures-keep-the-cameras-bytes-with-an-ffmpeg-stream-copy) | [architecture.md](architecture.md) | superseded (#6) |
+| [Capture output packs pixels without automatic conversion](architecture.md#capture-output-packs-pixels-without-automatic-conversion) | [architecture.md](architecture.md) | decided (#6) |
