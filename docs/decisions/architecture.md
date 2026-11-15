@@ -374,3 +374,11 @@ Status: decided (#8)
 Core uses a 60-second per-test and per-hook timeout, matching the existing long-test budget in the documentation checker. CI's shared runner exceeded the default five-second limit in both planar reconstruction and exhaustive `.irvis` recovery, without reporting incorrect values. The timeout guards against hangs; performance remains a separate, non-gating benchmark result.
 
 **Rejected:** shrinking deterministic coverage, weakening assertions or retrying until an idle interval happens to pass. Those approaches hide the scheduling dependency instead of giving functional checks sufficient headroom.
+
+## Browser diagnostics retain native planar bytes and disable brightness hints
+
+Status: decided (#9)
+
+The browser spike copies the full coded rectangle without requesting format conversion and retains plane layouts for offline analysis. It requests exact profile dimensions and exact `resizeMode: none`, rejecting mismatched coded dimensions and RGB frames. A preferred resize mode is insufficient because a browser could satisfy the dimensions through scaling. Unsupported constraints can be ignored; matching dimensions are not proof of unmodified samples. It uses capability detection for main-thread versus worker-only track processors, and reconstructs in the Worker with a bounded processor queue. It reports processed fps separately from the requested camera rate. Brightness hints stay disabled until the camera image is validated.
+
+**Rejected:** canvas readback, which changes thermal bytes into RGB; treating synthetic accuracy or matching statistics as proof of real-camera pixel accuracy.

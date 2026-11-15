@@ -8,6 +8,10 @@ How `apps/web` and its Netlify deployment work, for whoever changes them. Why th
 2. `main.tsx` finds `#root` and renders `<App />` in React's `StrictMode` with `createRoot`.
 3. `App` (`src/App.tsx`) reads `cameraProfiles` from `@irvis/core` and renders the page. Vite resolves `@irvis/core` through the npm workspace link to `packages/core/src/index.ts` and bundles core's TypeScript source.
 
+## Browser diagnostics
+
+`App` also renders `Diagnostics` from `src/Diagnostics.tsx`. It selects a core thermal profile mode and a media device, starts/stops `@irvis/backend-browser`, displays metadata and raw statistics, and downloads the latest report and planar frame. Unmount stops capture. The app project references the backend TypeScript project as well as core. See [backend data flow](backend-browser-technical.md#data-flow) and [export schema](../browser-diagnostics-format.md).
+
 ## Interfaces
 
 | Export | Signature | Notes |
@@ -60,6 +64,8 @@ Settings that live in the Netlify UI, for the owner:
 ## Tests
 
 `apps/web/src/App.test.tsx` renders `App` with Testing Library in jsdom: the heading `irvis`, the empty-registry line, and the list of names for passed profiles.
+
+Backend tests live in `packages/backend-browser/test/`; see [backend tests](backend-browser-technical.md#tests). `Diagnostics.test.tsx` covers empty profiles, session reset, fps, device storage and downloads.
 
 Not covered: `main.tsx`, the production build (CI runs `npm run build` but checks only that it succeeds), and anything Netlify does.
 

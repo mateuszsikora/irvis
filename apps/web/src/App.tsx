@@ -1,4 +1,5 @@
 import { cameraProfiles, type CameraProfile } from '@irvis/core';
+import { Diagnostics } from './Diagnostics.tsx';
 
 export interface AppProps {
   /** The supported cameras; the registry from core unless a test passes others. */
@@ -22,6 +23,7 @@ export function App({ profiles = cameraProfiles }: AppProps) {
           </ul>
         </>
       )}
+      <Diagnostics profiles={profiles} />
     </main>
   );
 }

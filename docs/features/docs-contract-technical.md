@@ -233,6 +233,10 @@ Vitest project `docs-check`; `npm test` runs it with the other projects. The tes
 
 Not covered: a `package.json` added or deleted on the branch (no merge-base side, so never a bump), a bump in a file whose path is not UTF-8, the messages `points outside the repository` for code-span and comment references, `cites a missing file`, the missing-table and missing-file messages of `checkMap` and `checkInvariants`, and `git ... failed`; setext headings next to list items and other CommonMark edge cases, links split across lines, comment markers inside string literals (they can produce a false failure), and the CI workflow itself, which runs only on GitHub.
 
+## Browser backend ownership
+
+Rule F6 owns `packages/backend-browser/` and requires its user or technical feature document, including changes to its package and TypeScript configuration.
+
 ## See also
 
 - [Ownership map](README.md#ownership-map)

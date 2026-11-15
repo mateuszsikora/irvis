@@ -140,3 +140,7 @@ Shared agent skills live in `.agents/skills/`, with symlinks in `.claude/skills/
 ## M2 USB spike
 
 `npm run spike:m2 -- <command>` aliases `capture usb`; [M2 findings](../findings/m2.md) gives commands, Linux permissions, and the optional macOS IOKit helper build. Node 26+ and the existing node-usb dependency are required; streaming also needs ffmpeg. The helper is diagnostic source, not a new release build tool.
+
+## Browser diagnostics spike
+
+`npm run spike:m3:web` runs the web Vite server bound to localhost. The page uses the `@irvis/backend-browser` workspace, whose TypeScript project references core and is referenced by the web app and root build. Vite bundles its module Worker with the page. See the [browser diagnostics](../features/backend-browser-user.md) and [M3 owner procedure](../findings/m3.md).

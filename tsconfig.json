@@ -5,6 +5,7 @@
     { "path": "./packages/core" },
     { "path": "./apps/web" },
     { "path": "./tools/docs-check" },
-    { "path": "./tools/capture-cli" }
+    { "path": "./tools/capture-cli" },
+    { "path": "./packages/backend-browser" }
   ]
 }

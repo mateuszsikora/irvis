@@ -124,6 +124,13 @@ export const RULES: readonly Rule[] = [
       '(or docs/features/capture-cli-user.md)',
   },
   {
+    id: 'F6',
+    source: String.raw`^packages/backend-browser/`,
+    docs: String.raw`^docs/features/backend-browser-(user|technical)\.md$`,
+    message:
+      'Browser backend changed: update docs/features/backend-browser-technical.md (or docs/features/backend-browser-user.md)',
+  },
+  {
     id: 'C2',
     source: String.raw`^\.github/(?!pull_request_template\.md$)`,
     docs: String.raw`^docs/guides/development\.md$`,
