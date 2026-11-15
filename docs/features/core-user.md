@@ -205,3 +205,11 @@ A `.irvis` file that cannot be read, or a writer call the format does not allow,
 - [Cameras](cameras-user.md)
 - [The .irvis format](../irvis-format.md)
 - [Architecture decisions](../decisions/architecture.md)
+
+## Recover a planar frame
+
+Use `reconstructPlanar(frame, { thermal: { firstRow: 192, rows: 192 }, image: { firstRow: 0, rows: 192 } })` for a 256×384 P2 Pro I420 or NV12 frame. Use the profile's actual row ranges for other modes. Omit `image` if no registered brightness image is available. The result supplies `raw`, `uncertain` and its inverse `confident`, plus `hint.enabled` and `hint.rSquared` for diagnostics. Supply conversion and camera state separately when constructing a `ThermalFrame`.
+
+Reconstruction is experimental and can make multi-kelvin errors. Confidence is a cost-margin heuristic, not a guarantee of accuracy. Monotonic brightness can help; an uninformative upper image automatically disables the hint. No browser capture or UI is added by this API.
+
+Run `node packages/core/test/benchmark/reconstruction.ts` with Node 26 to print synthetic quality and timing results as JSON lines. Each line reports PASS or FAIL against the targets; missing them does not fail CI. See the [technical reference](core-technical.md#planar-reconstruction) for metric definitions and limitations.

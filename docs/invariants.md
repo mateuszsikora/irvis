@@ -161,3 +161,10 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
 - **33.** USB descriptor probing authorizes requested IDs before WebUSB filters discovery results; an empty ID list includes all discovered devices. Devices outside a nonempty ID list are not opened.
   - `tools/capture-cli/src/usb-runtime.test.ts::authorizes the requested camera before WebUSB filtering and reads its descriptors`
   - `tools/capture-cli/src/usb-runtime.test.ts::authorizes all devices for an empty probe ID list`
+
+- **34.** Planar reconstruction preserves the observed low bytes and rounded chroma model, and I420 and padded NV12 inputs give identical results.
+  - `packages/core/test/reconstruction.test.ts::planar reconstruction::pins synthetic regression quality and preserves the observation model`
+  - `packages/core/test/reconstruction.test.ts::planar reconstruction::gives identical I420 and padded NV12 results`
+- **35.** Registered monotonic brightness can enable the planar hint; deterministic garbage upper halves disable it. The simple synthetic scenes without an edge inside a row pair reconstruct exactly even without a hint.
+  - `packages/core/test/reconstruction.test.ts::planar reconstruction::disables garbage hints and enables registered monotonic hints`
+  - `packages/core/test/reconstruction.test.ts::planar reconstruction::recovers scenes without edges inside row pairs exactly`

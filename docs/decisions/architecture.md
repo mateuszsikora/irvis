@@ -356,3 +356,21 @@ Status: decided
 Run every job in `ci.yml` and `promote.yml` on `[self-hosted, Linux, X64]`, using the existing runner registered for this repository. Match its platform labels rather than its machine name so a replacement runner can take over without workflow edits. Keep the existing triggers, permissions, timeouts, and verification steps.
 
 **Rejected:** keeping `ubuntu-latest`, because the repository owner wants these workflows to use the already registered self-hosted runner.
+
+## Planar reconstruction preserves the rounded chroma observation
+
+Status: decided (#8)
+
+`reconstructPlanar` enumerates at most 32 high-byte pairs per vertical pair. Both high-byte sums compatible with `(a + b + 1) >> 1` are considered; low bytes are never changed. Smooth, neighbouring-edge and interpolated-gradient proposals keep the search bounded instead of enumerating all 512 possible pairs. Column Viterbi followed by at most four alternating ICM sweeps minimizes square-root differences and a brightness hint cost. This is an approximation: a candidate omitted from the bounded set cannot win.
+
+The hint fits weighted isotonic regression to per-brightness medians of paired-row raw estimates. Median absolute deviations set its tolerance; clipped squared residuals against a median baseline set R². Fewer than 32 samples, fewer than four brightness levels, or R² below 0.7 disables it. Only pairs with brightness difference at most two train the mapping, to reduce edge contamination. Brightness must increase with raw value and the image must be spatially registered; inverted palettes are not supported.
+
+A final local cost margin of at least four marks both pixels confident. This is a heuristic within the candidate set, not proof of exact recovery; large errors can remain confident. Full uncertainty calibration and real browser transfer models need measured fixtures. No browser integration is included here.
+
+## Functional test timeouts allow shared runner contention
+
+Status: decided (#8)
+
+Core uses a 60-second per-test and per-hook timeout, matching the existing long-test budget in the documentation checker. CI's shared runner exceeded the default five-second limit in both planar reconstruction and exhaustive `.irvis` recovery, without reporting incorrect values. The timeout guards against hangs; performance remains a separate, non-gating benchmark result.
+
+**Rejected:** shrinking deterministic coverage, weakening assertions or retrying until an idle interval happens to pass. Those approaches hide the scheduling dependency instead of giving functional checks sufficient headroom.
