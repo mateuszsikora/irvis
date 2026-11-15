@@ -73,3 +73,7 @@ Not covered: `main.tsx`, the production build (CI runs `npm run build` but check
 
 - [Web app](web-app-user.md)
 - [Development guide: Promote to release](../guides/development.md#promote-to-release)
+
+## Desktop comparison panel
+
+`Diagnostics.tsx` passes its selected profile mode and latest running browser analysis to `Comparison.tsx`. The optional preload bridge reveals the desktop-only comparison panel. Mode changes unmount the old panel and stop reference capture; starting/stopping browser diagnostics remains independent. Simulation and live comparison, bounded reports and frame-pair downloads are described in [Electron backend](backend-electron-technical.md). The common build still runs without the preload in ordinary browsers.

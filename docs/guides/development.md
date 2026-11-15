@@ -144,3 +144,9 @@ Shared agent skills live in `.agents/skills/`, with symlinks in `.claude/skills/
 ## Browser diagnostics spike
 
 `npm run spike:m3:web` runs the web Vite server bound to localhost. The page uses the `@irvis/backend-browser` workspace, whose TypeScript project references core and is referenced by the web app and root build. Vite bundles its module Worker with the page. See the [browser diagnostics](../features/backend-browser-user.md) and [M3 owner procedure](../findings/m3.md).
+
+## Desktop spike
+
+`npm run spike:m3:desktop` builds the shared web UI and the Electron main/preload bundles, then opens the desktop window. Node 26+ and system ffmpeg are required for the macOS capture spike. Electron, esbuild and Playwright are desktop workspace development dependencies. The browser-safe `@irvis/backend-electron` package is a TypeScript project reference of the web app; ESLint rejects Electron/Node imports and dynamic imports there. The sandboxed preload alone uses CommonJS require.
+
+Run `npm run test:desktop` after desktop or comparison changes. Expected output: `desktop smoke: build, bridge isolation, module Worker, fetch, localStorage, video and CSP passed` and exit code 0. It generates a temporary video in the built web directory using ffmpeg. Run the usual lint, formatting, typecheck, unit tests, build and docs-check too. Hardware verification follows [M3](../findings/m3.md).

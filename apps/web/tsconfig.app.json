@@ -9,7 +9,8 @@
   },
   "references": [
     { "path": "../../packages/core/tsconfig.lib.json" },
-    { "path": "../../packages/backend-browser/tsconfig.lib.json" }
+    { "path": "../../packages/backend-browser/tsconfig.lib.json" },
+    { "path": "../../packages/backend-electron/tsconfig.lib.json" }
   ],
   "include": ["src"]
 }

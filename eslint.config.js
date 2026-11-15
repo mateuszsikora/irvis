@@ -119,6 +119,20 @@ export default defineConfig(
   {
     linterOptions: { reportUnusedDisableDirectives: 'error' },
   },
+  {
+    files: ['packages/backend-electron/**/*.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: ['electron', 'electron/*', 'node:*'] }],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'ImportExpression',
+          message: 'Use static imports; Electron is available only through the preload bridge.',
+        },
+      ],
+    },
+  },
+  { files: ['apps/desktop/test/*.mjs'], languageOptions: { globals: globals.browser } },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {
@@ -133,6 +147,10 @@ export default defineConfig(
     files: ['**/*.{js,mjs,cjs}'],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: { globals: globals.node },
+  },
+  {
+    files: ['apps/desktop/src/preload.cjs'],
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
   },
   {
     files: ['**/*.d.ts'],

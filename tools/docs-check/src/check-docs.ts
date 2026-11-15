@@ -131,6 +131,20 @@ export const RULES: readonly Rule[] = [
       'Browser backend changed: update docs/features/backend-browser-technical.md (or docs/features/backend-browser-user.md)',
   },
   {
+    id: 'F7',
+    source: String.raw`^apps/desktop/`,
+    docs: String.raw`^docs/features/desktop-(user|technical)\.md$`,
+    message:
+      'Desktop app changed: update docs/features/desktop-technical.md (or docs/features/desktop-user.md)',
+  },
+  {
+    id: 'F8',
+    source: String.raw`^packages/backend-electron/`,
+    docs: String.raw`^docs/features/backend-electron-(user|technical)\.md$`,
+    message:
+      'Electron backend changed: update docs/features/backend-electron-technical.md (or docs/features/backend-electron-user.md)',
+  },
+  {
     id: 'C2',
     source: String.raw`^\.github/(?!pull_request_template\.md$)`,
     docs: String.raw`^docs/guides/development\.md$`,

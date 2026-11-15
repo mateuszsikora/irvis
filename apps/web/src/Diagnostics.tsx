@@ -1,3 +1,4 @@
+import { Comparison } from './Comparison.tsx';
 import { useEffect, useRef, useState } from 'react';
 import { cameraProfiles, type CameraProfile } from '@irvis/core';
 import {
@@ -212,6 +213,14 @@ export function Diagnostics({
       >
         Download planar frame
       </button>
+      {selected && (
+        <Comparison
+          key={selected.profile.id + selected.mode.id}
+          profileId={selected.profile.id}
+          mode={selected.mode}
+          live={running ? result : undefined}
+        />
+      )}
     </section>
   );
 }

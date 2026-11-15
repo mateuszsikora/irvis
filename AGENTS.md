@@ -29,6 +29,8 @@ Every commit and pull request that changes behaviour lands its documentation in 
 | `packages/core/src/cameras/` | `docs/features/cameras-technical.md` (or `-user.md`) | F4 |
 | `tools/capture-cli/` except its tests | `docs/features/capture-cli-technical.md` (or `-user.md`) | F5 |
 | `packages/backend-browser/` | `docs/features/backend-browser-technical.md` (or `-user.md`) | F6 |
+| `apps/desktop/` | `docs/features/desktop-technical.md` (or `-user.md`) | F7 |
+| `packages/backend-electron/` | `docs/features/backend-electron-technical.md` (or `-user.md`) | F8 |
 | anything in `.github/` except the PR template | `docs/guides/development.md` | C2 |
 | root configuration: `package.json`, `tsconfig*.json`, `eslint.config.js`, `vitest.config.ts`, `.prettierrc*`, `.prettierignore`, `.nvmrc`, `.npmrc` | `docs/guides/development.md` (or `docs/guides/testing.md` for Vitest) | C3 |
 | any other path that no rule owns (new code) | new `docs/features/<feature>-user.md` and `-technical.md`, and a rule for the path in `RULES`, `docs/features/README.md` and this table | F0 |

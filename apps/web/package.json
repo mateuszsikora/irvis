@@ -12,7 +12,8 @@
     "@irvis/backend-browser": "*",
     "@irvis/core": "*",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "@irvis/backend-electron": "*"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.2",

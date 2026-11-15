@@ -23,7 +23,9 @@
     "typecheck": "tsc --build",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "spike:m3:web": "npm run dev --workspace @irvis/web -- --host localhost"
+    "spike:m3:web": "npm run dev --workspace @irvis/web -- --host localhost",
+    "spike:m3:desktop": "npm run build && npm run start --workspace @irvis/desktop",
+    "test:desktop": "npm run build && npm run test:smoke --workspace @irvis/desktop"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
