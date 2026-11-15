@@ -108,7 +108,7 @@ describe('parseInputPixelFormat', () => {
 });
 
 describe('captureArgs', () => {
-  it('stream-copies YUYV to stdout and lists packets', () => {
+  it('packs pixels without conversion and lists original packets', () => {
     const args = captureArgs({
       deviceIndex: 1,
       width: 256,
@@ -124,9 +124,11 @@ describe('captureArgs', () => {
     expect(at('-framerate')).toBe('25');
     expect(at('-t')).toBe('10');
     expect(at('-i')).toBe('1:none');
-    expect(args.join(' ')).toContain('-map 0:v -c:v copy -f rawvideo pipe:1');
+    expect(args.join(' ')).toContain(
+      '-map 0:v -c:v rawvideo -pix_fmt + -fps_mode passthrough -enc_time_base demux -f rawvideo pipe:1',
+    );
     expect(args.join(' ')).toContain('-map 0:v -c:v copy -f framecrc /tmp/x/packets.framecrc');
-    expect(args).not.toContain('-pix_fmt');
+    expect(at('-pix_fmt')).toBe('+');
   });
 });
 

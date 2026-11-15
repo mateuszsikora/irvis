@@ -197,7 +197,7 @@ export interface CaptureArgs {
 }
 
 /**
- * The ffmpeg arguments of a capture. The video is stream-copied (`-c:v copy`)
+ * The ffmpeg arguments of a capture. Raw pixels are packed without conversion
  * to stdout, so ffmpeg never converts the bytes AVFoundation delivers; a
  * second stream copy writes a framecrc line (pts and size) for every packet.
  */
@@ -222,7 +222,13 @@ export function captureArgs(a: CaptureArgs): string[] {
     '-map',
     '0:v',
     '-c:v',
-    'copy',
+    'rawvideo',
+    '-pix_fmt',
+    '+',
+    '-fps_mode',
+    'passthrough',
+    '-enc_time_base',
+    'demux',
     '-f',
     'rawvideo',
     'pipe:1',

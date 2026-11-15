@@ -319,8 +319,16 @@ Issue #6 asked for `tools/capture-cli` as "Node with tsx". Node 26 runs TypeScri
 
 ## Captures keep the camera's bytes with an ffmpeg stream copy
 
+Status: superseded (#6)
+
+The original implementation stream-copied AVFoundation packets to stdout and framecrc. Hardware testing found that YUYV packets could contain 512 trailing allocation bytes beyond the image, shifting every subsequent fixed-size frame. The original packet sizes remain useful evidence, but stdout now packs the pixels.
+
+## Capture output packs pixels without automatic conversion
+
 Status: decided (#6)
 
-The exact path depends on the bytes reaching irvis as the camera sent them. `capture-cli` asks AVFoundation for `yuyv422` and passes the packets on with `-c:v copy` to a `rawvideo` output on stdout, plus a second stream copy to `framecrc`, which lists the size and the pts of every packet ([how](../features/capture-cli-technical.md#capture)). ffmpeg then never decodes or converts a pixel, so what AVFoundation delivered is not hidden by a conversion. A format with another size per pixel (`nv12`, `bgr0`) or padded rows shows in the packet sizes. A format of the same size, such as `uyvy422`, does not: every packet still has 196 608 B, so the capture reads the format ffmpeg's input stream has from its log and stores it in `meta.json`, and the report says when it is not `yuyv422`. The Electron backend (#20) is expected to use the same arguments, once M1 shows that they work on the camera.
+Use `-c:v rawvideo -pix_fmt + -fps_mode passthrough -enc_time_base demux` for stdout and retain `-c:v copy` for the framecrc side channel. The rawvideo decoder and encoder remove packet allocation padding while retaining the input pixel format. The single `+` disables automatic pixel conversions ([ffmpeg documentation](https://ffmpeg.org/ffmpeg.html#Advanced-Video-options)); passthrough avoids frame duplication or dropping. Input-format warnings remain necessary: packing an unsupported format does not make it YUYV.
 
-**Rejected:** `-f rawvideo -pix_fmt yuyv422` without the copy, because ffmpeg would silently convert from whatever AVFoundation chose, and every frame would still have the expected size. **Rejected:** cutting the stream by size alone, because a padded or converted frame would pass unnoticed, and a reordered one (`uyvy422`) passes even the packet sizes.
+The packet-size check intentionally still reports a mismatch when the original packets are padded. Saved image payloads and source packet sizes answer different questions; a successful normalized capture must not be presented as proof that the original packets were exactly 196608 bytes.
+
+**Rejected:** silently trimming a fixed 512 bytes from every packet, because this observed allocation size is not a camera protocol guarantee. **Rejected:** automatic conversion to `yuyv422`, because it could alter the raw temperature bytes.

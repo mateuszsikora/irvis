@@ -8,7 +8,11 @@ export const profile: CameraProfile = {
   name: 'InfiRay P2 Pro',
   identification: {
     // Realtek bridge; the TOPDON TC001 reports the same pair.
-    usb: [{ vendorId: 0x0bda, productId: 0x5830 }],
+    usb: [
+      { vendorId: 0x0bda, productId: 0x5830 },
+      // TOOLTOP T7 observed during M1; also reported for compatible clones.
+      { vendorId: 0x0bda, productId: 0x5840 },
+    ],
   },
   videoModes: [
     {

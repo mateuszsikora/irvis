@@ -680,7 +680,9 @@ export function formatSummary(reports: readonly { name: string; report: CaptureR
       ? 'not captured'
       : swapped.some((r) => r.report.temperatures !== null)
         ? `unknown: AVFoundation delivered ${swappedFormats}, not ${REQUESTED_PIXEL_FORMAT}, so the bytes were not as the camera sent them`
-        : yesNo(works);
+        : thermal.some((r) => !r.report.frameSize.exact)
+          ? 'unknown: input packet sizes or frame boundaries differ from the expected layout'
+          : yesNo(works);
   const compared = thermal.filter((r) => r.report.temperatures?.referenceDiff != null);
   const within = compared.filter(
     (r) => Math.abs(r.report.temperatures?.referenceDiff ?? Infinity) <= 2,

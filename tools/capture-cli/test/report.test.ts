@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { reportCommand, setReference } from '../src/commands.ts';
-import { reportCapture } from '../src/report.ts';
+import { formatSummary, reportCapture } from '../src/report.ts';
 import { writeSyntheticCapture } from './synthetic.ts';
 
 let dir: string;
@@ -92,6 +92,9 @@ describe('report', () => {
     const { report, markdown } = await reportCapture(dir, 'room');
     expect(report.frameSize.exact).toBe(false);
     expect(markdown).toContain('every frame 196608 B: no (packets: 196616 B × 30');
+    expect(formatSummary([{ name: 'room', report }])).toContain(
+      'unknown: input packet sizes or frame boundaries differ from the expected layout',
+    );
   });
 
   it('reports a mode without temperature data', async () => {
