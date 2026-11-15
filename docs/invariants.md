@@ -2,7 +2,7 @@
 
 Numbered domain rules, each enforced by the tests listed under it. Cite a rule by number ("invariant 4"). A number is never reused; a rule that stops holding is struck through with the reason. How to add one: [documentation guide](guides/documentation.md#invariants).
 
-Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the architecture of the TypeScript packages, 18 to the camera registry, 19 to the YUYV decoder, 20 and 21 to the capture tool, 22 to 25 to the `.irvis` format, 26 to 28 to the corrections, 29 and 30 to the analysis.
+Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the architecture of the TypeScript packages, 18 to the camera registry, 19 to the YUYV decoder, 20 and 21 to the capture tool, 22 to 25 to the `.irvis` format, 26 to 28 to the corrections, 29 and 30 to the analysis, 31 to 33 to USB capture, 34 and 35 to planar reconstruction, and 36 to the browser backend.
 
 - **1.** A changed path that a rule owns fails the check unless some changed path matches that rule's documentation regex.
   - `tools/docs-check/test/rules.test.ts::rules::owned path without doc fails`
@@ -168,3 +168,8 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
 - **35.** Registered monotonic brightness can enable the planar hint; deterministic garbage upper halves disable it. The simple synthetic scenes without an edge inside a row pair reconstruct exactly even without a hint.
   - `packages/core/test/reconstruction.test.ts::planar reconstruction::disables garbage hints and enables registered monotonic hints`
   - `packages/core/test/reconstruction.test.ts::planar reconstruction::recovers scenes without edges inside row pairs exactly`
+
+- **36.** Browser diagnostics request exact profile dimensions and exact `resizeMode: none`, reject mismatched dimensions and RGB frames before copying, and copy the full coded rectangle without requesting format conversion, retaining layout and converting timestamps to milliseconds.
+  - `packages/backend-browser/test/frame.test.ts::browser capture::requests profile dimensions without resizing and the selected device`
+  - `packages/backend-browser/test/frame.test.ts::browser capture::rejects mismatched dimensions and RGB frames before copying bytes`
+  - `packages/backend-browser/test/frame.test.ts::browser capture::copies the full coded rectangle without requesting format conversion`

@@ -65,3 +65,4 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [GitHub Actions use the self-hosted Linux X64 runner](architecture.md#github-actions-use-the-self-hosted-linux-x64-runner) | [architecture.md](architecture.md) | decided |
 | [Planar reconstruction preserves the rounded chroma observation](architecture.md#planar-reconstruction-preserves-the-rounded-chroma-observation) | [architecture.md](architecture.md) | decided (#8) |
 | [Functional test timeouts allow shared runner contention](architecture.md#functional-test-timeouts-allow-shared-runner-contention) | [architecture.md](architecture.md) | decided (#8) |
+| [Browser diagnostics retain native planar bytes and disable brightness hints](architecture.md#browser-diagnostics-retain-native-planar-bytes-and-disable-brightness-hints) | [architecture.md](architecture.md) | decided (#9) |

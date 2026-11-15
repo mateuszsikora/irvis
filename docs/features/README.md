@@ -11,6 +11,7 @@ This file is for anyone who changes code in this repository. It lists the featur
 | Cameras | [cameras-user.md](cameras-user.md) | [cameras-technical.md](cameras-technical.md) | `packages/core/src/cameras/` |
 | Web app | [web-app-user.md](web-app-user.md) | [web-app-technical.md](web-app-technical.md) | `apps/web/`, `netlify.toml` |
 | Capture tool | [capture-cli-user.md](capture-cli-user.md) | [capture-cli-technical.md](capture-cli-technical.md) | `tools/capture-cli/` |
+| Browser backend | [backend-browser-user.md](backend-browser-user.md) | [backend-browser-technical.md](backend-browser-technical.md) | `packages/backend-browser/` |
 
 Any path outside the map falls under rule F0 below, so a new package or app has to come with its own feature documents.
 
@@ -28,6 +29,7 @@ A rule fails when a changed path matches its source regex and no changed path ma
 | F3 | `^(apps/web/\|netlify\.toml$)` | `^docs/features/web-app-(user\|technical)\.md$` | Web app or its Netlify configuration changed: update docs/features/web-app-technical.md (or docs/features/web-app-user.md) |
 | F4 | `^packages/core/src/cameras/` | `^docs/features/cameras-(user\|technical)\.md$` | Camera registry or profile schema changed: update docs/features/cameras-technical.md (or docs/features/cameras-user.md) |
 | F5 | `^tools/capture-cli/` | `^docs/features/capture-cli-(user\|technical)\.md$` | Capture tool changed: update docs/features/capture-cli-technical.md (or docs/features/capture-cli-user.md) |
+| F6 | `^packages/backend-browser/` | `^docs/features/backend-browser-(user\|technical)\.md$` | Browser backend changed: update docs/features/backend-browser-technical.md (or docs/features/backend-browser-user.md) |
 | C2 | `^\.github/(?!pull_request_template\.md$)` | `^docs/guides/development\.md$` | CI or GitHub configuration changed: update docs/guides/development.md |
 | C3 | `^(package\.json\|tsconfig(\.[^/]+)?\.json\|(eslint\|vitest)\.config\.[cm]?[jt]s\|\.prettierrc(\.[^/]+)?\|\.prettierignore\|\.nvmrc\|\.npmrc)$` | `^docs/guides/(development\|testing)\.md$` | Root TypeScript configuration changed: update docs/guides/development.md (or docs/guides/testing.md for the Vitest configuration) |
 
