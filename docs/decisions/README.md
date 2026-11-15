@@ -66,3 +66,4 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [Planar reconstruction preserves the rounded chroma observation](architecture.md#planar-reconstruction-preserves-the-rounded-chroma-observation) | [architecture.md](architecture.md) | decided (#8) |
 | [Functional test timeouts allow shared runner contention](architecture.md#functional-test-timeouts-allow-shared-runner-contention) | [architecture.md](architecture.md) | decided (#8) |
 | [Browser diagnostics retain native planar bytes and disable brightness hints](architecture.md#browser-diagnostics-retain-native-planar-bytes-and-disable-brightness-hints) | [architecture.md](architecture.md) | decided (#9) |
+| [PNG photos embed a lossless snapshot by default](architecture.md#png-photos-embed-a-lossless-snapshot-by-default) | [architecture.md](architecture.md) | decided (#15) |

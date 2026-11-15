@@ -177,3 +177,10 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
 - **37.** Desktop simulation compares only profile thermal rows; unsynchronized live pairs never claim bit-exact or flat-region match metrics.
   - `apps/web/src/Comparison.test.tsx::desktop comparison::compares only thermal rows against the exact reference`
   - `apps/web/src/Comparison.test.tsx::desktop comparison::does not claim bit-exact metrics for unsynchronized live frames`
+
+- **38.** Photo snapshots are lossless by default and preserve frame metadata and uncertainty even if the source reuses its raw buffer.
+  - `packages/core/src/export/export.test.ts::photo export::round trips a lossless snapshot with metadata and captures reused buffers`
+- **39.** PNG photo pixels match the selected palette and corrections, and the embedded frame reopens through the ordinary thermal reader.
+  - `packages/core/src/export/export.test.ts::photo export::writes a standard RGBA PNG and opens its embedded frame through IrvisReader`
+- **40.** Temperature CSV preserves row-major coordinates, unrounded Celsius readings and uncertainty; non-finite readings are empty.
+  - `packages/core/src/export/export.test.ts::photo export::exports row-major Celsius without rounding and marks uncertain or missing readings`

@@ -382,3 +382,19 @@ Status: decided (#9)
 The browser spike copies the full coded rectangle without requesting format conversion and retains plane layouts for offline analysis. It requests exact profile dimensions and exact `resizeMode: none`, rejecting mismatched coded dimensions and RGB frames. A preferred resize mode is insufficient because a browser could satisfy the dimensions through scaling. Unsupported constraints can be ignored; matching dimensions are not proof of unmodified samples. It uses capability detection for main-thread versus worker-only track processors, and reconstructs in the Worker with a bounded processor queue. It reports processed fps separately from the requested camera rate. Brightness hints stay disabled until the camera image is validated.
 
 **Rejected:** canvas readback, which changes thermal bytes into RGB; treating synthetic accuracy or matching statistics as proof of real-camera pixel accuracy.
+
+## PNG photos embed a lossless snapshot by default
+
+Status: decided (#15)
+
+A photo stores one complete .irvis file in the private ancillary PNG chunk
+`irVs`. Its lowercase final letter allows image editors to retain thermal
+data when editing the visible image. Consequently the visible image is not
+authoritative for measurements: the embedded frame is. Export defaults to
+threshold 0; callers can explicitly select the existing codec's bounded-loss
+options. PNG rendering uses the supplied frame and correction settings.
+
+**Rejected:** a second temperature encoding for PNG, because it would duplicate
+the recording codec, conversion metadata and uncertainty handling. CSV uses
+one row per pixel with coordinates, Celsius and an uncertainty flag, rather
+than a bare matrix that loses uncertainty.
