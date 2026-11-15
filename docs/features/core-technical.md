@@ -341,3 +341,48 @@ Errors are `planar dimensions must be positive even integers`, `invalid planar l
 `packages/core/test/reconstruction.test.ts` covers the conversion, exact simple pair-aligned scenes without hints too, padded NV12 parity, garbage hint rejection, invalid input and known metric values. Regression floors cover twenty deterministic seeds, blurred and unblurred, with monotonic and garbage upper images, at 64×48. The full-size 256×192 benchmark lives at `packages/core/test/benchmark/reconstruction.ts`; run `node packages/core/test/benchmark/reconstruction.ts` under Node 26. It includes background, hand, 320 °C tip, checkerboard and twenty random rectangle scenes, three 3×3 box-blur passes when enabled, and realistic monotonic or garbage image rows. After three warmups it reports median time from three runs per case, all comparison metrics, CPU/Node identity, and PASS/FAIL against 30 ms, 99.9% flat exactness and p99 ≤0.5 K. Failure to reach targets does not set a failing exit code; timing on CPUs other than Apple M1/M2 is explicitly noncomparable. Synthetic results do not validate real browser transfers or camera accuracy.
 
 Core's Vitest project allows 60 seconds per test and hook so shared-runner contention does not turn functional regression checks into speed tests. Performance targets remain in non-gating benchmarks; see the [testing guide](../guides/testing.md#shared-runner-load).
+
+## Photo export
+
+`packages/core/src/export/` exports three functions through the core entry point:
+
+- `exportSnapshot(frame, options): Promise<Uint8Array>` captures the frame arrays
+  and metadata before awaiting, then uses `MemoryByteSink` and `IrvisWriter`
+  to append one frame and close the file. `SnapshotOptions` accepts writer
+  options except width and height (taken from the frame); threshold defaults
+  to 0. Profile, fps and path remain required. Optional `fields` supplies
+  the declared frame fields. Writer validation and errors apply.
+- `exportPng(frame, options): Promise<Uint8Array>` calls `celsiusImage`,
+  `renderPalette`, `exportSnapshot` and the internal `encodePng`.
+  `PngOptions` extends snapshot options with palette (default iron),
+  range (default auto), and correction (default `settingsFromCamera`).
+  Auto range falls back to 0–1 °C when no certain finite reading exists.
+  Input-image, correction, palette and range validation errors propagate.
+  PNG is encoded in pure TypeScript with synchronous fflate, without DOM.
+- `exportCsv(image: CelsiusImage): string` validates with `checkImage` and
+  writes `x,y,celsius,uncertain`, one row per pixel in row-major order,
+  CRLF separators and a final CRLF, without BOM. Celsius values use
+  JavaScript's locale-independent string conversion without rounding;
+  non-finite values are empty. Nonzero mask values produce 1, otherwise 0.
+  Callers use `celsiusImage` to apply the desired corrections first.
+
+The PNG layout and reader integration are specified in
+[PNG photos](../irvis-format.md#png-photos). Export buffers reside in memory;
+the caller saves the returned bytes or CSV text through its platform backend.
+
+PNG framing failures throw `IrvisError` prefixed with
+`invalid thermal PNG: `. Reasons are `signature is missing`,
+`truncated chunk`, `invalid chunk length`, `invalid chunk type`,
+`CRC mismatch`, `IHDR must be first`, `invalid IHDR`,
+`invalid dimensions`, `duplicate irVs chunk`, `invalid IEND`,
+`IDAT is missing`, `irVs chunk is missing`, `unknown critical chunk`,
+`IEND is missing`, `irVs is not an .irvis file`,
+`snapshot index is missing or damaged`, or
+`expected one frame matching IHDR dimensions`. Embedded codec errors
+propagate as ordinary .irvis errors.
+
+`packages/core/src/export/export.test.ts` covers snapshot metadata and buffer
+reuse, PNG framing/CRCs and inflated RGBA bytes, reopening through
+`IrvisReader`, malformed containers, CSV values and uncertainty, and range
+fallback/validation. It uses synthetic data; external image-editor behaviour
+is not covered.

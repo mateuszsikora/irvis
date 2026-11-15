@@ -133,7 +133,7 @@ The payload is a JSON object `{ "timestamp": <ms>, "values": { … } }`: the vie
 | `alarms` | `AlarmSettings`: `{ "highCelsius", "lowCelsius", "hysteresis" }`, a threshold a number or `null` |
 | `isotherms` | a list of `Isotherm`: `{ "kind": "above" \| "below", "celsius", "color": [r, g, b] }` or `{ "kind": "between", "minCelsius", "maxCelsius", "color" }` |
 
-These are the user's settings. What the camera applied itself is in the chunk's `cameraState` (`emissivity`, `reflected-temperature`), and readings are corrected relative to it ([decision](decisions/architecture.md#the-software-correction-works-relative-to-what-the-camera-applied)). The planned names of [#12](https://github.com/mateuszsikora/irvis/issues/12) follow its types in the same way: `palette`, a `PaletteId` (`"iron"`, `"white-hot"`, `"black-hot"`, `"rainbow"`, `"red-hot"` or `"cold-blue"`); `range`, `"auto"` or a `TemperatureRange` `{ "minCelsius", "maxCelsius" }`; and `measurements`, whose schema waits for several measurements at once (#18). TODO(owner): fix every name and its schema, with code that writes and reads them, before v1 is frozen in #16.
+These are the user's settings. What the camera applied itself is in the chunk's `cameraState` (`emissivity`, `reflected-temperature`), and readings are corrected relative to it ([decision](decisions/architecture.md#the-software-correction-works-relative-to-what-the-camera-applied)). Photo exports (#15) use the types from [#12](https://github.com/mateuszsikora/irvis/issues/12): `palette`, a `PaletteId` (`"iron"`, `"white-hot"`, `"black-hot"`, `"rainbow"`, `"red-hot"` or `"cold-blue"`); `range`, `"auto"` or a `TemperatureRange` `{ "minCelsius", "maxCelsius" }`; and `measurements`, whose schema waits for several measurements at once (#18). Photo exports write the resolved numeric range and correction settings as specified in [PNG photos](#png-photos). TODO(owner): fix the remaining view-setting names and schemas, with code that writes and reads them, before v1 is frozen in #16.
 
 ## Index and trailer
 
@@ -193,3 +193,34 @@ The earlier simulation estimated, for T = 0.125 K (8 raw), 2.4 to 4.2 MB/min sta
 
 - [Core: technical](features/core-technical.md#interfaces): the writer, the reader and their errors.
 - [Architecture decisions](decisions/architecture.md#recordings-are-irvis-files-and-mp4-is-an-export)
+
+## PNG photos
+
+Version 1 (draft) also defines the private ancillary chunk `irVs`. The payload
+is exactly one complete version-1 .irvis file, including signature, index and
+trailer, with one frame. Its dimensions must equal PNG IHDR dimensions.
+There is exactly one `irVs` chunk, after IHDR and before IEND; the writer
+places it after IDAT. No extra wrapper or compression surrounds the payload.
+
+PNG follows the [W3C PNG specification](https://www.w3.org/TR/png-3/):
+chunk lengths and CRCs are big-endian, and the CRC covers the four type bytes
+and payload. The lowercase i means ancillary, r means private, uppercase V
+is the reserved bit, and lowercase s means safe to copy. Editors may retain
+the original thermal frame while changing the visible image; measurements
+always use that frame, not the PNG pixels.
+
+The writer produces 8-bit RGBA (colour type 6), non-interlaced, filter 0 on
+each row, with zlib-wrapped DEFLATE in IDAT. This differs from the raw
+DEFLATE inside .irvis. Non-finite temperatures render transparent black.
+
+`IrvisReader.open` detects PNG by signature, reads the PNG into memory,
+checks chunk boundaries and CRCs, extracts the snapshot, requires an intact snapshot index, checks its dimensions
+and frame count and decodes the frame before returning the normal reader.
+It rejects missing or duplicate thermal chunks and nested PNG payloads.
+It does not decode or validate the compressed visible image. Ordinary PNGs
+without `irVs` cannot provide thermal readings.
+
+The photo writer stores `palette`, the resolved `range`
+(`minCelsius`, `maxCelsius`), and `emissivity`, `reflectedCelsius`,
+`offsetKelvin` in the embedded header's view state, overriding those keys
+in caller-supplied view settings. These settings describe the visible image.

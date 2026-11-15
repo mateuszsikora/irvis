@@ -2,6 +2,8 @@
 // when the file was cut short or damaged, by scanning the records up to the
 // last valid one. Specification: docs/irvis-format.md
 import { inflateSync } from 'fflate';
+import { extractPngSnapshot, isPng } from '../export/png-container.ts';
+import { memoryByteSource } from '../memory.ts';
 import type { ByteSource } from '../bytes.ts';
 import type { ThermalFrame } from '../frames.ts';
 import { FrameDecoder } from './codec.ts';
@@ -176,6 +178,24 @@ export class IrvisReader {
   static async open(source: ByteSource): Promise<IrvisReader> {
     const size = await source.size();
     const signature = await source.read(0, IRVIS_SIGNATURE.length);
+    if (isPng(signature)) {
+      const png = extractPngSnapshot(await source.read(0, size));
+      if (!hasSignature(png.bytes))
+        throw new IrvisError('invalid thermal PNG: irVs is not an .irvis file');
+      const reader = await IrvisReader.open(memoryByteSource(png.bytes));
+      if (!reader.indexed) {
+        throw new IrvisError('invalid thermal PNG: snapshot index is missing or damaged');
+      }
+      if (
+        reader.frameCount !== 1 ||
+        reader.header.width !== png.width ||
+        reader.header.height !== png.height
+      ) {
+        throw new IrvisError('invalid thermal PNG: expected one frame matching IHDR dimensions');
+      }
+      await reader.readFrame(0);
+      return reader;
+    }
     if (!hasSignature(signature))
       throw new IrvisError('not an .irvis file: the signature is missing');
     const scanner = new RecordScanner(source, size);

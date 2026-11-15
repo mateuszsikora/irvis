@@ -213,3 +213,19 @@ Use `reconstructPlanar(frame, { thermal: { firstRow: 192, rows: 192 }, image: { 
 Reconstruction is experimental and can make multi-kelvin errors. Confidence is a cost-margin heuristic, not a guarantee of accuracy. Monotonic brightness can help; an uninformative upper image automatically disables the hint. No browser capture or UI is added by this API.
 
 Run `node packages/core/test/benchmark/reconstruction.ts` with Node 26 to print synthetic quality and timing results as JSON lines. Each line reports PASS or FAIL against the targets; missing them does not fail CI. See the [technical reference](core-technical.md#planar-reconstruction) for metric definitions and limitations.
+
+## Export a photo or temperature table
+
+The core API exports a frame as a PNG photo, a one-frame `.irvis` snapshot,
+or a CSV temperature table. These functions are available to app developers;
+this change does not add viewer controls.
+
+PNG opens as a normal colour image in image viewers and retains the raw
+thermal frame for irvis measurements. The default palette is iron, with an
+automatic range and the camera's existing correction settings. Snapshot data
+are lossless by default, including uncertain-pixel flags. An image editor
+may strip thermal data; keep the original export for measurements.
+
+CSV lists every pixel with zero-based x and y coordinates, its Celsius
+reading and an uncertainty flag. Missing or non-finite readings have an
+empty temperature field. Uncertain readings remain present with flag 1.
