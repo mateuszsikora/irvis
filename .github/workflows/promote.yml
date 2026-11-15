@@ -20,7 +20,7 @@ concurrency:
 jobs:
   promote:
     name: Promote to release
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 5
     permissions:
       contents: write
