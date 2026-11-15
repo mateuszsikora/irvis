@@ -10,7 +10,7 @@
 
 The result contains `variant`, `metrics`, exact `reference` raw values, `reconstructed` raw values and the `planar` frame. Metrics include low-byte match, chroma-model match, mean/p99/max absolute errors in kelvins, indices of errors at least 3 K, and reconstruction duration. Bit-exact and flat-region matches are emitted only for simulation.
 
-The web panel stores at most 100 measurement records per start. Live pairing chooses the latest browser result with an arrival gap no greater than 500 ms. Reports record both source timestamps and receipt times, browser statistics, profile/mode, user agent, user-confirmed scale and a pending hardware verdict. Frame dumps serialize typed arrays as numeric arrays and preserve planar layout/strides. Live differences include unsynchronized exposure and sensor noise, not only conversion error.
+The web panel stores the first 100 measurement records per start, then stops appending to the report while continuing to update the latest comparison. Frame-pair export saves that latest comparison, so its frame may be newer than the last sample in the bounded report. Live pairing chooses the latest browser result with an arrival gap no greater than 500 ms. Reports record both source timestamps and receipt times, browser statistics, profile/mode, user agent, user-confirmed scale and a pending hardware verdict. Frame dumps serialize typed arrays as numeric arrays and preserve planar layout/strides. Live differences include unsynchronized exposure and sensor noise, not only conversion error.
 
 ## Interfaces
 

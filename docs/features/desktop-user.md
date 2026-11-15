@@ -12,7 +12,7 @@ For **Live static scene**, first start **Browser diagnostics** on the same camer
 
 ## Save results and stop
 
-**Download comparison report** saves `report.json` with up to 100 measurements. **Download frame pair** saves `frame-pair.json` with exact bytes, native or simulated planar bytes, reconstructed raw values and metadata for offline analysis. Stop both reference and browser diagnostics to release both camera consumers.
+**Download comparison report** saves `report.json` with the first 100 measurements (or fewer if stopped earlier). **Download frame pair** saves `frame-pair.json` with exact bytes, native or simulated planar bytes, reconstructed raw values and metadata for offline analysis. The frame pair is the latest comparison; after the report fills, this can be a later frame not included in its 100 samples. Review both exports when assessing accuracy. Stop both reference and browser diagnostics to release both camera consumers.
 
 A missing recent browser frame shows `Waiting for a browser frame received within 500 ms. Start browser diagnostics too.` Capture rejects a native format other than YUYV instead of silently converting an alleged exact reference. macOS capture is the only implemented hardware input; camera commands and packaged ffmpeg remain later milestones.
 
