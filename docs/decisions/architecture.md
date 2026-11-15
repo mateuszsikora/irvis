@@ -348,3 +348,11 @@ Status: decided (#7)
 Use `usb` 2.x, which exports the legacy `getDeviceList` API as well as `webusb.getDevices`. Installed version 3.3.0 exposes only WebUSB and cannot run the implemented unclaimed-control-transfer path. The M1 descriptor probe creates a `WebUSB` instance with explicit allowed IDs (or all devices for an empty list) and automatic driver detachment disabled; M2 uses legacy devices. The default WebUSB singleton does not authorize any device in a fresh process. Integration tests verify the installed exports and exercise the real authorization filter with synthetic discovery results, while transport mocks preserve numeric OUT results.
 
 Rejected: treating TypeScript structural casts and transport mocks as proof of compatibility with a native package. The connected-camera run exposed both the missing export and the different callback result types.
+
+## GitHub Actions use the self-hosted Linux X64 runner
+
+Status: decided
+
+Run every job in `ci.yml` and `promote.yml` on `[self-hosted, Linux, X64]`, using the existing runner registered for this repository. Match its platform labels rather than its machine name so a replacement runner can take over without workflow edits. Keep the existing triggers, permissions, timeouts, and verification steps.
+
+**Rejected:** keeping `ubuntu-latest`, because the repository owner wants these workflows to use the already registered self-hosted runner.

@@ -89,6 +89,8 @@ There are no git hooks. The documentation check looks at the whole branch, and a
 
 ## CI
 
+Both workflows use runners with all three labels `self-hosted`, `Linux`, and `X64`; the registered runner is `hp600g1`. Jobs wait in the queue when no matching runner is available. The runner needs git and Bash; CI installs the Node version from `.nvmrc` with `actions/setup-node`. See the [runner decision](../decisions/architecture.md#github-actions-use-the-self-hosted-linux-x64-runner).
+
 [.github/workflows/ci.yml](../../.github/workflows/ci.yml) runs on every pull request event (opened, synchronize, reopened) and on every push to `main`. It has read-only access to the repository contents.
 
 | Job | Runs on | Steps | Timeout |
