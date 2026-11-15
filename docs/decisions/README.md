@@ -63,3 +63,4 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [USB spike uses explicit transfer sequences without claiming UVC](architecture.md#usb-spike-uses-explicit-transfer-sequences-without-claiming-uvc) | [architecture.md](architecture.md) | decided (#7) |
 | [The USB spike uses node-usb 2.x for unclaimed EP0 transfers](architecture.md#the-usb-spike-uses-node-usb-2x-for-unclaimed-ep0-transfers) | [architecture.md](architecture.md) | decided (#7) |
 | [GitHub Actions use the self-hosted Linux X64 runner](architecture.md#github-actions-use-the-self-hosted-linux-x64-runner) | [architecture.md](architecture.md) | decided |
+| [Planar reconstruction preserves the rounded chroma observation](architecture.md#planar-reconstruction-preserves-the-rounded-chroma-observation) | [architecture.md](architecture.md) | decided (#8) |
