@@ -72,7 +72,7 @@ Risks that the spikes settle:
 - The spikes M1 to M3 end with a report in `docs/findings/`, one file per spike, such as [m1.md](findings/m1.md). Work that does not depend on a spike's result goes on in parallel; work that does waits for the owner's decision.
 - Milestones do not run strictly in sequence. The specification asked for one after another; the owner agreed to any order that leads to the finished product.
 - Every uncertain constant (temperature divisor, command codes) lives in the camera profile with a comment on its source and confidence.
-- Code from other projects only under their licence, with attribution in `NOTICE`. The protocol is described in our own words in `protocol.md` (planned, M2).
+- Code from other projects only under their licence, with attribution in `NOTICE`. The protocol is described in our own words in [protocol.md](protocol.md).
 
 ## Milestones
 
@@ -107,7 +107,7 @@ The three pull requests go in this order, because #3 and #4 change the same file
 
 | Issue | Pull request |
 | --- | --- |
-| [#7](https://github.com/mateuszsikora/irvis/issues/7) | `protocol.md` (planned, M2); commands in the profile; `capture-cli usb` on macOS and Linux; NUC and gain while ffmpeg streams; reading and testing the camera state (gain, TPD parameters, `pseudo_color`, `cur_vtemp`) |
+| [#7](https://github.com/mateuszsikora/irvis/issues/7) | [protocol.md](protocol.md); commands in the profile; `capture-cli usb` on macOS and Linux; NUC and gain while ffmpeg streams; reading and testing the camera state (gain, TPD parameters, `pseudo_color`, `cur_vtemp`) |
 
 P2Pro-Viewer (MIT) sends gain as a vendor control transfer, but has no NUC command: its README lists "NUC shutter control" as not done. The NUC command has to come from other sources or from experiments.
 

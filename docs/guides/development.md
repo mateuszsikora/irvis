@@ -134,3 +134,7 @@ Shared agent skills live in `.agents/skills/`, with symlinks in `.claude/skills/
 
 - [Testing guide](testing.md)
 - [Documentation guide](documentation.md)
+
+## M2 USB spike
+
+`npm run spike:m2 -- <command>` aliases `capture usb`; [M2 findings](../findings/m2.md) gives commands, Linux permissions, and the optional macOS IOKit helper build. Node 26+ and the existing node-usb dependency are required; streaming also needs ffmpeg. The helper is diagnostic source, not a new release build tool.

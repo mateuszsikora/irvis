@@ -332,3 +332,11 @@ Use `-c:v rawvideo -pix_fmt + -fps_mode passthrough -enc_time_base demux` for st
 The packet-size check intentionally still reports a mismatch when the original packets are padded. Saved image payloads and source packet sizes answer different questions; a successful normalized capture must not be presented as proof that the original packets were exactly 196608 bytes.
 
 **Rejected:** silently trimming a fixed 512 bytes from every packet, because this observed allocation size is not a camera protocol guarantee. **Rejected:** automatic conversion to `yuyv422`, because it could alter the raw temperature bytes.
+
+## USB spike uses explicit transfer sequences without claiming UVC
+
+Status: decided (#7)
+
+The P2 Pro gain commands carry an initial vendor transfer and ordered `followUp` transfers. The spike checks camera readiness around the sequence; it does not treat the first packet as a complete command. Normal access leaves interfaces unclaimed. Explicit detach and an IOKit DeviceRequest helper are diagnostic alternatives, with separate logs.
+
+Rejected: automatic kernel-driver detachment, because it could interrupt video and would not establish desktop coexistence. Rejected: inventing a NUC opcode or low-gain conversion from another camera model; those remain pending evidence. Experimental state reads retain raw values and errors rather than asserting verified software-correction defaults.

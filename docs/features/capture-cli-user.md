@@ -134,3 +134,7 @@ The [technical document](capture-cli-technical.md#failure-modes) lists every mes
 - [Capture tool: technical](capture-cli-technical.md)
 - [M1 findings](../findings/m1.md)
 - [Cameras](cameras-user.md)
+
+## USB commands (M2)
+
+`npm run spike:m2 -- list` lists matching cameras and kernel-driver status on macOS or Linux. `state`, `gain high|low`, `tpd <name> <raw>`, `palette <number>`, `watch`, and `nuc` are available under `capture usb` or `spike:m2`. NUC currently reports unsupported without sending a command. Use [M2 instructions](../findings/m2.md) for experiments, logging, udev installation, IOKit fallback and restoring settings. [Protocol](../protocol.md) distinguishes reported values from hypotheses. No hardware result is implied by a successful software test.

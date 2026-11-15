@@ -60,3 +60,4 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [The capture tool runs on Node type stripping, without tsx](architecture.md#the-capture-tool-runs-on-node-type-stripping-without-tsx) | [architecture.md](architecture.md) | decided (#6) |
 | [Captures keep the camera's bytes with an ffmpeg stream copy](architecture.md#captures-keep-the-cameras-bytes-with-an-ffmpeg-stream-copy) | [architecture.md](architecture.md) | superseded (#6) |
 | [Capture output packs pixels without automatic conversion](architecture.md#capture-output-packs-pixels-without-automatic-conversion) | [architecture.md](architecture.md) | decided (#6) |
+| [USB spike uses explicit transfer sequences without claiming UVC](architecture.md#usb-spike-uses-explicit-transfer-sequences-without-claiming-uvc) | [architecture.md](architecture.md) | decided (#7) |

@@ -18,10 +18,12 @@ in node_modules and in the release packages.
 LeoDJ/P2Pro-Viewer (https://github.com/LeoDJ/P2Pro-Viewer)
 Copyright (c) 2023 LeoDJ
 Licence: MIT
-Used in: packages/core/src/cameras/infiray-p2pro/
+Used in: packages/core/src/cameras/infiray-p2pro/, tools/capture-cli/src/usb-protocol.ts
 What: protocol knowledge, no code: the USB ID 0x0bda:0x5830, the 256x384
   mode at 25 fps, and the split of the frame into an image half and a
-  16-bit temperature half.
+  16-bit temperature half; the USB control-transfer sequences, mixed-endian
+  TPD encoding, gain and palette commands reimplemented in TypeScript from
+  P2Pro/P2Pro_cmd.py (revision 23887289d3841fdae25c3a11b8d3eed8cd778800).
 
 atomic14/InfiRayCapture (https://github.com/atomic14/InfiRayCapture)
 Copyright (c) 2025 atomic14

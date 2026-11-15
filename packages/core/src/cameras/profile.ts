@@ -208,13 +208,15 @@ export interface UvcExtensionUnitTransport {
 
 /**
  * A command the desktop app can send. The UI builds its controls from these.
- * TODO(owner): how parameters are encoded into the transport is defined in #7.
+ * Multi-transfer commands send followUp in order before polling completion.
  */
 export interface CameraCommand extends Provenance {
   /** Unique in the profile, kebab-case, for example `nuc`. */
   readonly id: string;
   readonly label: string;
   readonly transport: VendorControlTransport | UvcExtensionUnitTransport;
+  /** Remaining vendor transfers, sent in order before checking device status. */
+  readonly followUp?: readonly VendorControlTransport[];
   /** CameraStateField.id values that the command changes; re-read after it runs. */
   readonly changes: readonly string[];
 }

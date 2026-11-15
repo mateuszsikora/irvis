@@ -13,8 +13,8 @@ Profile `infiray-p2pro` in [profile.ts](profile.ts): the InfiRay P2 Pro thermal 
 
 Not in the profile yet:
 
-- **Low gain.** Probably another divisor; the profile has no `gain` state field and one conversion, which is labelled `high`. #7 adds the gain field, its command and the low-gain conversion.
+- **Low gain.** Probably another divisor; the profile has no `gain` state field and one conversion, which is labelled `high`. The M2 probe can switch gain, but a low-gain conversion and state defaults await hardware measurements.
 - **NETD, accuracy and measurement ranges.** `sensor.ranges` is empty and `netd` and `accuracy` are absent. #16 adds NETD measured in the M1 spike.
-- **Camera state and commands.** `state` and `commands` are empty until #7.
+- **Camera state and commands.** `state` remains empty pending measurements. `commands` contains reported `gain-high` and `gain-low` sequences; `usbProtocol` supplies diagnostic constants. See [protocol](../../../../../docs/protocol.md) for confidence, unsupported NUC and experimental sensor-temperature reads.
 
 Third-party projects used here are listed in [NOTICE](../../../../../NOTICE).
