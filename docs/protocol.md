@@ -1,8 +1,8 @@
 # P2 Pro USB protocol
 
-Version 1 of irvis's experimental description. No closed vendor libraries are used. These commands are not yet hardware-verified on the TOOLTOP T7 (PID 5840). USB IDs are shared by other cameras; select the camera explicitly when several match.
+Version 1 of irvis's experimental description. No closed vendor libraries are used. TOOLTOP T7 (PID 5840) state and gain readback have been observed locally; see [M2 measurements](findings/m2.md#local-hardware-run). USB IDs are shared by other cameras; select the camera explicitly when several match.
 
-Primary source: [LeoDJ/P2Pro-Viewer P2Pro_cmd.py, revision 23887289](https://github.com/LeoDJ/P2Pro-Viewer/blob/23887289d3841fdae25c3a11b8d3eed8cd778800/P2Pro/P2Pro_cmd.py). The implementation is attributed in `NOTICE`. Confidence **reported** means implemented or described in that source, not measured here; **hypothesis** means a probe assumption. No entry below has measured confidence.
+Primary source: [LeoDJ/P2Pro-Viewer P2Pro_cmd.py, revision 23887289](https://github.com/LeoDJ/P2Pro-Viewer/blob/23887289d3841fdae25c3a11b8d3eed8cd778800/P2Pro/P2Pro_cmd.py). The implementation is attributed in `NOTICE`. Confidence **reported** means implemented or described in that source, not measured here; **hypothesis** means a probe assumption. The tables distinguish source claims from local observations; transfer completion and readback do not prove temperature accuracy.
 
 ## Transfers
 
@@ -25,7 +25,7 @@ All numeric codes above are hexadecimal. The CLI checks ready before a transacti
 | 8514 / c514 | Read / write TPD; reply u16 BE | reported |
 | TPD 0 | Distance: raw / 163.835 metres, raw 0–32767 | reported |
 | TPD 1, 2 | Reflected and atmospheric temperature, raw kelvin 0–1024 | reported |
-| TPD 3, 4 | Emissivity and atmospheric transmittance, raw / 127, 0–127 | reported |
+| TPD 3, 4 | Emissivity and atmospheric transmittance: upstream claims raw / 127 and 0–127; this T7 returns 128 for both. Probe accepts 0–128 so the observed values can be restored; scaling remains unresolved | reported scaling; measured initial raw 128 |
 | TPD 5 | Gain: 0 low, 1 high | reported |
 | 8409 / c409 | Read / write palette on preview path zero; 1 white hot, 3 iron red, 11 black hot, 2 reserved | reported |
 | 8b0d | Current sensor temperature command | reported name only |

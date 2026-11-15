@@ -30,9 +30,9 @@ vi.mock('usb', () => ({
         _value: number,
         _index: number,
         data: Buffer | number,
-        cb: (error: undefined, data: Buffer) => void,
+        cb: (error: undefined, data: Buffer | number) => void,
       ) {
-        cb(undefined, Buffer.alloc(typeof data === 'number' ? data : 0));
+        cb(undefined, typeof data === 'number' ? Buffer.alloc(data) : data.length);
       },
     },
   ],

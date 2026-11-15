@@ -340,3 +340,11 @@ Status: decided (#7)
 The P2 Pro gain commands carry an initial vendor transfer and ordered `followUp` transfers. The spike checks camera readiness around the sequence; it does not treat the first packet as a complete command. Normal access leaves interfaces unclaimed. Explicit detach and an IOKit DeviceRequest helper are diagnostic alternatives, with separate logs.
 
 Rejected: automatic kernel-driver detachment, because it could interrupt video and would not establish desktop coexistence. Rejected: inventing a NUC opcode or low-gain conversion from another camera model; those remain pending evidence. Experimental state reads retain raw values and errors rather than asserting verified software-correction defaults.
+
+## The USB spike uses node-usb 2.x for unclaimed EP0 transfers
+
+Status: decided (#7)
+
+Use `usb` 2.x, which exports the legacy `getDeviceList` API as well as `webusb.getDevices`. Installed version 3.3.0 exposes only WebUSB and cannot run the implemented unclaimed-control-transfer path. The M1 descriptor probe uses the explicit `webusb` export; M2 uses legacy devices. An import-only integration test verifies the real installed exports, while transport mocks preserve numeric OUT results.
+
+Rejected: treating TypeScript structural casts and transport mocks as proof of compatibility with a native package. The connected-camera run exposed both the missing export and the different callback result types.

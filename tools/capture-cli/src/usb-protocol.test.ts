@@ -63,9 +63,15 @@ describe('USB protocol', () => {
     }
   });
 
+  it('can restore the raw emissivity value 128 observed on the T7', async () => {
+    const { camera, calls } = mock();
+    await camera.tpd(3, 128);
+    expect(calls.find((call) => call.index === 0x9d00)?.data).toBe('14c5000300000080');
+  });
+
   it('rejects out-of-range parameters without a transfer', async () => {
     const { camera, calls } = mock();
-    await expect(camera.tpd(3, 128)).rejects.toThrow('invalid');
+    await expect(camera.tpd(3, 129)).rejects.toThrow('invalid');
     await expect(camera.palette(2)).rejects.toThrow('invalid');
     await expect(camera.gain('auto')).rejects.toThrow('gain');
     expect(calls).toEqual([]);

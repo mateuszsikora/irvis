@@ -179,7 +179,7 @@ interface UsbDeviceLike {
 }
 
 interface UsbModule {
-  readonly usb: { getDevices(): Promise<UsbDeviceLike[]> };
+  readonly webusb: { getDevices(): Promise<UsbDeviceLike[]> };
 }
 
 const USB_PACKAGE = 'usb';
@@ -200,7 +200,7 @@ export async function probeUsb(options: UsbProbeOptions): Promise<string[]> {
   const lines: string[] = [];
   let devices: UsbDeviceLike[];
   try {
-    devices = await usbModule.usb.getDevices();
+    devices = await usbModule.webusb.getDevices();
   } catch (error) {
     return [`listing USB devices failed: ${String(error)}`];
   }

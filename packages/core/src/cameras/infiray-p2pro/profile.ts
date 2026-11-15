@@ -93,5 +93,7 @@ export const usbProtocol = {
   // cur_vtemp is named upstream but not called: retain bytes, do not decode a temperature.
   sensorTemperatureReadLength: 2,
   tpdNames: ['distance', 'tu', 'ta', 'ems', 'tau', 'gain'],
-  tpdMax: [32767, 1024, 1024, 127, 127, 1],
+  // TOOLTOP T7 returned EMS=TAU=128 in M2; allow restoring those raw values.
+  // The ratio divisor remains unverified despite the upstream claim of 127.
+  tpdMax: [32767, 1024, 1024, 128, 128, 1],
 } as const;

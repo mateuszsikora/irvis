@@ -28,7 +28,7 @@ interface Device {
     value: number,
     index: number,
     data: Buffer | number,
-    callback: (error: Error | undefined, data?: Buffer) => void,
+    callback: (error: Error | undefined, data?: Buffer | number) => void,
   ): void;
 }
 const USB_PACKAGE = 'usb';
@@ -189,11 +189,11 @@ export async function usbCommand(args: readonly string[]): Promise<string> {
                 value,
                 index,
                 payload: typeof data === 'number' ? data : data.toString('hex'),
-                response: result?.toString('hex'),
+                response: Buffer.isBuffer(result) ? result.toString('hex') : result,
                 error: error?.message,
               });
               if (error) reject(error);
-              else resolve(result ?? Buffer.alloc(0));
+              else resolve(Buffer.isBuffer(result) ? result : Buffer.alloc(0));
             });
           });
         const transport: Transfer = values.iokit

@@ -154,3 +154,6 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
   - `tools/capture-cli/src/usb-protocol.test.ts::USB protocol::encodes gain as two ordered vendor transfers before polling completion`
   - `tools/capture-cli/src/usb-protocol.test.ts::USB protocol::reads TPD with big endian selector, length and response`
   - `tools/capture-cli/src/usb-protocol.test.ts::USB protocol::rejects malformed responses and camera status errors`
+
+- **32.** USB diagnostics must allow restoring the T7's observed raw emissivity value 128 without assuming a temperature-correction ratio.
+  - `tools/capture-cli/src/usb-protocol.test.ts::USB protocol::can restore the raw emissivity value 128 observed on the T7`
