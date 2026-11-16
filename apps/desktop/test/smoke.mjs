@@ -1,3 +1,10 @@
+import {
+  IrvisWriter,
+  IrvisReader,
+  MemoryByteSink,
+  memoryByteSource,
+  cameraProfiles,
+} from '@irvis/core';
 import { _electron as electron } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, rmSync, mkdtempSync, readFileSync, existsSync, readdirSync } from 'node:fs';
@@ -7,6 +14,9 @@ import assert from 'node:assert/strict';
 
 const dist = resolve('../web/dist');
 const video = resolve(dist, 'smoke.webm');
+const audioWorklet =
+  '/assets/' +
+  readdirSync(resolve(dist, 'assets')).find((name) => /^audio-worklet-.*\.js$/.test(name));
 const worker =
   '/assets/' + readdirSync(resolve(dist, 'assets')).find((name) => /^worker-.*\.js$/.test(name));
 execFileSync(
@@ -55,6 +65,108 @@ try {
   await page.reload();
   await page.waitForSelector('h1');
   assert.equal(await page.locator('h1').textContent(), 'irvis');
+  const audioSamples = await page.evaluate(async (url) => {
+    const context = new AudioContext();
+    try {
+      await context.audioWorklet.addModule(url);
+      const oscillator = context.createOscillator();
+      const node = new AudioWorkletNode(context, 'irvis-microphone');
+      oscillator.connect(node);
+      node.connect(context.destination);
+      const captured = new Promise((resolve, reject) => {
+        const timer = setTimeout(
+          () => reject(new Error('Packaged audio worklet did not run.')),
+          3000,
+        );
+        node.port.onmessage = ({ data }) => {
+          if (data.samples) {
+            clearTimeout(timer);
+            node.port.postMessage('ack');
+            resolve(data.samples.length);
+          }
+        };
+      });
+      oscillator.start();
+      await context.resume();
+      return await captured;
+    } finally {
+      await context.close();
+    }
+  }, audioWorklet);
+  assert.equal(audioSamples, 2048);
+  const storageResult = await page.evaluate(async () => {
+    const storage = window.irvisDesktop.recordingStorage;
+    const name = `smoke-${crypto.randomUUID()}.irvis`;
+    await storage('open', name);
+    await storage('append', name, new Uint8Array([1, 2, 3]));
+    await storage('flush', name);
+    await storage('close', name);
+    const size = await storage('size', name);
+    const bytes = await storage('read', name, undefined, 1, 8);
+    let rejected = false;
+    try {
+      await storage('open', '../escape.irvis');
+    } catch {
+      rejected = true;
+    }
+    await storage('remove', name);
+    const audioName = name.replace('.irvis', '.audio-v2.pcm');
+    await storage('open', audioName);
+    await storage('append', audioName, new Uint8Array([1]));
+    await storage('close', audioName);
+    const audioListed = (await storage('list')).includes(audioName);
+    await storage('remove', audioName);
+    return { audioListed, size, bytes: [...bytes], rejected };
+  });
+  assert.deepEqual(storageResult, { audioListed: true, size: 3, bytes: [2, 3], rejected: true });
+
+  const sink = new MemoryByteSink();
+  const profile = cameraProfiles[0];
+  const writer = await IrvisWriter.create(sink, {
+    profile,
+    width: 1,
+    height: 1,
+    fps: 1,
+    path: 'exact',
+    threshold: 0,
+  });
+  await writer.appendFrame({
+    width: 1,
+    height: 1,
+    raw: new Uint16Array([19000]),
+    timestamp: 0,
+    uncertain: null,
+    conversion: profile.conversions[0].conversion,
+    cameraState: { origin: 'assumed', values: {} },
+  });
+  await writer.flush();
+  const unfinishedName = await page.evaluate(
+    async (bytes) => {
+      const name = `smoke-reload-${crypto.randomUUID()}.irvis`;
+      await window.irvisDesktop.recordingStorage('open', name);
+      await window.irvisDesktop.recordingStorage('append', name, new Uint8Array(bytes));
+      return name; // Deliberately leave the sink open and without an index.
+    },
+    [...sink.bytes()],
+  );
+  await page.reload();
+  await page.waitForSelector('h1');
+  const recoveredBytes = await page.evaluate(async (name) => {
+    const storage = window.irvisDesktop.recordingStorage;
+    const size = await storage('size', name);
+    return [...(await storage('read', name, undefined, 0, size))];
+  }, unfinishedName);
+  const recovered = await IrvisReader.open(memoryByteSource(new Uint8Array(recoveredBytes)));
+  assert.equal(recovered.indexed, false);
+  assert.equal((await recovered.readFrame(0)).frame.raw[0], 19000);
+  await page.evaluate(async (name) => {
+    await window.irvisDesktop.recordingStorage('remove', name);
+    // A new document can start a new recording after recovering the old one.
+    await window.irvisDesktop.recordingStorage('open', name);
+    await window.irvisDesktop.recordingStorage('close', name);
+    await window.irvisDesktop.recordingStorage('remove', name);
+  }, unfinishedName);
+
   await page.getByRole('button', { name: 'Start', exact: true }).click();
   await page.waitForFunction(() =>
     document.querySelector('[aria-label="Colour bounds"]')?.textContent.includes('°C'),

@@ -15,7 +15,8 @@
     "react-dom": "^19.3.1",
     "@irvis/backend-electron": "*",
     "@irvis/ui": "*",
-    "@irvis/backend-replay": "*"
+    "@irvis/backend-replay": "*",
+    "@irvis/media": "*"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.2",

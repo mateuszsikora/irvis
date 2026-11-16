@@ -1,3 +1,4 @@
+import { installRecordingStorage } from './recordings.js';
 import { app, BrowserWindow, ipcMain, protocol, net, session } from 'electron';
 import { spawn } from 'node:child_process';
 import { resolve, sep } from 'node:path';
@@ -87,9 +88,6 @@ async function boot() {
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event) => event.preventDefault());
   window.webContents.on('render-process-gone', stop);
-  window.webContents.on('did-start-navigation', (details) => {
-    if (details.isMainFrame && !details.isSameDocument) stop();
-  });
   window.on('closed', stop);
   function authorize(event) {
     if (
@@ -99,6 +97,23 @@ async function boot() {
     )
       throw new Error('Untrusted IPC sender');
   }
+  const closeRecordings = installRecordingStorage(
+    ipcMain,
+    resolve(app.getPath('userData'), 'recordings'),
+    authorize,
+  );
+  window.webContents.on('did-start-navigation', (details) => {
+    if (details.isMainFrame && !details.isSameDocument) {
+      stop();
+      void closeRecordings();
+    }
+  });
+  window.webContents.on('render-process-gone', () => {
+    void closeRecordings();
+  });
+  window.on('closed', () => {
+    void closeRecordings();
+  });
   ipcMain.handle('capture:start', (event, options) => {
     authorize(event);
     stop();

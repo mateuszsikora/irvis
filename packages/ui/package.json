@@ -8,7 +8,8 @@
   },
   "dependencies": {
     "@irvis/core": "*",
-    "react": "^19.3.1"
+    "react": "^19.3.1",
+    "@irvis/media": "*"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",

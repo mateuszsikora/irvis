@@ -33,11 +33,13 @@ Every commit and pull request that changes behaviour lands its documentation in 
 | `packages/backend-electron/` | `docs/features/backend-electron-technical.md` (or `-user.md`) | F8 |
 | `packages/backend-replay/` | `docs/features/backend-replay-technical.md` (or `-user.md`) | F9 |
 | `packages/ui/` | `docs/features/ui-technical.md` (or `-user.md`) | F10 |
+| `packages/media/` | `docs/features/media-technical.md` (or `-user.md`) | F11 |
 | anything in `.github/` except the PR template | `docs/guides/development.md` | C2 |
 | root configuration: `package.json`, `tsconfig*.json`, `eslint.config.js`, `vitest.config.ts`, `.prettierrc*`, `.prettierignore`, `.nvmrc`, `.npmrc` | `docs/guides/development.md` (or `docs/guides/testing.md` for Vitest) | C3 |
 | any other path that no rule owns (new code) | new `docs/features/<feature>-user.md` and `-technical.md`, and a rule for the path in `RULES`, `docs/features/README.md` and this table | F0 |
 
 - Test files and bumps of an Action, a hook or a dependency version need no documentation. Neither do `docs/`, this file, `CONTRIBUTING.md`, the PR template and `.agents/` or `.claude/`; the full list is in [docs/features/README.md](docs/features/README.md#left-out-on-purpose).
+- For media storage, recording or export, run `node packages/media/test/browser.mjs` with Playwright Chromium installed and ffprobe on PATH.
 - Verify with `npm run docs-check` before finishing. `SKIP_DOCS_CHECK=1` works only locally; CI ignores it.
 - Planned work, milestones and acceptance criteria: [docs/roadmap.md](docs/roadmap.md); read it before starting a milestone PR. It is a plan, not a description of the code.
 - Before deciding something, read [docs/decisions/README.md](docs/decisions/README.md). Record a new decision in `docs/decisions/` and run `npm run decisions-index`.

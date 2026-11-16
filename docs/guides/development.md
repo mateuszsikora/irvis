@@ -157,3 +157,7 @@ Run `npm run test:desktop` after desktop or comparison changes. Expected output:
 
 
 Photo library tests use the development-only `fake-indexeddb` dependency to exercise IndexedDB transactions without a browser. It is not bundled into the application; run the existing `npm test` command.
+
+## Media package
+
+The solution includes `packages/media`, a DOM-capable npm workspace for recording storage and MP4 export. UI and web reference its declaration build. Mediabunny is an MPL-2.0 dependency used without source changes. Only media's TypeScript projects use `skipLibCheck` to avoid duplicate transitive WebCodecs/DOM declarations; source checking remains strict.

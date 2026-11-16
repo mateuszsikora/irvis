@@ -15,6 +15,7 @@ This file is for anyone who changes code in this repository. It lists the featur
 | Desktop app | [desktop-user.md](desktop-user.md) | [desktop-technical.md](desktop-technical.md) | `apps/desktop/` |
 | Electron backend | [backend-electron-user.md](backend-electron-user.md) | [backend-electron-technical.md](backend-electron-technical.md) | `packages/backend-electron/` |
 | Replay backend | [backend-replay-user.md](backend-replay-user.md) | [backend-replay-technical.md](backend-replay-technical.md) | `packages/backend-replay/` |
+| Media | [media-user.md](media-user.md) | [media-technical.md](media-technical.md) | `packages/media/` |
 | Viewer UI | [ui-user.md](ui-user.md) | [ui-technical.md](ui-technical.md) | `packages/ui/` |
 
 Any path outside the map falls under rule F0 below, so a new package or app has to come with its own feature documents.
@@ -38,6 +39,7 @@ A rule fails when a changed path matches its source regex and no changed path ma
 | F8 | `^packages/backend-electron/` | `^docs/features/backend-electron-(user\|technical)\.md$` | Electron backend changed: update docs/features/backend-electron-technical.md (or docs/features/backend-electron-user.md) |
 | F9 | `^packages/backend-replay/` | `^docs/features/backend-replay-(user\|technical)\.md$` | Replay backend changed: update docs/features/backend-replay-technical.md (or docs/features/backend-replay-user.md) |
 | F10 | `^packages/ui/` | `^docs/features/ui-(user\|technical)\.md$` | Viewer UI changed: update docs/features/ui-technical.md (or docs/features/ui-user.md) |
+| F11 | `^packages/media/` | `^docs/features/media-(user\|technical)\.md$` | Media changed: update docs/features/media-technical.md (or docs/features/media-user.md) |
 | C2 | `^\.github/(?!pull_request_template\.md$)` | `^docs/guides/development\.md$` | CI or GitHub configuration changed: update docs/guides/development.md |
 | C3 | `^(package\.json\|tsconfig(\.[^/]+)?\.json\|(eslint\|vitest)\.config\.[cm]?[jt]s\|\.prettierrc(\.[^/]+)?\|\.prettierignore\|\.nvmrc\|\.npmrc)$` | `^docs/guides/(development\|testing)\.md$` | Root TypeScript configuration changed: update docs/guides/development.md (or docs/guides/testing.md for the Vitest configuration) |
 

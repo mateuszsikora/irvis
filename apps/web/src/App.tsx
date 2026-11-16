@@ -1,8 +1,10 @@
+import { desktopBridge, createDesktopRecordingStorage } from '@irvis/backend-electron';
+import { createBrowserRecordingStorage, type RecordingStorage } from '@irvis/media';
 import { createPhotoLibrary } from './photo-library.ts';
 import { cameraProfiles, type CameraProfile } from '@irvis/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Viewer, type PhotoLibrary } from '@irvis/ui';
-import { createReplayBackend } from '@irvis/backend-replay';
+import { openRecording, createReplayBackend } from '@irvis/backend-replay';
 import { liveBackend } from './viewer-backend.ts';
 import './viewer.css';
 import brandMark from './brand/mark.svg';
@@ -17,6 +19,12 @@ export function App({ profiles = cameraProfiles }: AppProps) {
     () => (typeof indexedDB === 'undefined' ? undefined : createPhotoLibrary()),
     [],
   );
+  const recordingStorage = useMemo(() => {
+    const bridge = desktopBridge();
+    return bridge?.recordingStorage
+      ? createDesktopRecordingStorage(bridge)
+      : createBrowserRecordingStorage();
+  }, []);
   const [source, setSource] = useState('demo');
   const [profileId, setProfileId] = useState(profiles[0]?.id ?? '');
   const profile = profiles.find((p) => p.id === profileId);
@@ -71,6 +79,7 @@ export function App({ profiles = cameraProfiles }: AppProps) {
           key={`${source}-${profile.id}`}
           source={source}
           profile={profile}
+          recordingStorage={recordingStorage}
           photoLibrary={photoLibrary}
         />
       )}
@@ -89,7 +98,9 @@ function SourceViewer({
   source,
   profile,
   photoLibrary,
+  recordingStorage,
 }: {
+  recordingStorage: RecordingStorage;
   source: string;
   profile: CameraProfile;
   photoLibrary: PhotoLibrary | undefined;
@@ -113,6 +124,8 @@ function SourceViewer({
   );
   return (
     <Viewer
+      openRecording={openRecording}
+      recordingStorage={recordingStorage}
       backend={backend}
       profile={profile}
       captureError={error}

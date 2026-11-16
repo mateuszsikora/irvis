@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import {
   celsiusToUnit,
   unitToCelsius,
@@ -8,6 +8,14 @@ import {
 } from '@irvis/core';
 import { type AnalysisSettings, type Measurement } from './measurements.ts';
 
+function correctionDraft(correction: CorrectionSettings | null) {
+  return [
+    String(correction?.emissivity ?? 1),
+    String(correction?.offsetKelvin ?? 0),
+    String(correction?.reflectedCelsius ?? 25),
+  ];
+}
+
 export function AnalysisControls({
   value,
   onChange,
@@ -16,11 +24,11 @@ export function AnalysisControls({
   onChange: (value: AnalysisSettings) => void;
 }) {
   const [nextId, setNextId] = useState(1);
-  const [draft, setDraft] = useState([
-    String(value.correction?.emissivity ?? 1),
-    String(value.correction?.offsetKelvin ?? 0),
-    String(value.correction?.reflectedCelsius ?? 25),
-  ]);
+  const [draft, setDraft] = useState(() => correctionDraft(value.correction));
+  // Synchronize fields before paint without remounting measurement state.
+  useLayoutEffect(() => {
+    setDraft(correctionDraft(value.correction));
+  }, [value.correction]);
   const [threshold, setThreshold] = useState(celsiusToUnit(value.threshold, value.unit).toFixed(1));
   const update = (patch: Partial<AnalysisSettings>) => onChange({ ...value, ...patch });
   const selected = value.objects.find((o) => o.id === value.selected);

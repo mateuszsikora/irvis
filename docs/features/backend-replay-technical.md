@@ -19,3 +19,9 @@ An empty fixture list throws `Replay needs at least one frame.` Invalid device o
 ## See also
 
 - [User guide](backend-replay-user.md)
+
+## File playback
+
+`openRecording(ByteSource)` opens a core `IrvisReader` and returns a `RecordingPlayer` implementing `Player`, plus frame, accumulated recorded-view and error subscriptions and `close`. It starts paused. Positions are relative to the first frame timestamp; seeks clamp to the file and choose the frame at or before that position. Rate must be finite and positive. The performance clock preserves gaps between frames. Playback pauses at the last timestamp and Play at the end restarts.
+
+Only one decode is in flight. A newer seek invalidates its result and replaces pending demand. Close cancels the timer and suppresses late deliveries. Errors pause playback and publish through `errors`. File storage remains owned by the host. Subscribe and then seek to receive the initial frame. `test/player.test.ts` covers timestamps, view-state restoration, stale seeks, close, rate and end-of-file behavior.

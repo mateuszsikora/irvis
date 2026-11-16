@@ -106,3 +106,7 @@ The shared viewer's measurement controls use a grid with labelled coordinate and
 Each operation opens a connection and closes it after its transaction. Saves resolve on transaction completion, not request success; duplicate keys, quota and transaction failures propagate to the UI. Version changes close open connections. Blocked opens report `Photo storage is blocked by another window.` and close a later successful connection. Delete removes only the selected record. Browser/site data clearing and storage eviction remain possible, so the gallery recommends downloading backups.
 
 `src/photo-library.test.ts` uses `fake-indexeddb` to exercise persistence across adapter instances, duplicate-save failure and selected deletion. No live browser persistence or quota test is claimed.
+
+## Recording storage injection
+
+`App.tsx` constructs one `RecordingStorage`: the preload's recording API selects `createDesktopRecordingStorage`; otherwise `createBrowserRecordingStorage` supplies OPFS or an explicitly warned memory fallback. The same instance survives source/profile remounts. External recording files use `fileByteSource`.

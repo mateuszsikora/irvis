@@ -77,3 +77,5 @@ export function createReplayBackend(fixtures?: readonly ThermalFrame[]): CameraB
     },
   };
 }
+
+export { openRecording } from './player.ts';

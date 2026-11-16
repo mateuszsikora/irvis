@@ -1,3 +1,7 @@
+import type { IrvisReader } from './irvis/reader.ts';
+import type { Subscribable } from './store.ts';
+import type { ThermalFrame } from './frames.ts';
+import type { ViewStateValues } from './irvis/format.ts';
 import type { Store } from './store.ts';
 
 /** Where playback is and how it runs. */
@@ -20,4 +24,13 @@ export interface Player {
   /** Sets the speed; `rate` is greater than 0. */
   setRate(rate: number): void;
   readonly viewState: Store<PlayerViewState>;
+}
+
+/** A file player owns no camera or storage handle; the host owns its ByteSource. */
+export interface RecordingPlayer extends Player {
+  readonly reader: IrvisReader;
+  readonly frames: Subscribable<ThermalFrame>;
+  readonly recordedViewState: Subscribable<ViewStateValues>;
+  readonly errors: Subscribable<unknown>;
+  close(): void;
 }

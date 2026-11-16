@@ -59,3 +59,13 @@ After a frame is displayed, press `Capture photo`. The saved PNG includes the vi
 The photo-only gallery shows previews and `Analyze`, `Download` and `Delete` actions for each filename. Analyze starts with no added measurement objects; add new points, lines and areas as usual. Download keeps a standard PNG with temperature data, not a flattened export. Delete removes that gallery record immediately; it does not remove downloaded files or close an already open analysis. A failed deletion keeps the entry visible and reports `Gallery error:`. Close and reopen Gallery to retry a failed list operation.
 
 The app saves photos locally in this browser/site or desktop app profile. They survive reloads and camera/profile switches, but clearing app/site data or browser eviction can remove them. Download important photos for backup. Gallery contents are not synchronized between the browser and desktop app.
+
+## Record, play and export video
+
+The Recordings section supports `.irvis` capture, playback, microphone audio and MP4 export. See the [recording guide](media-user.md) for storage notices, thresholds and backup options. Gallery filter selects All, Photos or Videos. Recording thumbnails are previews; a black image alone does not mean the file is damaged. Open the recording to inspect it.
+
+## Annotate a saved photo
+
+In Gallery, choose **Annotate** beside a photo. Pick an annotation colour and size. Enter text, then click its position; leave text empty to draw with the pointer. **Undo annotation** and **Redo annotation** change only the annotation draft. **Export flattened PNG** saves a separate image without temperature data. Keep the original photo for temperature analysis; annotations never overwrite it. Draft annotations are not retained after leaving the editor.
+
+Opening a recording restores its saved temperature correction. Playback and seeking follow saved correction changes. **Apply correction** or **Reset parameters** overrides that correction for the currently open recording; the override remains when seeking. Reopen the recording to follow its saved correction again. Files without saved correction use their recorded camera correction unchanged.

@@ -1,3 +1,8 @@
+import { recordedView } from './recorded-view.ts';
+import { exportMp4, fileByteSource, saveRecordingFile } from '@irvis/media';
+import { RecordingControls } from './RecordingControls.tsx';
+import type { RecordingStorage } from '@irvis/media';
+import type { ByteSource, RecordingPlayer } from '@irvis/core';
 import { PhotoGallery } from './PhotoGallery.tsx';
 import { photoCorrection, type PhotoLibrary } from './photos.ts';
 import { AnalysisControls } from './AnalysisControls.tsx';
@@ -21,6 +26,8 @@ import { FrameRenderer, type ViewSettings } from './render.ts';
 
 export interface ViewerProps {
   photoLibrary?: PhotoLibrary;
+  openRecording?: (source: ByteSource) => Promise<RecordingPlayer>;
+  recordingStorage?: RecordingStorage;
   backend: CameraBackend;
   profile: CameraProfile;
   /** Only supply when the backend actually implements command dispatch. */
@@ -32,6 +39,8 @@ export function Viewer({
   profile,
   command,
   photoLibrary,
+  recordingStorage,
+  openRecording,
   captureError = '',
 }: ViewerProps) {
   const [devices, setDevices] = useState<readonly { id: string; label: string }[]>([]);
@@ -59,8 +68,11 @@ export function Viewer({
     gain: 'high',
     analysis: initialAnalysis,
   });
+  const playbackCorrectionOverride = useRef(false);
+  const playbackRef = useRef<RecordingPlayer | null>(null);
   const rendererRef = useRef<FrameRenderer | null>(null);
   const [savingPhoto, setSavingPhoto] = useState(false);
+  const [galleryFilter, setGalleryFilter] = useState('all');
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryRevision, setGalleryRevision] = useState(0);
   const [photoStatus, setPhotoStatus] = useState('');
@@ -114,6 +126,7 @@ export function Viewer({
   }, [sounding]);
   useEffect(
     () => () => {
+      playbackRef.current?.close();
       photoGeneration.current++;
       void audio.current?.close();
     },
@@ -131,6 +144,8 @@ export function Viewer({
       const { frame } = await reader.readFrame(0);
       if (token !== photoGeneration.current) return;
       await stop();
+      playbackRef.current?.close();
+      playbackRef.current = null;
       if (token !== photoGeneration.current) return;
       latest.current = {
         frame: { kind: 'thermal', frame },
@@ -172,6 +187,7 @@ export function Viewer({
     frame: RawFrame;
     mode: VideoMode;
     generation: number;
+    receivedAt?: number;
     captureMetadata?: Pick<SnapshotOptions, 'profile' | 'fps' | 'path'>;
   } | null>(null);
   const active = useRef<CameraSession | null>(null);
@@ -220,6 +236,7 @@ export function Viewer({
           renderer.draw(value.frame, profile, value.mode, {
             ...current.current,
             alarmGeneration: value.generation,
+            ...(value.receivedAt === undefined ? {} : { receivedAt: value.receivedAt }),
             ...(value.captureMetadata ? { captureMetadata: value.captureMetadata } : {}),
           });
         } catch (e) {
@@ -248,10 +265,17 @@ export function Viewer({
         received = true;
         setHasFrame(true);
       }
-      latest.current = { frame, mode: session.mode, generation: token };
+      latest.current = {
+        frame,
+        mode: session.mode,
+        generation: token,
+        receivedAt: performance.now(),
+      };
     });
   }, [session]);
   async function connect() {
+    playbackRef.current?.close();
+    playbackRef.current = null;
     photoGeneration.current++;
     setPhotoName('');
     setPhotoError('');
@@ -277,6 +301,7 @@ export function Viewer({
     }
   }
   async function stop() {
+    playbackRef.current?.pause();
     generation.current++;
     setTriggered(false);
     if (photoName) {
@@ -514,14 +539,125 @@ export function Viewer({
               <Icon name="gallery" />
               Gallery
             </button>
-            <button disabled title="Coming in a later update">
-              <Icon name="video" />
-              Video<small>Soon</small>
-            </button>
           </nav>
+          <label>
+            Gallery filter
+            <select
+              value={galleryFilter}
+              onChange={(e) => {
+                setGalleryFilter(e.target.value);
+                setGalleryOpen(true);
+              }}
+            >
+              <option value="all">All</option>
+              <option value="photos">Photos</option>
+              <option value="videos">Videos</option>
+            </select>
+          </label>
+          <RecordingControls
+            {...(openRecording ? { openRecording } : {})}
+            showFiles={galleryFilter !== 'photos'}
+            {...(recordingStorage ? { storage: recordingStorage } : {})}
+            profile={profile}
+            live={!!session && hasFrame}
+            failure={failure}
+            frame={() => rendererRef.current?.recordingFrame() ?? null}
+            onExport={async (file, factor, smooth, recorded) => {
+              const canvas = document.createElement('canvas');
+              const exported = document.createElement('canvas');
+              const renderer = new FrameRenderer(
+                canvas,
+                document.createElement('canvas'),
+                document.createElement('output'),
+                document.createElement('p'),
+                document.createElement('output'),
+              );
+              const sidecar = (await recordingStorage?.list())?.find((item) =>
+                ['.audio-v2.pcm', '.audio-v1.webm'].some(
+                  (suffix) => item.name === file.name.replace(/\.irvis$/, suffix),
+                ),
+              );
+              const audio = sidecar
+                ? new Blob(
+                    [(await sidecar.source.read(0, await sidecar.source.size())).slice().buffer],
+                    {
+                      type: sidecar.name.endsWith('.pcm')
+                        ? 'application/x-irvis-audio'
+                        : 'audio/webm',
+                    },
+                  )
+                : undefined;
+              const bytes = await exportMp4(
+                file.source,
+                exported,
+                (frame, view) => {
+                  const config = recorded
+                    ? recordedView(view, current.current)
+                    : structuredClone(current.current);
+                  renderer.draw(
+                    { kind: 'thermal', frame },
+                    profile,
+                    profile.videoModes.find((m) => m.layout)!,
+                    config,
+                  );
+                  exported.width = canvas.width * factor;
+                  exported.height = canvas.height * factor;
+                  const context = exported.getContext('2d')!;
+                  context.imageSmoothingEnabled = smooth;
+                  context.drawImage(canvas, 0, 0, exported.width, exported.height);
+                },
+                audio,
+              );
+              await saveRecordingFile(
+                file.name.replace(/\.irvis$/, '.mp4'),
+                fileByteSource(new Blob([bytes.slice().buffer], { type: 'video/mp4' })),
+              );
+            }}
+            onPlayback={async (player) => {
+              await stop();
+              playbackRef.current?.close();
+              playbackRef.current = player;
+              photoGeneration.current++;
+              setPhotoName('Recording');
+              setError('');
+              playbackCorrectionOverride.current = false;
+              const correction = photoCorrection(player.reader.header.viewState);
+              let recordedCorrection = JSON.stringify(correction);
+              setAnalysisRevision((value) => value + 1);
+              player.recordedViewState.subscribe((view) => {
+                if (playbackRef.current !== player || playbackCorrectionOverride.current) return;
+                const correction = photoCorrection(view);
+                const signature = JSON.stringify(correction);
+                if (signature === recordedCorrection) return;
+                recordedCorrection = signature;
+                setSettings((s) => ({ ...s, analysis: { ...s.analysis!, correction } }));
+              });
+              setSettings((s) => ({
+                ...s,
+                rotation: 0,
+                mirrorX: false,
+                mirrorY: false,
+                analysis: { ...s.analysis!, correction, objects: [], selected: null, alarm: false },
+              }));
+              player.frames.subscribe((frame) => {
+                if (playbackRef.current !== player) return;
+                latest.current = {
+                  frame: { kind: 'thermal', frame },
+                  mode: profile.videoModes.find((m) => m.layout)!,
+                  generation: generation.current,
+                  captureMetadata: {
+                    profile: player.reader.header.profile,
+                    fps: player.reader.header.fps,
+                    path: player.reader.header.path,
+                  },
+                };
+                setHasFrame(true);
+              });
+            }}
+          />
           {!photoLibrary && <p>Photo storage is unavailable in this host.</p>}
           {photoStatus && <p role="status">{photoStatus}</p>}
-          {galleryOpen && photoLibrary && (
+          {galleryOpen && galleryFilter !== 'videos' && photoLibrary && (
             <PhotoGallery
               library={photoLibrary}
               revision={galleryRevision}
@@ -539,6 +675,8 @@ export function Viewer({
             key={analysisRevision}
             value={settings.analysis!}
             onChange={(analysis) => {
+              if (playbackRef.current && analysis.correction !== settings.analysis!.correction)
+                playbackCorrectionOverride.current = true;
               if (
                 analysis.alarm &&
                 !settings.analysis!.alarm &&
