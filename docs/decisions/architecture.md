@@ -156,9 +156,19 @@ Status: decided (#3)
 
 Implemented in #5 (the placeholder page of `apps/web` and its component tests), #17.
 
-The viewer has many panels, settings and measurement overlays. Bundle size does not matter for a desktop app and a static site. What matters is the ecosystem (components, i18n, testing tools) and that the people and agents working on the code know it well. Camera frames at 25 per second bypass the React render cycle: the canvas is drawn directly from an external store, and numeric readouts update about five times a second.
+The viewer has many panels, settings and measurement overlays. Bundle size does not matter for a desktop app and a static site. What matters is the ecosystem (components, testing tools) and that the people and agents working on the code know it well. Camera frames at 25 per second bypass the React render cycle: the canvas is drawn directly from an external store, and numeric readouts update about five times a second.
 
 **Rejected:** Preact, because its compatibility layer has edge cases and saving about 40 KB buys nothing here. **Rejected:** no framework, because the amount of UI state would end in a hand-written framework.
+
+## The UI uses simple English only
+
+Status: decided (#17)
+
+Implemented in #17 (planned viewer scope).
+
+The owner narrowed the scope on 16 November 2026: people finding irvis on GitHub can use a simple English interface. Use short, clear English labels and messages. A language selector, translation catalogues, localization infrastructure and a Polish skeleton are out of scope. The vendor app's language options remain in the Android audit as observed evidence, not parity requirements.
+
+**Rejected:** preparing i18n and a Polish skeleton in the viewer shell, because the owner does not need translations and the additional work does not serve the intended audience.
 
 ## Workspace packages are consumed as TypeScript source
 

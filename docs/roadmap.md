@@ -21,18 +21,23 @@ The first camera is the TOOLTOP T7, a rebrand of the InfiRay P2 Pro.
 
 ## Features
 
-The target is parity with the vendor's Android app. This list comes from the T7 manual and is preliminary; the owner completes it from screenshots of the app ([#11](https://github.com/mateuszsikora/irvis/issues/11)).
+The target is parity with the vendor's Android app. The original T7-manual list is supplemented by the owner-accepted [Android feature catalogue](findings/android-app.md) from [#11](https://github.com/mateuszsikora/irvis/issues/11).
+
+The [Android functional audit](findings/android-app.md) records tests on the owner-confirmed TOOLTOP T7 and maps the observed controls to M4/M5 issues. It adds evidence for kelvins, region highlighting, measurement editing/reset and limits, saved-photo analysis and annotations, optional recording audio, and gallery management. Thermal-parameter validation and range switching were exercised, but their host/camera boundary still needs protocol evidence. The circular arrow resets measurement objects; it does not establish a manual NUC control. The accepted targets are handed off to #17, #18, #19 and #22; unresolved command semantics remain implementation work in #22, not an inventory blocker.
 
 | Feature | Kind | Browser | Desktop |
 | --- | --- | --- | --- |
 | Live view, scaling, smoothing, rotation, mirroring | software | yes | yes |
 | Palettes: Iron, White Hot, Black Hot, Rainbow, Red Hot, Cold Blue | software | yes | yes |
-| Automatic or manual palette range, scale bar | software | yes | yes |
+| Automatic or manual palette range, scale lock, scale bar | software | yes | yes |
 | Min, max and centre tracking with markers | software | yes | yes |
-| Measurement: point, line, area (several at once) | software | yes | yes |
-| Emissivity, temperature correction, °C and °F | software, unless the camera computes it | yes | yes |
-| Threshold alarms, isotherms | software | yes | yes |
+| Measurement: point, line, area (three of each in the vendor app), editing, deletion and reset | software | yes | yes |
+| Emissivity, temperature correction, °C, °F and K | software, unless the camera computes it | yes | yes |
+| Threshold alarms, isotherms, region highlighting | software | yes | yes |
 | Photo (PNG with temperature data), recording (`.irvis` with MP4 export) | software | yes | yes |
+| Saved-photo measurements, annotations and gallery management | software | yes | yes |
+| Optional audio for video recording (#19) | software | yes | yes |
+| Ambient and reflected temperature inputs (camera-side contribution unresolved) | software inputs; verify camera commands in #22 | host correction only | host correction and verified commands |
 | Shutter calibration (NUC) on demand | hardware | greyed out | yes |
 | High or low gain range | hardware | greyed out | yes |
 | Settings stored in the camera | hardware | greyed out | yes |
@@ -42,7 +47,7 @@ UI rules:
 
 - Hardware features are visible in the browser but greyed out, with "available in the desktop app" and a download link.
 - When the reconstruction reports uncertain pixels, the UI can mark them (optional overlay) and puts no min or max marker on them.
-- The UI language is English, with i18n prepared for Polish.
+- The UI uses simple English only. Translation catalogues, language selection and a Polish skeleton are out of scope ([decision](decisions/architecture.md#the-ui-uses-simple-english-only)).
 
 Out of scope for now: mobile apps and iOS (Safari on iPhone does not see external cameras), Firefox (no `MediaStreamTrackProcessor`), signing and notarisation of builds (a separate task later), and any use of closed InfiRay libraries: the protocol is our own, reconstructed from public sources.
 
@@ -133,20 +138,20 @@ Targets for the reconstruction (from the specification): Y matches the low bytes
 
 | Issue | Pull request |
 | --- | --- |
-| [#11](https://github.com/mateuszsikora/irvis/issues/11) | The feature list of the vendor Android app, from the owner's screenshots |
+| [#11](https://github.com/mateuszsikora/irvis/issues/11) | Accepted text-only Android feature catalogue and M4/M5 handoff |
 | [#12](https://github.com/mateuszsikora/irvis/issues/12) | Six palettes (Iron, White Hot, Black Hot, Rainbow, Red Hot, Cold Blue), render to RGBA, automatic and manual range; min and max with position, point (3×3 mean), line, area, histogram |
 | [#13](https://github.com/mateuszsikora/irvis/issues/13) | Emissivity with reflected temperature, offset, °C and °F, threshold alarms, isotherms |
 | [#14](https://github.com/mateuszsikora/irvis/issues/14) | The `.irvis` container and codec, [irvis-format.md](irvis-format.md) |
 | [#15](https://github.com/mateuszsikora/irvis/issues/15) | Photo export: PNG with the one-frame `.irvis` embedded in a private chunk, CSV |
-| [#17](https://github.com/mateuszsikora/irvis/issues/17) | A minimal `packages/backend-replay` that plays synthetic frames and fixtures from memory; the React viewer on top of it: live view, scale bar, controls generated from capabilities and profile commands, greyed-out hardware features in the browser, uncertain-pixel overlay, i18n (English, Polish skeleton) |
-| [#18](https://github.com/mateuszsikora/irvis/issues/18) | Several points, lines and areas at once; min, max and centre markers |
-| [#19](https://github.com/mateuszsikora/irvis/issues/19) | `packages/media`; crash-safe recording to `.irvis` (Electron `fs`, browser OPFS); `.irvis` playback through `Player` in `backend-replay`, with full measurements; MP4 export through WebCodecs |
+| [#17](https://github.com/mateuszsikora/irvis/issues/17) | A minimal `packages/backend-replay` that plays synthetic frames and fixtures from memory; the React viewer on top of it: live view, scale bar, controls generated from capabilities and profile commands, greyed-out hardware features in the browser, uncertain-pixel overlay, simple English UI (no localization layer) |
+| [#18](https://github.com/mateuszsikora/irvis/issues/18) | Several points, lines and areas at once; editing/reset, tracking, region highlighting, units/corrections/alarms and saved-photo analysis from #11 |
+| [#19](https://github.com/mateuszsikora/irvis/issues/19) | `packages/media`; crash-safe recording to `.irvis` (Electron `fs`, browser OPFS); `.irvis` playback through `Player` in `backend-replay`, with full measurements; MP4 export through WebCodecs; photo/annotation/gallery workflows and optional microphone audio from #11 |
 | [#20](https://github.com/mateuszsikora/irvis/issues/20) | The browser and desktop backends completed, ffmpeg arguments per system |
 | [#21](https://github.com/mateuszsikora/irvis/issues/21) | Playwright runs the same fixtures through `backend-replay` in Chromium, WebKit and Electron; readings are bit-identical with Node |
 
 **Acceptance (from the specification):** the same recorded frames in `fixtures/` give identical readings in both environments (exact path). #21 automates this. It covers the exact path, the UI wiring and the differences between V8 and JavaScriptCore, not the real camera backends; the spikes and the M5 checklist cover those.
 
-**Owner:** screenshots of the Android app in #11.
+**Owner:** Android feature list accepted in #11; the [catalogue and evidence](findings/android-app.md) are the reference for M4/M5.
 
 ### M5. Hardware features in the desktop app
 
@@ -208,7 +213,6 @@ Targets for the reconstruction (from the specification): Y matches the low bytes
 
 ## Open questions
 
-- The full feature list of the Android app (#11).
 - The factor k in the default recording threshold (k × NETD), after #6.
 - Motion compensation in `.irvis` v1, after the measurements in #16.
 - Whether the camera applies emissivity itself (#7); if it does, the P2 Pro profile gets the state fields `emissivity` and `reflected-temperature`. The formula is decided ([decision](decisions/architecture.md#emissivity-is-corrected-with-the-fourth-power-law-and-a-reflected-temperature)).
