@@ -29,7 +29,7 @@ The types are in `src/cameras/profile.ts`; each field has a TSDoc comment.
 | `FrameLayout` | optional `image: RowRange`, `thermal: RowRange & { packing: 'u16le' }` | each range (`firstRow`, `rows`) lies inside the frame; the two do not overlap; the thermal block is `sensor.width` × `sensor.height` values (the mode's `width` values per row, `rows` rows) |
 | `SensorSpec` | `width`, `height`, optional `netd` (`kelvin`), optional `accuracy` (`celsius`, `percent`), `ranges: MeasurementRange[]` (`gain`, `minCelsius`, `maxCelsius`) | positive integer size; `kelvin` > 0; accuracy values ≥ 0; `minCelsius` < `maxCelsius`; each range's `gain` unique and, with an enum state field `gain`, one of its values |
 | `Conversion` | `{ kind: 'linear'; scale; offset }`: °C = raw × scale + offset. `{ kind: 'polynomial'; coefficients }`: °C = c0 + c1·raw + …, by Horner's scheme. `{ kind: 'lut'; firstRaw; celsius }`: °C = celsius[raw − firstRaw] | `scale` finite and not 0, `offset` finite; at least two finite coefficients; `firstRaw` from 0 to 65535, a non-empty table of finite values that ends at or below raw 65535 |
-| `ProfileConversion` | `gain`, `conversion`, provenance | at least one; `gain` unique; with an enum state field `gain`: one conversion for each of its values and none for other values; without it: exactly one conversion |
+| `ProfileConversion` | `gain`, `conversion`, optional `recordingThreshold`, provenance | `recordingThreshold` is an integer 0–32767 in raw units, absent means no suggestion; at least one; `gain` unique; with an enum state field `gain`: one conversion for each of its values and none for other values; without it: exactly one conversion |
 | `CameraStateField` | `id`, `label`, `affects` (`data` or `meaning`), `refresh` (`command` or `second`), and `{ kind: 'enum'; values; default }` or `{ kind: 'number'; unit; default }` | ids unique and kebab-case; an enum has unique values and its `default` is one of them; a number's `default` is finite; a field called `gain` is an enum; `emissivity` and `reflected-temperature` come together, each a number with `affects: 'data'`, unit `''` (default greater than 0 and at most 1) and `°C` (default above −273.15) |
 | `CameraStateSnapshot` | `origin` (`camera`, `declared`, `assumed`), `values` (by field id) | Not part of a profile: what a frame carries |
 | `CameraCommand` | `id`, `label`, `transport`, optional `followUp` (ordered vendor transfers), `changes` (state field ids), provenance | ids unique and kebab-case; `changes` names existing fields |
@@ -46,14 +46,16 @@ Gain commands encode fixed values as transfer sequences. TODO(owner): measure ca
 
 | Part | Value |
 | --- | --- |
-| `version` | 1 |
+| `version` | 2 |
 | `identification` | USB `0x0bda:0x5830` and `0x0bda:0x5840`, no `labelPattern` (`USB Camera` is not specific enough to identify a model) |
 | `videoModes` | `yuyv-256x384`, 25 fps, `image` rows 0–191, `thermal` rows 192–383 `u16le`, no `enableCommand`; `yuyv-256x192`, 25 fps, `layout: null` |
-| `sensor` | 256×192, no `netd` or `accuracy`, `ranges` empty |
-| `conversions` | One, `gain: 'high'`: linear, `scale` 1/64, `offset` −273.15, confidence `reported` |
+| `sensor` | 256×192, scene-based `netd.kelvin` 0.07545446351476191 (`measured`), no `accuracy`, `ranges` empty |
+| `conversions` | One, `gain: 'high'`: linear, `scale` 1/64, `offset` −273.15, confidence `reported`, `recordingThreshold: 10` (0.15625 K) |
 | `state`, `commands` | State unconfirmed; reported `gain-high` and `gain-low` commands |
 
 With no `gain` state field, the validator requires exactly one conversion, so the low-gain conversion waits for #7. The M1 spike checks the modes and the conversion on a camera ([findings](../findings/m1.md)).
+
+The high-gain recording suggestion is ceil(2 × NETD × 64). It uses unadjusted temporal noise from 256 event-free frames of the stationary wall scene; it is not a calibrated NETD specification. Writers still require an explicit threshold. Photos remain lossless by default. See the [decision](../decisions/architecture.md#recording-defaults-use-twice-the-static-scene-noise).
 
 ## Interfaces
 
@@ -84,6 +86,7 @@ Exported from `@irvis/core` (`src/cameras/index.ts`):
 | `identification: labelPattern '<pattern>' is not a valid regular expression` | |
 | `<where>: source is empty`, `<where>: unknown confidence '<value>'` | Provenance |
 | `sensor: width and height must be positive integers` | |
+| `<where>: recordingThreshold must be an integer from 0 to 32767` | Invalid optional recording suggestion for a gain |
 | `sensor.netd: kelvin must be greater than 0` | |
 | `sensor.accuracy: celsius and percent must be 0 or more` | |
 | `sensor.ranges[<i>]: minCelsius must be below maxCelsius` | |
@@ -124,7 +127,7 @@ Exported from `@irvis/core` (`src/cameras/index.ts`):
 | `packages/core/src/cameras/infiray-p2pro/profile.test.ts` | The P2 Pro profile is registered and valid, matches `0x0bda:0x5830` and `0x0bda:0x5840`, and a synthetic 256×384 frame (196 608 B) decodes to 22.5 °C and a 35 °C centre |
 | `packages/core/test/profiles.ts` | Not a test: `testProfile(overrides)`, a consistent profile with made-up constants that the tests above change one part at a time |
 
-Not covered: every message in the table above has its check in `validate.ts`, but not every one has a test. No test uses a real frame of the camera; #16 adds fixtures.
+Not covered: every message in the table above has its check in `validate.ts`, but not every one has a test. Real packed camera fixtures and v1 recording regressions are covered in `packages/core/test/real-frames.test.ts`; the profile test checks the noise-derived threshold and the validator test checks its allowed range.
 
 ## See also
 

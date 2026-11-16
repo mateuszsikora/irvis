@@ -10,6 +10,7 @@ Start here to find a document. Each fact is in one place; this table says which.
 | `<format>.md` | Specifications of wire or file formats, each with a version number: [irvis-format.md](irvis-format.md), the `.irvis` recording format; [protocol.md](protocol.md), experimental USB commands; [browser-diagnostics-format.md](browser-diagnostics-format.md), browser spike exports |
 | [roadmap.md](roadmap.md) | The plan: milestones, their issues and order, acceptance criteria, owner tasks, risks, deviations from the specification. A plan, not a description of the code |
 | `findings/m<n>.md` | Reports of the hardware spikes (instructions, measured results, the decision taken) and the M5 checklist: [M1](findings/m1.md), [M2](findings/m2.md), [M3](findings/m3.md) |
+| [findings/irvis-codec.md](findings/irvis-codec.md) | Real static-wall fixtures, temporal noise, codec sizes and the v1 freeze |
 | [findings/reconstruction.md](findings/reconstruction.md) | Synthetic planar reconstruction benchmark, quality limits and timing on Apple M2 Pro |
 | [guides/development.md](guides/development.md) | Setup, npm scripts, hooks, CI |
 | [guides/testing.md](guides/testing.md) | How to run the tests and what each test file needs |

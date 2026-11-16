@@ -184,3 +184,11 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
   - `packages/core/src/export/export.test.ts::photo export::writes a standard RGBA PNG and opens its embedded frame through IrvisReader`
 - **40.** Temperature CSV preserves row-major coordinates, unrounded Celsius readings and uncertainty; non-finite readings are empty.
   - `packages/core/src/export/export.test.ts::photo export::exports row-major Celsius without rounding and marks uncertain or missing readings`
+
+- **41.** Real packed P2 Pro fixtures retain their captured bytes and decode the thermal half as little-endian raw values; the frozen v1 file remains lossless, and every newly encoded real pixel stays within T.
+  - `packages/core/test/real-frames.test.ts::real camera frames::preserves packed capture bytes and thermal decoding`
+  - `packages/core/test/real-frames.test.ts::real camera frames::reads the frozen v1 recording exactly in reverse order`
+  - `packages/core/test/real-frames.test.ts::real camera frames::bounds every real pixel through lossless and lossy recording`
+- **42.** The P2 Pro high-gain recording suggestion rounds twice the measured scene noise upward to whole raw units; profile recording thresholds fit the codec's integer range 0–32767.
+  - `packages/core/src/cameras/infiray-p2pro/profile.test.ts::infiray-p2pro profile::derives the recording threshold from twice the measured scene noise`
+  - `packages/core/src/cameras/validate.test.ts::validateProfile::rejects recording thresholds outside the codec range`

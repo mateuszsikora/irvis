@@ -247,7 +247,7 @@ Status: decided (#14)
 
 Issue #14 lists three block modes: skip, resend the block towards a temporally denoised value, and send a mask with only the pixels outside T. The encoder has all three, and the frame body stores a quantised residual for every value it sends, keyframes included. Every value it sends lies within h = ⌊T/4⌋ of a target, and the target is the per-pixel denoised estimate clamped to within T − h of the measured value, so |measured − stored| ≤ T still holds ([how](../irvis-format.md#how-irvis-encodes)). Values therefore land near the noise-free level of the pixel, and the next frame's noise rarely takes them outside T, so the blocks of a still scene stay skipped.
 
-On the benchmark's synthetic scenes ([results](../irvis-format.md#benchmark)), the alternative of storing each sent value at the nearest point within T of the measured one (step 2T + 1) took 8.31 MB/min for a static scene at T = 8 raw and 4.56 MB/min at T = 16, against 1.05 and 0.11 MB/min now, because its values sit anywhere in ±T and half of them fall out with the next frame's noise. Coding the targets exactly (h = 0) took 7.05 and 5.03 MB/min for the moving hand at T = 8 and 16, against 4.72 and 2.72. The quantiser step is stored in each chunk record, so the encoder's settings (h, the weight of the estimate, the choice between the modes) can change without a format change; #16 tunes them on real frames.
+On the benchmark's synthetic scenes ([results](../irvis-format.md#benchmark)), the alternative of storing each sent value at the nearest point within T of the measured one (step 2T + 1) took 8.31 MB/min for a static scene at T = 8 raw and 4.56 MB/min at T = 16, against 1.05 and 0.11 MB/min now, because its values sit anywhere in ±T and half of them fall out with the next frame's noise. Coding the targets exactly (h = 0) took 7.05 and 5.03 MB/min for the moving hand at T = 8 and 16, against 4.72 and 2.72. The quantiser step is stored in each chunk record, so the encoder's settings (h, the weight of the estimate, the choice between the modes) can change without a format change; #16 measures them on real frames and retains the defaults.
 
 **Rejected:** quantising around the measured value with step 2T + 1, for the sizes above. **Rejected:** coding every sent value exactly (h = 0), for the sizes above.
 
@@ -257,7 +257,7 @@ Status: decided (#14)
 
 A frame record carries its own length and CRC-32, and its body is deflated on its own. A file cut anywhere is then readable up to the last whole frame; a damaged byte costs the rest of its chunk when the index is intact and everything after it when the file has to be scanned, and nothing before it; and a writer appends a frame with one `ByteSink.append` and needs no state from the deflate of earlier frames. The 9 bytes of framing and the few bytes of a fresh deflate block cost about 0.4 KB/s at 25 fps, which is under 0.03 MB/min.
 
-**Rejected:** one deflate stream per chunk with a sync flush after every frame, because a reader would need streaming inflate across records and a damaged record would break the rest of the chunk's stream; whether the shared history would compress better is not measured (TODO(owner): measure in #16 if the deflate share of the files matters). **Rejected:** a CRC per chunk only, because a crash would lose up to 10 s instead of about 1 s.
+**Rejected:** one deflate stream per chunk with a sync flush after every frame, because a reader would need streaming inflate across records and a damaged record would break the rest of the chunk's stream; whether the shared history would compress better is not measured (future experiment if the deflate share of the files matters). **Rejected:** a CRC per chunk only, because a crash would lose up to 10 s instead of about 1 s.
 
 ## .irvis metadata is JSON and frame data are binary
 
@@ -285,7 +285,9 @@ Status: decided (#14)
 
 ## Motion compensation in .irvis is postponed
 
-Status: postponed (#14)
+Status: superseded (#16)
+
+V1 is frozen without motion vectors; see [the replacement decision](#version-1-freezes-without-motion-vectors).
 
 Predicting a block from a shifted block of the previous frame would help a moving camera or a moving object, but whether it pays off depends on real frames: their noise, how often the camera moves, and how much of a block motion compensation could match within T. Issue #14 asks to decide after measurements on real frames, which come with the fixtures in #16. Version 1 has no motion vectors; adding them needs a new block mode or a new format version.
 
@@ -398,3 +400,46 @@ options. PNG rendering uses the supplied frame and correction settings.
 the recording codec, conversion metadata and uncertainty handling. CSV uses
 one row per pixel with coordinates, Celsius and an uncertainty flag, rather
 than a bare matrix that loses uncertainty.
+
+## Recording defaults use twice the static scene noise
+
+Status: decided (#16)
+
+The P2 Pro high-gain profile suggests T = ceil(2 × NETD / (1/64 K)) = 10 raw
+units (0.15625 K), using the median temporal population standard deviation
+0.07545446351476191 K measured on 256 event-free wall-scene frames on
+2026-11-16. Here NETD means a scene-based estimate, not a calibrated sensor
+specification. The factor k = 2 trades recording size for a strict per-pixel
+bound; it is not a statistical promise that all sensor noise lies within T.
+The profile records the unadjusted noise, including common-mode drift. Gain
+conversion confidence remains reported. `ProfileConversion.recordingThreshold`
+is optional and applies only to that gain; writers still require an explicit
+threshold and lossless exports still use zero. The profile version rises to 2.
+
+**Rejected:** using the smaller noise after subtracting each frame's mean,
+which removes common-mode variation as well as noise; silently changing the
+writer's explicit threshold or the lossless photo default.
+
+## Version 1 freezes without motion vectors
+
+Status: decided (#16)
+
+Version 1 keeps the existing skip, dense and sparse block modes and per-frame
+deflate. The real static-wall series verifies the error bound through drift
+and frozen sequences; its measurements are in the codec findings. No motion
+compensation implementation or moving-camera comparison is claimed. A static
+scene does not justify adding motion-vector syntax, search cost and decoder
+complexity. Motion compensation remains a possible future-version experiment;
+this decision settles its absence from v1, not its general usefulness.
+
+The file layout, record types, frame fields and block syntax are frozen.
+The existing view-state field remains an extensible JSON object: readers retain
+unknown keys and applications may ignore them. The currently implemented photo
+keys are documented; future application keys do not alter the binary format.
+A changed binary layout, new record type or frame field requires a version bump.
+The committed lossless real-frame file tests backwards decoding independently
+of the current writer; encoder tuning may still change within the error bound.
+
+**Rejected:** waiting for every future UI setting before freezing a generic
+JSON container, or declaring that a stationary capture proves motion search
+cannot improve moving-camera recordings.

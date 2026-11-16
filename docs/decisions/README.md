@@ -54,7 +54,7 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [.irvis metadata is JSON and frame data are binary](architecture.md#irvis-metadata-is-json-and-frame-data-are-binary) | [architecture.md](architecture.md) | decided (#14) |
 | [The .irvis threshold is in raw units](architecture.md#the-irvis-threshold-is-in-raw-units) | [architecture.md](architecture.md) | decided (#14) |
 | [Camera profiles carry a version](architecture.md#camera-profiles-carry-a-version) | [architecture.md](architecture.md) | decided (#14) |
-| [Motion compensation in .irvis is postponed](architecture.md#motion-compensation-in-irvis-is-postponed) | [architecture.md](architecture.md) | postponed (#14) |
+| [Motion compensation in .irvis is postponed](architecture.md#motion-compensation-in-irvis-is-postponed) | [architecture.md](architecture.md) | superseded (#16) |
 | [The web version is hosted on Netlify and goes to production from release](architecture.md#the-web-version-is-hosted-on-netlify-and-goes-to-production-from-release) | [architecture.md](architecture.md) | decided (#3) |
 | [The desktop app ships its own LGPL ffmpeg build](architecture.md#the-desktop-app-ships-its-own-lgpl-ffmpeg-build) | [architecture.md](architecture.md) | decided (#3) |
 | [The capture tool runs on Node type stripping, without tsx](architecture.md#the-capture-tool-runs-on-node-type-stripping-without-tsx) | [architecture.md](architecture.md) | decided (#6) |
@@ -67,3 +67,5 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [Functional test timeouts allow shared runner contention](architecture.md#functional-test-timeouts-allow-shared-runner-contention) | [architecture.md](architecture.md) | decided (#8) |
 | [Browser diagnostics retain native planar bytes and disable brightness hints](architecture.md#browser-diagnostics-retain-native-planar-bytes-and-disable-brightness-hints) | [architecture.md](architecture.md) | decided (#9) |
 | [PNG photos embed a lossless snapshot by default](architecture.md#png-photos-embed-a-lossless-snapshot-by-default) | [architecture.md](architecture.md) | decided (#15) |
+| [Recording defaults use twice the static scene noise](architecture.md#recording-defaults-use-twice-the-static-scene-noise) | [architecture.md](architecture.md) | decided (#16) |
+| [Version 1 freezes without motion vectors](architecture.md#version-1-freezes-without-motion-vectors) | [architecture.md](architecture.md) | decided (#16) |

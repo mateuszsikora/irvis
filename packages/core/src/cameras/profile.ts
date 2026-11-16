@@ -108,6 +108,8 @@ export interface ProfileConversion extends Provenance {
   /** A value of the `gain` state field; any string when the profile has no such field. */
   readonly gain: string;
   readonly conversion: Conversion;
+  /** Suggested .irvis error bound in raw units for this gain; writers still take an explicit threshold. */
+  readonly recordingThreshold?: number;
 }
 
 /** A temperature range the camera measures in one gain mode. */

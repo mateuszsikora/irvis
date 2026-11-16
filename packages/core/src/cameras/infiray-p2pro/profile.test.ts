@@ -12,6 +12,15 @@ describe('infiray-p2pro profile', () => {
     expect(validateProfile(profile)).toEqual([]);
   });
 
+  it('derives the recording threshold from twice the measured scene noise', () => {
+    const noise = profile.sensor.netd?.kelvin;
+    const conversion = profile.conversions[0];
+    expect(noise).toBeGreaterThan(0);
+    expect(conversion?.recordingThreshold).toBe(Math.ceil(2 * (noise ?? NaN) * 64));
+    expect(conversion?.recordingThreshold).toBe(10);
+    expect(profile.version).toBe(2);
+  });
+
   it('matches the Realtek USB IDs', () => {
     expect(matchProfiles({ vendorId: 0x0bda, productId: 0x5830 })).toEqual([profile]);
     expect(matchProfiles({ vendorId: 0x0bda, productId: 0x5840 })).toEqual([profile]);

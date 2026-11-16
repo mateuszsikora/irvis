@@ -267,6 +267,9 @@ export function validateProfile(profile: CameraProfile): string[] {
     const where = `conversions.${c.gain}`;
     checkProvenance(where, c, out);
     checkConversion(where, c.conversion, out);
+    if (c.recordingThreshold !== undefined && !isUint(c.recordingThreshold, 32767)) {
+      out.push(`${where}: recordingThreshold must be an integer from 0 to 32767`);
+    }
     if (gainField?.kind === 'enum' && !gainField.values.includes(c.gain)) {
       out.push(`${where}: '${c.gain}' is not a value of state field 'gain'`);
     }
