@@ -33,3 +33,17 @@ export async function exportPng(frame: ThermalFrame, options: PngOptions): Promi
   });
   return encodePng(image.width, image.height, rgba, snapshot);
 }
+
+/** Encode already rendered RGBA pixels, including overlays, with matching thermal data. */
+export async function exportRenderedPng(
+  frame: ThermalFrame,
+  rgba: Uint8ClampedArray,
+  options: SnapshotOptions,
+): Promise<Uint8Array> {
+  if (rgba.length !== frame.width * frame.height * 4) {
+    throw new Error('Rendered photo dimensions must match the thermal frame.');
+  }
+  const pixels = rgba.slice();
+  const snapshot = await exportSnapshot(frame, options);
+  return encodePng(frame.width, frame.height, pixels, snapshot);
+}

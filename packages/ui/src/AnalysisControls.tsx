@@ -16,7 +16,11 @@ export function AnalysisControls({
   onChange: (value: AnalysisSettings) => void;
 }) {
   const [nextId, setNextId] = useState(1);
-  const [draft, setDraft] = useState(['1', '0', '25']);
+  const [draft, setDraft] = useState([
+    String(value.correction?.emissivity ?? 1),
+    String(value.correction?.offsetKelvin ?? 0),
+    String(value.correction?.reflectedCelsius ?? 25),
+  ]);
   const [threshold, setThreshold] = useState(celsiusToUnit(value.threshold, value.unit).toFixed(1));
   const update = (patch: Partial<AnalysisSettings>) => onChange({ ...value, ...patch });
   const selected = value.objects.find((o) => o.id === value.selected);

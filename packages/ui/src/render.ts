@@ -1,6 +1,10 @@
+import { orientPhoto } from './photos.ts';
 import { analyze, geometry, type AnalysisSettings } from './measurements.ts';
 import {
   autoRange,
+  exportRenderedPng,
+  type ThermalFrame,
+  type SnapshotOptions,
   correctFrame,
   temperatureCorrection,
   settingsFromCamera,
@@ -30,6 +34,7 @@ export interface ViewSettings {
   uncertain: boolean;
   gain: string;
   analysis?: AnalysisSettings;
+  captureMetadata?: Pick<SnapshotOptions, 'profile' | 'fps' | 'path'>;
   /** Identity of the frame source; a new source starts without alarm hysteresis. */
   alarmGeneration?: number;
 }
@@ -37,6 +42,7 @@ export interface ViewSettings {
 /** Mutable frame state belongs to the canvas subscription, never React state. */
 export class FrameRenderer {
   range: TemperatureRange = { minCelsius: 20, maxCelsius: 40 };
+  private photo: { frame: ThermalFrame; options: SnapshotOptions } | null = null;
   private readouts: HTMLElement | undefined;
   private onAlarm: ((active: boolean) => void) | undefined;
   private alarmGeneration: number | undefined;
@@ -63,6 +69,7 @@ export class FrameRenderer {
     this.source = document.createElement('canvas');
   }
   draw(input: RawFrame, profile: CameraProfile, mode: VideoMode, settings: ViewSettings) {
+    this.photo = null;
     if (settings.alarmGeneration !== this.alarmGeneration) {
       this.alarmState = null;
       this.alarmGeneration = settings.alarmGeneration;
@@ -209,6 +216,45 @@ export class FrameRenderer {
         0,
         0,
       );
+    const thermal: ThermalFrame =
+      input.kind === 'thermal'
+        ? input.frame
+        : {
+            ...decoded,
+            timestamp: input.timestamp,
+            conversion: conversion!,
+            cameraState: { origin: 'assumed', values: {} },
+          };
+    this.photo = {
+      frame: structuredClone(
+        orientPhoto(thermal, settings.rotation, settings.mirrorX, settings.mirrorY),
+      ),
+      options: {
+        profile: settings.captureMetadata?.profile ?? {
+          id: profile.id,
+          version: profile.version,
+          name: profile.name,
+        },
+        fps: settings.captureMetadata?.fps ?? mode.fps,
+        path:
+          settings.captureMetadata?.path ??
+          (input.kind === 'yuv420' || thermal.uncertain ? 'reconstructed' : 'exact'),
+        viewState: {
+          palette: settings.palette,
+          range: { ...this.range },
+          correction: { ...(analysis?.correction ?? settingsFromCamera(thermal.cameraState)) },
+          unit: analysis?.unit ?? 'C',
+          capturedOverlays: true,
+        },
+      },
+    };
     this.bounds.textContent = `${formatTemperature(this.range.minCelsius, analysis?.unit ?? 'C')} — ${formatTemperature(this.range.maxCelsius, analysis?.unit ?? 'C')}`;
+  }
+  capturePhoto(): Promise<Uint8Array> {
+    const photo = this.photo;
+    const context = this.canvas.getContext('2d');
+    if (!photo || !context) throw new Error('No rendered thermal frame is available.');
+    const pixels = context.getImageData(0, 0, this.canvas.width, this.canvas.height).data;
+    return exportRenderedPng(photo.frame, pixels, photo.options);
   }
 }

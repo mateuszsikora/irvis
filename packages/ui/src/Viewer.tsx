@@ -1,3 +1,5 @@
+import { PhotoGallery } from './PhotoGallery.tsx';
+import { photoCorrection, type PhotoLibrary } from './photos.ts';
 import { AnalysisControls } from './AnalysisControls.tsx';
 import { initialAnalysis } from './measurements.ts';
 import { useEffect, useRef, useState } from 'react';
@@ -12,18 +14,26 @@ import {
   type CameraSession,
   type RawFrame,
   type VideoMode,
+  type SnapshotOptions,
 } from '@irvis/core';
 import { Icon } from './Icon.tsx';
 import { FrameRenderer, type ViewSettings } from './render.ts';
 
 export interface ViewerProps {
+  photoLibrary?: PhotoLibrary;
   backend: CameraBackend;
   profile: CameraProfile;
   /** Only supply when the backend actually implements command dispatch. */
   captureError?: string;
   command?: (id: string) => Promise<void>;
 }
-export function Viewer({ backend, profile, command, captureError = '' }: ViewerProps) {
+export function Viewer({
+  backend,
+  profile,
+  command,
+  photoLibrary,
+  captureError = '',
+}: ViewerProps) {
   const [devices, setDevices] = useState<readonly { id: string; label: string }[]>([]);
   const [device, setDevice] = useState('');
   const [modeId, setModeId] = useState(profile.videoModes.find((m) => m.layout)?.id ?? '');
@@ -49,6 +59,34 @@ export function Viewer({ backend, profile, command, captureError = '' }: ViewerP
     gain: 'high',
     analysis: initialAnalysis,
   });
+  const rendererRef = useRef<FrameRenderer | null>(null);
+  const [savingPhoto, setSavingPhoto] = useState(false);
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryRevision, setGalleryRevision] = useState(0);
+  const [photoStatus, setPhotoStatus] = useState('');
+  const [saveError, setSaveError] = useState('');
+  const [analysisRevision, setAnalysisRevision] = useState(0);
+  async function capturePhoto() {
+    if (!photoLibrary || !rendererRef.current) return;
+    setSavingPhoto(true);
+    setPhotoError('');
+    setPhotoStatus('');
+    setSaveError('');
+    try {
+      const bytes = await rendererRef.current.capturePhoto();
+      const createdAt = Date.now();
+      const id = crypto.randomUUID();
+      const name = `irvis-${new Date(createdAt).toISOString().replaceAll(':', '-')}-${id.slice(0, 8)}.png`;
+      await photoLibrary.save({ id, name, createdAt, bytes });
+      setGalleryRevision((value) => value + 1);
+      setGalleryOpen(true);
+      setPhotoStatus(`Saved ${name}`);
+    } catch (e) {
+      setSaveError(String(e));
+    } finally {
+      setSavingPhoto(false);
+    }
+  }
   const [triggered, setTriggered] = useState(false);
   const [photoName, setPhotoName] = useState('');
   const [photoError, setPhotoError] = useState('');
@@ -81,7 +119,7 @@ export function Viewer({ backend, profile, command, captureError = '' }: ViewerP
     },
     [],
   );
-  async function openPhoto(file: File) {
+  async function openPhoto(file: Pick<File, 'name' | 'arrayBuffer'>) {
     const token = ++photoGeneration.current;
     setPhotoError('');
     try {
@@ -96,13 +134,28 @@ export function Viewer({ backend, profile, command, captureError = '' }: ViewerP
       if (token !== photoGeneration.current) return;
       latest.current = {
         frame: { kind: 'thermal', frame },
+        captureMetadata: {
+          profile: reader.header.profile,
+          fps: reader.header.fps,
+          path: reader.header.path,
+        },
         generation: generation.current,
         mode: profile.videoModes.find((m) => m.layout)!,
       };
       setSettings((s) => ({
         ...s,
-        analysis: { ...s.analysis!, objects: [], selected: null, correction: null, alarm: false },
+        rotation: 0,
+        mirrorX: false,
+        mirrorY: false,
+        analysis: {
+          ...s.analysis!,
+          objects: [],
+          selected: null,
+          correction: photoCorrection(reader.header.viewState),
+          alarm: false,
+        },
       }));
+      setAnalysisRevision((value) => value + 1);
       setPhotoName(file.name);
       setHasFrame(true);
       setError('');
@@ -115,7 +168,12 @@ export function Viewer({ backend, profile, command, captureError = '' }: ViewerP
   const bounds = useRef<HTMLOutputElement>(null),
     warning = useRef<HTMLParagraphElement>(null);
   const current = useRef(settings);
-  const latest = useRef<{ frame: RawFrame; mode: VideoMode; generation: number } | null>(null);
+  const latest = useRef<{
+    frame: RawFrame;
+    mode: VideoMode;
+    generation: number;
+    captureMetadata?: Pick<SnapshotOptions, 'profile' | 'fps' | 'path'>;
+  } | null>(null);
   const active = useRef<CameraSession | null>(null);
   const generation = useRef(0);
   useEffect(() => {
@@ -151,6 +209,7 @@ export function Viewer({ backend, profile, command, captureError = '' }: ViewerP
       readouts.current ?? undefined,
       (active) => setTriggered(active && latest.current?.generation === generation.current),
     );
+    rendererRef.current = renderer;
     let previousFrame = latest.current;
     let previousSettings = current.current;
     let request = 0;
@@ -161,6 +220,7 @@ export function Viewer({ backend, profile, command, captureError = '' }: ViewerP
           renderer.draw(value.frame, profile, value.mode, {
             ...current.current,
             alarmGeneration: value.generation,
+            ...(value.captureMetadata ? { captureMetadata: value.captureMetadata } : {}),
           });
         } catch (e) {
           setTriggered(false);
@@ -173,7 +233,10 @@ export function Viewer({ backend, profile, command, captureError = '' }: ViewerP
       request = requestAnimationFrame(draw);
     };
     request = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(request);
+    return () => {
+      rendererRef.current = null;
+      cancelAnimationFrame(request);
+    };
   }, [profile]);
   useEffect(() => {
     if (!session) return;
@@ -339,6 +402,11 @@ export function Viewer({ backend, profile, command, captureError = '' }: ViewerP
               </div>
             </div>
           </div>
+          {saveError && (
+            <p className="notice error-notice" role="alert">
+              Photo capture failed: {saveError}
+            </p>
+          )}
           {photoError && (
             <p className="notice error-notice" role="alert">
               Photo import failed: {photoError}
@@ -431,17 +499,44 @@ export function Viewer({ backend, profile, command, captureError = '' }: ViewerP
             </p>
           )}
           <nav className="tool-dock" aria-label="Tools">
-            {(['Photo', 'Video', 'Gallery'] as const).map((name, i) => (
-              <button key={name} disabled title="Coming in a later update">
-                <Icon name={(['photo', 'video', 'gallery'] as const)[i]!} />
-                <span>{name}</span>
-                <small>Soon</small>
-              </button>
-            ))}
+            <button
+              disabled={!photoLibrary || !hasFrame || !!failure || savingPhoto}
+              onClick={() => void capturePhoto()}
+            >
+              <Icon name="photo" />
+              {savingPhoto ? 'Saving photo…' : 'Capture photo'}
+            </button>
+            <button
+              disabled={!photoLibrary}
+              aria-expanded={galleryOpen}
+              onClick={() => setGalleryOpen((value) => !value)}
+            >
+              <Icon name="gallery" />
+              Gallery
+            </button>
+            <button disabled title="Coming in a later update">
+              <Icon name="video" />
+              Video<small>Soon</small>
+            </button>
           </nav>
+          {!photoLibrary && <p>Photo storage is unavailable in this host.</p>}
+          {photoStatus && <p role="status">{photoStatus}</p>}
+          {galleryOpen && photoLibrary && (
+            <PhotoGallery
+              library={photoLibrary}
+              revision={galleryRevision}
+              onOpen={(photo) =>
+                void openPhoto({
+                  name: photo.name,
+                  arrayBuffer: () => Promise.resolve(photo.bytes.slice().buffer),
+                })
+              }
+            />
+          )}
         </div>
         <aside className="settings-panel" aria-label="View settings">
           <AnalysisControls
+            key={analysisRevision}
             value={settings.analysis!}
             onChange={(analysis) => {
               if (

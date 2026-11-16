@@ -392,3 +392,8 @@ is not covered.
 ### Kelvin display units
 
 `corrections/units.ts` accepts `K` alongside `C` and `F`. Absolute kelvin values add/subtract 273.15 at the display/input boundary; temperature differences in kelvins are unchanged. `TEMPERATURE_UNITS` lists C, F, K. Internal measurements, alarms and corrections remain in Celsius. The viewer adds narrower validated correction input limits and a 25 °C reflected reset; `DEFAULT_CORRECTION` remains 20 °C. `corrections/units.test.ts` covers absolute and difference conversions.
+
+
+### Rendered thermal photos
+
+`exportRenderedPng(frame, rgba, options)` accepts a caller-rendered RGBA image including overlays. Its dimensions must match the thermal frame; it throws `Rendered photo dimensions must match the thermal frame.` on a byte-count mismatch. It copies pixels and starts the lossless snapshot before yielding, preserving data when callers reuse their buffers. The PNG and private `irVs` format are unchanged. Callers must transform both image and thermal arrays together when rotating or mirroring. `export/export.test.ts` checks visible scanlines, raw round-trip, buffer reuse and validation.

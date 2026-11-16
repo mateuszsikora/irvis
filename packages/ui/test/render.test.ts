@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { cameraProfiles, type ThermalFrame } from '@irvis/core';
+import { cameraProfiles, IrvisReader, memoryByteSource, type ThermalFrame } from '@irvis/core';
 import { initialAnalysis } from '../src/measurements.ts';
 import { FrameRenderer, type ViewSettings } from '../src/render.ts';
 describe('FrameRenderer', () => {
@@ -57,8 +57,9 @@ describe('FrameRenderer', () => {
       context.mockRestore();
     }
   });
-  it('holds locked bounds across changing scenes and marks uncertain pixels', () => {
+  it('holds locked bounds across changing scenes and marks uncertain pixels', async () => {
     const context = {
+      getImageData: vi.fn(() => ({ data: new Uint8ClampedArray(12).fill(123) })),
       putImageData: vi.fn<(image: ImageData, x: number, y: number) => void>(),
       drawImage: vi.fn(),
       translate: vi.fn(),
@@ -141,6 +142,11 @@ describe('FrameRenderer', () => {
     );
     const correctedSettings: ViewSettings = {
       ...settings,
+      captureMetadata: {
+        profile: { id: 'imported', version: 2, name: 'Imported camera' },
+        fps: 12,
+        path: 'reconstructed',
+      },
       analysis: {
         ...initialAnalysis,
         alarm: true,
@@ -177,6 +183,17 @@ describe('FrameRenderer', () => {
       { ...correctedSettings, analysis: { ...correctedSettings.analysis!, alarm: false } },
     );
     expect(alarm).toHaveBeenLastCalledWith(false);
+    const photo = await analysisRenderer.capturePhoto();
+    const reader = await IrvisReader.open(memoryByteSource(photo));
+    const captured = (await reader.readFrame(0)).frame;
+    expect(captured.width).toBe(1);
+    expect(captured.height).toBe(3);
+    expect([...captured.raw]).toEqual([100, 40, 20]);
+    expect([...captured.uncertain!]).toEqual([1, 0, 0]);
+    expect(reader.header.viewState['capturedOverlays']).toBe(true);
+    expect(reader.header.profile.id).toBe('imported');
+    expect(reader.header.fps).toBe(12);
+    expect(reader.header.path).toBe('reconstructed');
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });

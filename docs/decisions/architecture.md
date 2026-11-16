@@ -487,3 +487,12 @@ Status: decided (#18)
 Objects use percentages of the unrotated thermal image and expose numeric coordinate edits. This supports keyboard movement and rectangle resizing, keeps objects bounded when frame sizes change, and does not assume unverified vendor gestures. Overlays are drawn before rotation and mirroring. Clear-all affects objects only.
 
 Host corrections are explicitly committed and use the existing core relative-camera model. The viewer follows reference limits and a reflected reset of 25 °C rather than changing core's general 20 °C default. Ambient correction stays disabled until a physical model is justified. A one-frame PNG/snapshot loader provides saved-photo analysis now; #19 owns gallery and capture integration. Captured presentation and editable objects remain distinct.
+
+
+## Thermal photo capture uses matching oriented pixels and injected local storage
+
+Status: decided (#18, #19)
+
+Capture stores the viewer canvas, including overlays, and transforms raw values and uncertainty into the same orientation. A separate flattened export would lose further measurement support; storing an unrotated thermal frame beside a rotated image would violate the existing PNG dimension contract. Both remain native resolution, with host correction metadata separate from raw data. Reopening creates fresh measurement objects and restores correction, while the original captured image remains available in gallery previews and downloads.
+
+The host injects a photo-library interface. Its initial implementation uses IndexedDB for bounded individual photo files in browser and desktop app profiles, with downloads for backup. It does not add a partial recording subsystem: #19 still owns crash-safe streamed recording storage, `packages/media`, video and annotations. The shared UI does not select a storage backend.

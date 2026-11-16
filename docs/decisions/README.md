@@ -75,3 +75,4 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [Capture ownership follows the current preload session](architecture.md#capture-ownership-follows-the-current-preload-session) | [architecture.md](architecture.md) | decided (#17) |
 | [Brand marks use outlined SVG letters](architecture.md#brand-marks-use-outlined-svg-letters) | [architecture.md](architecture.md) | decided (#17) |
 | [Viewer measurements use image-relative coordinates and explicit host edits](architecture.md#viewer-measurements-use-image-relative-coordinates-and-explicit-host-edits) | [architecture.md](architecture.md) | decided (#18) |
+| [Thermal photo capture uses matching oriented pixels and injected local storage](architecture.md#thermal-photo-capture-uses-matching-oriented-pixels-and-injected-local-storage) | [architecture.md](architecture.md) | decided (#18, #19) |
