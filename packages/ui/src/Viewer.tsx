@@ -1,0 +1,525 @@
+import { useEffect, useRef, useState } from 'react';
+import {
+  PALETTES,
+  rangeProblems,
+  type CameraBackend,
+  type CameraProfile,
+  type CameraSession,
+  type RawFrame,
+  type VideoMode,
+} from '@irvis/core';
+import { Icon } from './Icon.tsx';
+import { FrameRenderer, type ViewSettings } from './render.ts';
+
+export interface ViewerProps {
+  backend: CameraBackend;
+  profile: CameraProfile;
+  /** Only supply when the backend actually implements command dispatch. */
+  captureError?: string;
+  command?: (id: string) => Promise<void>;
+}
+export function Viewer({ backend, profile, command, captureError = '' }: ViewerProps) {
+  const [devices, setDevices] = useState<readonly { id: string; label: string }[]>([]);
+  const [device, setDevice] = useState('');
+  const [modeId, setModeId] = useState(profile.videoModes.find((m) => m.layout)?.id ?? '');
+  const [session, setSession] = useState<CameraSession | null>(null);
+  const [hasFrame, setHasFrame] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [confirmed, setConfirmed] = useState(false);
+  const [orientationLock, setOrientationLock] = useState(false);
+  const [rangeMode, setRangeMode] = useState('auto');
+  const [lower, setLower] = useState('20');
+  const [upper, setUpper] = useState('40');
+  const [zoom, setZoom] = useState('1');
+  const [settings, setSettings] = useState<ViewSettings>({
+    palette: 'iron',
+    range: null,
+    locked: false,
+    rotation: 0,
+    mirrorX: false,
+    mirrorY: false,
+    smooth: false,
+    uncertain: false,
+    gain: 'high',
+  });
+  const canvas = useRef<HTMLCanvasElement>(null),
+    scale = useRef<HTMLCanvasElement>(null);
+  const bounds = useRef<HTMLOutputElement>(null),
+    warning = useRef<HTMLParagraphElement>(null);
+  const current = useRef(settings);
+  const latest = useRef<{ frame: RawFrame; mode: VideoMode } | null>(null);
+  const active = useRef<CameraSession | null>(null);
+  const generation = useRef(0);
+  useEffect(() => {
+    current.current = settings;
+  }, [settings]);
+  useEffect(() => {
+    let alive = true;
+    void backend
+      .listDevices()
+      .then((list) => {
+        if (alive) {
+          setDevices(list);
+          setDevice(list[0]?.id ?? '');
+        }
+      })
+      .catch((e) => {
+        if (alive) setError(String(e));
+      });
+    return () => {
+      alive = false;
+      generation.current++;
+      void active.current?.close().catch(() => {});
+      active.current = null;
+    };
+  }, [backend]);
+  useEffect(() => {
+    if (!canvas.current || !scale.current || !bounds.current || !warning.current) return;
+    const renderer = new FrameRenderer(
+      canvas.current,
+      scale.current,
+      bounds.current,
+      warning.current,
+    );
+    let previousFrame = latest.current;
+    let previousSettings = current.current;
+    let request = 0;
+    const draw = () => {
+      const value = latest.current;
+      if (value && (value !== previousFrame || previousSettings !== current.current)) {
+        try {
+          renderer.draw(value.frame, profile, value.mode, current.current);
+        } catch (e) {
+          setError(String(e));
+        }
+        previousFrame = value;
+        previousSettings = current.current;
+      }
+      request = requestAnimationFrame(draw);
+    };
+    request = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(request);
+  }, [profile]);
+  useEffect(() => {
+    if (!session) return;
+    let received = false;
+    return session.frames.subscribe((frame) => {
+      if (!received) {
+        received = true;
+        setHasFrame(true);
+      }
+      latest.current = { frame, mode: session.mode };
+    });
+  }, [session]);
+  async function connect() {
+    const token = ++generation.current;
+    setBusy(true);
+    setError('');
+    setHasFrame(false);
+    setConfirmed(false);
+    if (backend.id === 'browser') setSettings((s) => ({ ...s, gain: 'high' }));
+    try {
+      const opened = await backend.open({ deviceId: device, profile, modeId });
+      if (token !== generation.current) {
+        await opened.close();
+        return;
+      }
+      active.current = opened;
+      setSession(opened);
+    } catch (e) {
+      if (token === generation.current) setError(String(e));
+    } finally {
+      if (token === generation.current) setBusy(false);
+    }
+  }
+  async function stop() {
+    generation.current++;
+    setBusy(false);
+    const opened = active.current;
+    active.current = null;
+    setSession(null);
+    try {
+      await opened?.close();
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+  const range = { minCelsius: Number(lower), maxCelsius: Number(upper) };
+  const invalid = lower.trim() === '' || upper.trim() === '' || rangeProblems(range).length > 0;
+  const update = (patch: Partial<ViewSettings>) => setSettings((s) => ({ ...s, ...patch }));
+  const gains = profile.state.find((f) => f.id === 'gain');
+  const gainOptions = gains?.kind === 'enum' ? gains.values : ['high', 'low'];
+  const failure = error || captureError;
+  return (
+    <section aria-label="Thermal viewer" className="viewer">
+      <div className="viewer-topbar">
+        <div>
+          <span className="eyebrow">WORKSPACE</span>
+          <h2>
+            Live view{' '}
+            <span className={`status-badge ${session && hasFrame && !failure ? 'is-live' : ''}`}>
+              <i />
+              {failure
+                ? 'Capture error'
+                : busy
+                  ? 'Connecting'
+                  : session
+                    ? hasFrame
+                      ? backend.id === 'replay'
+                        ? 'Demo running'
+                        : 'Live'
+                      : 'Waiting for frames'
+                    : hasFrame
+                      ? 'Paused'
+                      : 'Ready'}
+            </span>
+          </h2>
+        </div>
+        <div className="transport">
+          <span className="source-note">
+            {backend.id === 'replay' ? 'Synthetic scene · no camera needed' : profile.name}
+          </span>
+          <button
+            className="primary-button"
+            disabled={busy || !!session || !device || !modeId}
+            onClick={() => void connect()}
+          >
+            <Icon name="play" />
+            Start
+          </button>
+          <button className="stop-button" disabled={!busy && !session} onClick={() => void stop()}>
+            <Icon name="stop" />
+            Stop
+          </button>
+        </div>
+      </div>
+      <div className="workspace-grid">
+        <div className="preview-column">
+          <div className="preview-card">
+            <div className="preview-meta">
+              <span>
+                {backend.id === 'replay' ? 'DEMO' : 'THERMAL'}
+                <span className="meta-divider">/</span>
+                {profile.sensor.width} × {profile.sensor.height}
+              </span>
+              <span>
+                {settings.smooth ? 'Smooth' : 'Clear'} · {settings.rotation}°
+              </span>
+            </div>
+            <div className={`view-stage ${hasFrame ? 'has-frame' : ''}`}>
+              <canvas
+                ref={canvas}
+                aria-label="Thermal image"
+                style={{
+                  width: `${Number(zoom) * 100}%`,
+                  height: `${Number(zoom) * 100}%`,
+                  maxWidth: Number(zoom) > 1 ? 'none' : '100%',
+                }}
+              />
+              {!hasFrame && (
+                <div className="empty-view">
+                  <span className="empty-icon">
+                    <Icon name="image" />
+                  </span>
+                  <h3>
+                    {busy || session ? 'Waiting for the first frame' : 'A different way to see'}
+                  </h3>
+                  <p>
+                    {backend.id === 'replay'
+                      ? 'Explore the thermal viewer with a synthetic scene.'
+                      : 'Connect your camera and start a thermal view.'}
+                  </p>
+                  <span>{busy || session ? 'Capture is starting…' : 'Press Start to begin'}</span>
+                </div>
+              )}
+            </div>
+            <div className="scale-strip">
+              <canvas ref={scale} aria-label="Temperature scale" className="temperature-scale" />
+              <div className="scale-caption">
+                <output ref={bounds} aria-label="Colour bounds">
+                  Waiting for frames
+                </output>
+                <span>
+                  {settings.locked
+                    ? 'Locked scale'
+                    : rangeMode === 'manual'
+                      ? 'Manual range'
+                      : 'Auto range'}{' '}
+                  · °C
+                </span>
+              </div>
+            </div>
+          </div>
+          {failure && (
+            <p className="notice error-notice" role="alert">
+              {failure}
+            </p>
+          )}
+          <p ref={warning} className="notice" role="status" />
+          <div className="preview-toolbar">
+            <label className="zoom-control">
+              Scale
+              <select aria-label="Scale" value={zoom} onChange={(e) => setZoom(e.target.value)}>
+                <option value="0.5">50%</option>
+                <option value="1">Fit</option>
+                <option value="2">200%</option>
+              </select>
+            </label>
+            <div className="segmented" role="group" aria-label="Rendering">
+              {['Clear', 'Smooth'].map((value) => (
+                <button
+                  key={value}
+                  aria-pressed={settings.smooth === (value === 'Smooth')}
+                  onClick={() => update({ smooth: value === 'Smooth' })}
+                >
+                  {value}
+                </button>
+              ))}
+            </div>
+            <label className="switch-label">
+              <input
+                type="checkbox"
+                checked={settings.uncertain}
+                onChange={(e) => update({ uncertain: e.target.checked })}
+              />
+              <span>Uncertain pixels</span>
+            </label>
+          </div>
+          <nav className="tool-dock" aria-label="Tools">
+            {(['Measurement', 'Photo', 'Video', 'Gallery'] as const).map((name, i) => (
+              <button key={name} disabled title="Coming in a later update">
+                <Icon name={(['measure', 'photo', 'video', 'gallery'] as const)[i]!} />
+                <span>{name}</span>
+                <small>Soon</small>
+              </button>
+            ))}
+          </nav>
+        </div>
+        <aside className="settings-panel" aria-label="View settings">
+          <section className="settings-section">
+            <div className="section-heading">
+              <h3>Palette</h3>
+              <span>{PALETTES.find((p) => p.id === settings.palette)?.name}</span>
+            </div>
+            <div className="palette-grid" role="group" aria-label="Palette">
+              {PALETTES.map((p) => (
+                <button
+                  className="palette-choice"
+                  key={p.id}
+                  aria-pressed={settings.palette === p.id}
+                  onClick={() => update({ palette: p.id })}
+                >
+                  <span
+                    className="palette-swatch"
+                    style={{
+                      background: `linear-gradient(90deg, ${p.stops.map((s) => `rgb(${s.color.join(' ')}) ${(s.index / 255) * 100}%`).join(', ')})`,
+                    }}
+                  />
+                  <span>{p.name}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+          <section className="settings-section">
+            <div className="section-heading">
+              <h3>Temperature range</h3>
+              <span>°C</span>
+            </div>
+            <div className="segmented full-width" role="group" aria-label="Range mode">
+              {['auto', 'manual'].map((value) => (
+                <button
+                  key={value}
+                  aria-pressed={rangeMode === value}
+                  onClick={() => {
+                    setRangeMode(value);
+                    if (value === 'auto') update({ range: null });
+                    else if (!invalid) update({ range });
+                  }}
+                >
+                  {value === 'auto' ? 'Automatic' : 'Manual'}
+                </button>
+              ))}
+            </div>
+            {rangeMode === 'manual' ? (
+              <div className="manual-range">
+                <label>
+                  Lower bound (°C)
+                  <input type="number" value={lower} onChange={(e) => setLower(e.target.value)} />
+                </label>
+                <label>
+                  Upper bound (°C)
+                  <input type="number" value={upper} onChange={(e) => setUpper(e.target.value)} />
+                </label>
+                <button
+                  className="apply-button"
+                  disabled={invalid}
+                  onClick={() => update({ range })}
+                >
+                  Apply bounds
+                </button>
+                {invalid && (
+                  <p role="alert">Lower bound must be below upper bound; both must be finite.</p>
+                )}
+              </div>
+            ) : (
+              <p className="setting-help">Colours follow the scene’s temperature range.</p>
+            )}
+            <label className="switch-label">
+              <input
+                type="checkbox"
+                checked={settings.locked}
+                onChange={(e) => update({ locked: e.target.checked })}
+              />
+              <span>Lock scale</span>
+            </label>
+          </section>
+          <section className="settings-section">
+            <div className="section-heading">
+              <h3>Orientation</h3>
+              <Icon name="rotate" />
+            </div>
+            <div className="segmented full-width" role="group" aria-label="Rotation">
+              {[0, 90, 180, 270].map((r) => (
+                <button
+                  key={r}
+                  disabled={orientationLock}
+                  aria-pressed={settings.rotation === r}
+                  onClick={() => update({ rotation: r })}
+                >
+                  {r}°
+                </button>
+              ))}
+            </div>
+            <div className="orientation-toggles">
+              {(['mirrorX', 'mirrorY'] as const).map((key, i) => (
+                <label className="switch-label" key={key}>
+                  <input
+                    type="checkbox"
+                    checked={settings[key]}
+                    onChange={(e) => update({ [key]: e.target.checked })}
+                  />
+                  <span>{['Mirror horizontally', 'Mirror vertically'][i]}</span>
+                </label>
+              ))}
+              <label className="switch-label">
+                <input
+                  type="checkbox"
+                  checked={orientationLock}
+                  onChange={(e) => setOrientationLock(e.target.checked)}
+                />
+                <span>Lock orientation</span>
+              </label>
+            </div>
+          </section>
+          <details className="settings-disclosure">
+            <summary>Camera setup</summary>
+            <div className="connection">
+              {backend.id === 'electron' ? (
+                <label>
+                  Camera index
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={device}
+                    disabled={busy || !!session}
+                    onChange={(e) => setDevice(e.target.value)}
+                  />
+                </label>
+              ) : (
+                <label>
+                  Camera
+                  <select
+                    aria-label="Camera"
+                    value={device}
+                    disabled={busy || !!session}
+                    onChange={(e) => setDevice(e.target.value)}
+                  >
+                    {devices.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.label || d.id}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <label>
+                Video mode
+                <select
+                  aria-label="Video mode"
+                  value={modeId}
+                  disabled={busy || !!session}
+                  onChange={(e) => setModeId(e.target.value)}
+                >
+                  {profile.videoModes
+                    .filter((m) => m.layout)
+                    .map((m) => (
+                      <option key={m.id}>{m.id}</option>
+                    ))}
+                </select>
+              </label>
+            </div>
+          </details>
+          {backend.id === 'browser' && (
+            <section className="settings-section camera-state">
+              <h3>Camera state</h3>
+              <p className="setting-help">
+                {confirmed
+                  ? 'Camera mode declared by user.'
+                  : 'camera mode unknown, readings assume high gain'}
+              </p>
+              <p className="setting-help">
+                Factory settings are assumed. This does not send a command to the camera.
+              </p>
+              <label>
+                Declared gain
+                <select
+                  aria-label="Declared gain"
+                  value={settings.gain}
+                  onChange={(e) => {
+                    update({ gain: e.target.value });
+                    setConfirmed(true);
+                  }}
+                >
+                  {gainOptions.map((g) => (
+                    <option key={g}>{g}</option>
+                  ))}
+                </select>
+              </label>
+              <button className="apply-button" onClick={() => setConfirmed(true)}>
+                Confirm camera mode and factory settings
+              </button>
+            </section>
+          )}
+          <details className="settings-disclosure">
+            <summary>Camera commands</summary>
+            <div className="command-controls">
+              {profile.commands.map((c) => (
+                <button
+                  key={c.id}
+                  disabled={!session || !backend.capabilities.deviceControl || !command}
+                  onClick={() => {
+                    void command?.(c.id).catch((e) => setError(String(e)));
+                  }}
+                >
+                  {c.label}
+                </button>
+              ))}
+              {backend.id === 'browser' ? (
+                <p className="setting-help">
+                  available in the desktop app ·{' '}
+                  <a href="https://github.com/mateuszsikora/irvis/releases">Download desktop app</a>
+                </p>
+              ) : (
+                !backend.capabilities.deviceControl && (
+                  <p className="setting-help">Camera commands are unavailable in this backend.</p>
+                )
+              )}
+            </div>
+          </details>
+        </aside>
+      </div>
+    </section>
+  );
+}

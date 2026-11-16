@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node", "vitest"],
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "tsBuildInfoFile": "../../node_modules/.tsbuild/ui-test.tsbuildinfo"
+  },
+  "references": [{ "path": "./tsconfig.lib.json" }, { "path": "../core/tsconfig.lib.json" }],
+  "include": ["test", "vitest.config.ts"]
+}

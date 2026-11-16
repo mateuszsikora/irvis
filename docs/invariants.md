@@ -192,3 +192,21 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
 - **42.** The P2 Pro high-gain recording suggestion rounds twice the measured scene noise upward to whole raw units; profile recording thresholds fit the codec's integer range 0–32767.
   - `packages/core/src/cameras/infiray-p2pro/profile.test.ts::infiray-p2pro profile::derives the recording threshold from twice the measured scene noise`
   - `packages/core/src/cameras/validate.test.ts::validateProfile::rejects recording thresholds outside the codec range`
+
+- **43.** Viewer manual colour bounds must be finite and ordered; invalid edits cannot be applied.
+  - `packages/ui/test/viewer.test.tsx::Viewer::offers six palettes and rejects reversed manual bounds`
+- **44.** Scale lock holds colour bounds across scene changes, and uncertain pixels do not determine automatic bounds.
+  - `packages/ui/test/render.test.ts::FrameRenderer::holds locked bounds across changing scenes and marks uncertain pixels`
+
+- **45.** Closing an obsolete Electron capture session cannot stop a newer session, including across adapter instances.
+  - `apps/web/src/viewer-session.test.tsx::viewer sessions::keeps the newer Electron capture running after Start Stop Start with a delayed open`
+  - `apps/web/src/viewer-backend.test.ts::viewer backend::isolates capture ownership across adapter instances and drops obsolete errors`
+- **46.** Retrying capture clears the old error and ignores later errors from closed browser sessions.
+  - `apps/web/src/viewer-session.test.tsx::viewer sessions::clears capture errors on retry and ignores errors from the closed browser session`
+
+- **47.** After Stop, display settings redraw the retained frame without restarting capture.
+  - `packages/ui/test/viewer.test.tsx::Viewer::redraws the retained frame when settings change after Stop`
+
+- **48.** Pending capture errors belong to the mounted source and profile; changing either isolates the new view from old errors without suppressing current errors.
+  - `apps/web/src/viewer-session.test.tsx::viewer sessions::ignores pending capture errors after switching to Demo and back before starting again`
+  - `apps/web/src/viewer-session.test.tsx::viewer sessions::isolates pending errors when the camera profile changes and still reports current errors`

@@ -55,6 +55,12 @@ try {
   await page.reload();
   await page.waitForSelector('h1');
   assert.equal(await page.locator('h1').textContent(), 'irvis');
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
+  await page.waitForFunction(() =>
+    document.querySelector('[aria-label="Colour bounds"]')?.textContent.includes('°C'),
+  );
+  await page.getByRole('button', { name: 'Stop', exact: true }).click();
+  await page.locator('summary').filter({ hasText: 'Capture diagnostics' }).click();
   assert.equal(await page.evaluate(() => typeof window.irvisDesktop.start), 'function');
   assert.equal(await page.evaluate(() => typeof window.require), 'undefined');
   const prefs = await app.evaluate(({ BrowserWindow }) =>
@@ -141,6 +147,7 @@ try {
     assert.equal(dump.pair.metrics.exactMatch, 1);
     assert.equal(dump.reference.data.length, 256 * 384 * 2);
     await page.reload();
+    await page.locator('summary').filter({ hasText: 'Capture diagnostics' }).click();
     await waitUntil(() => !alive(firstPid), 'Reload left the previous ffmpeg process running');
     assert.equal(
       await page.getByRole('button', { name: 'Start reference', exact: true }).isEnabled(),

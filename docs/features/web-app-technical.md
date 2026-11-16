@@ -28,7 +28,7 @@ Scripts in `apps/web/package.json`: `dev` (`vite`), `build` (`vite build`), `pre
 
 | Setting | Value | Why |
 | --- | --- | --- |
-| `base` | `'/'` | Netlify serves the site from the root, and Electron will serve the same files from `app://irvis/` |
+| `base` | `'/'` | Netlify serves the site from the root, and Electron serves the same files from `app://irvis/` |
 | `plugins` | `@vitejs/plugin-react` | JSX and React Fast Refresh in `dev` |
 | `build.outDir` | `dist` (emptied first) | What Netlify publishes |
 | `test` | project `web`, environment `jsdom`, files `src/**/*.test.{ts,tsx}` | Read by Vitest ([testing guide](../guides/testing.md#react-component-tests)) |
@@ -77,3 +77,21 @@ Not covered: `main.tsx`, the production build (CI runs `npm run build` but check
 ## Desktop comparison panel
 
 `Diagnostics.tsx` passes its selected profile mode and latest running browser analysis to `Comparison.tsx`. The optional preload bridge reveals the desktop-only comparison panel. Mode changes unmount the old panel and stop reference capture; starting/stopping browser diagnostics remains independent. Simulation and live comparison, bounded reports and frame-pair downloads are described in [Electron backend](backend-electron-technical.md). The common build still runs without the preload in ordinary browsers.
+
+## Viewer integration
+
+`App.tsx` mounts a keyed `SourceViewer` wrapping `@irvis/ui` above a collapsible Capture diagnostics panel. Demo is the default and uses `@irvis/backend-replay`. Source and profile changes remount the viewer to release its session. `viewer-backend.ts` selects Electron at runtime when `desktopBridge()` exists; otherwise browser capture uses `startDiagnostics` and forwards its planar frames. The existing bridge supplies exact YUYV frames. The adapter advertises no device control because neither current capture API dispatches profile commands. Electron accepts a numeric Camera index (default 0); browser lists media devices plus Default camera, which can prompt permission on Start. Capture failures are shown in the app alert. One Vite build serves both environments. Stop the viewer before starting diagnostics on the same device.
+
+Shared controls and limitations: [viewer user guide](ui-user.md) and [technical details](ui-technical.md). Viewer styles live in `src/viewer.css`.
+
+`src/viewer-backend.test.ts` verifies runtime backend selection, frame forwarding and idempotent bridge cleanup. The desktop smoke test also starts and stops the synthetic viewer before checking diagnostics.
+
+## Session ownership and errors
+
+`viewer-backend.ts` tracks a capture owner token in a WeakMap keyed by the preload bridge, shared across adapter instances. Only the current owner may forward frames/errors or issue global `bridge.stop()`. Closing an obsolete pending open removes its listener without stopping newer capture. Browser callbacks also check whether their session has closed. Each new open clears the capture error before starting. `SourceViewer` in `App.tsx` owns the backend and capture error state and passes that error into the viewer for an inline alert and Capture error status. It is keyed by source and profile, so changing either creates independent error state. Its unmount cleanup invalidates the error callback even while `bridge.start()` is unresolved. Late open results are still closed by the viewer generation check; the adapter ownership check still prevents that close from stopping newer capture.
+
+`src/viewer-session.test.tsx` covers Start → Stop → Start with a delayed first Electron open and error recovery for browser capture. It also covers pending errors after switching to Demo and back without a new open, profile changes during open, eventual old-session cleanup, and delivery of current-profile errors. `src/viewer-backend.test.ts` additionally tests ownership across separate adapter instances and ignored obsolete errors.
+
+## Brand assets
+
+`src/brand/mark.svg` contains the compact `ir` mark; `src/brand/wordmark.svg` contains the full `irvis` wordmark. Both use outlined vector letters and an asymmetric rounded silhouette. The compact `ir` is dark ink `#291a0f` on amber `#ffb066`; the full wordmark retains that mark and adds ivory `vis` (`#f3eee8`) directly on a transparent background, for dark surfaces. `src/brand/wordmark-badge.svg` preserves the enclosed charcoal `#202126` variant for light, photographic or otherwise variable backgrounds; it is a reusable source asset, not the header default. No installed font or raster image is required. `App.tsx` uses a picture in the level-one heading: the wordmark is 115.5 × 44 CSS pixels normally and the compact mark is 40 × 40 pixels at viewport widths up to 480 px. A visually hidden `irvis` label keeps the heading accessible; the picture is decorative. `index.html` references the compact SVG as its favicon, and Vite emits the asset in the build.

@@ -453,3 +453,29 @@ of the current writer; encoder tuning may still change within the error bound.
 **Rejected:** waiting for every future UI setting before freezing a generic
 JSON container, or declaring that a stationary capture proves motion search
 cannot improve moving-camera recordings.
+
+## The viewer adapts existing capture APIs and locks an explicit angle
+
+Status: decided (#17)
+
+The shared React viewer consumes CameraBackend subscriptions. The web composition layer adapts the existing browser diagnostic stream and Electron preload capture stream; replay supplies an independent synthetic source. Neither existing capture bridge offers command dispatch, so capability gating keeps hardware controls disabled until that API exists. A source switch closes the prior session.
+
+Desktop/browser orientation lock holds an explicitly selected rotation, since these environments do not share Android's orientation lifecycle. Clear and Smooth use standard browser interpolation; the unknown vendor TisoView algorithm is not reproduced.
+
+**Rejected:** duplicating privileged capture APIs in the UI and claiming vendor-equivalent smoothing without evidence.
+
+## Capture ownership follows the current preload session
+
+Status: decided (#17)
+
+The Electron preload exposes global start and stop operations. The web adapter assigns an owner token per bridge, shared across adapter instances, so closing a late result from a cancelled open cannot stop a newer capture. Frames and asynchronous errors use the same ownership check. Retrying clears the previous capture error before opening. Error state additionally belongs to a keyed source/profile component, whose unmount cleanup invalidates the callback even before an open returns a session. This keeps pending camera errors out of Demo and newly selected profiles, without relying on another Electron capture to supersede the old bridge owner.
+
+**Rejected:** letting every session invoke global stop, which creates a race during Start → Stop → Start. Disabling Start until an old IPC promise settles would avoid overlap in one component but would not cover adapter replacement on source changes.
+
+## Brand marks use outlined SVG letters
+
+Status: decided (#17)
+
+The compact `ir` mark and full `irvis` wordmark share the amber `ir` silhouette and custom outlined letters. The header wordmark adds ivory `vis` directly on the dark app background, without a surrounding capsule, to distinguish infrared (`ir`) from visualization (`vis`) without losing contrast. An enclosed charcoal variant is retained for variable backgrounds. The transparent header version avoids making the brand resemble an interactive button. SVG preserves sharp edges at small UI sizes and avoids installed-font differences. The full mark replaces the separate icon and text in the header; the compact version serves narrow screens and the favicon.
+
+**Rejected:** raster logo assets and live text inside the SVG, because they respectively lose resolution independence and depend on font availability.

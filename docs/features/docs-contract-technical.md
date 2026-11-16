@@ -245,3 +245,5 @@ Rule F6 owns `packages/backend-browser/` and requires its user or technical feat
 - [Invariants](../invariants.md)
 
 The ownership map includes F7 for `apps/desktop/` and F8 for `packages/backend-electron/`; each requires its corresponding desktop or backend-electron feature document.
+
+Rules F9 and F10 own `packages/backend-replay/` and `packages/ui/` respectively, requiring their paired feature documentation. Tests remain excluded by the shared test-path rules.
