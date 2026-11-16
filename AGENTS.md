@@ -39,6 +39,7 @@ Every commit and pull request that changes behaviour lands its documentation in 
 | any other path that no rule owns (new code) | new `docs/features/<feature>-user.md` and `-technical.md`, and a rule for the path in `RULES`, `docs/features/README.md` and this table | F0 |
 
 - Test files and bumps of an Action, a hook or a dependency version need no documentation. Neither do `docs/`, this file, `CONTRIBUTING.md`, the PR template and `.agents/` or `.claude/`; the full list is in [docs/features/README.md](docs/features/README.md#left-out-on-purpose).
+- For the cross-runtime parity scenario or its comparison contract, run `npm run test:parity` with Playwright Chromium/WebKit installed and a display for Electron.
 - For media storage, recording or export, run `node packages/media/test/browser.mjs` with Playwright Chromium installed and ffprobe on PATH.
 - Verify with `npm run docs-check` before finishing. `SKIP_DOCS_CHECK=1` works only locally; CI ignores it.
 - Planned work, milestones and acceptance criteria: [docs/roadmap.md](docs/roadmap.md); read it before starting a milestone PR. It is a plan, not a description of the code.

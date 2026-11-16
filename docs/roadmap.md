@@ -149,7 +149,7 @@ Targets for the reconstruction (from the specification): Y matches the low bytes
 | [#20](https://github.com/mateuszsikora/irvis/issues/20) | The browser and desktop backends completed, ffmpeg arguments per system |
 | [#21](https://github.com/mateuszsikora/irvis/issues/21) | Playwright runs the same fixtures through `backend-replay` in Chromium, WebKit and Electron; readings are bit-identical with Node |
 
-**Acceptance (from the specification):** the same recorded frames in `fixtures/` give identical readings in both environments (exact path). #21 automates this. It covers the exact path, the UI wiring and the differences between V8 and JavaScriptCore, not the real camera backends; the spikes and the M5 checklist cover those.
+**Acceptance (from the specification):** the same recorded frames in `fixtures/` give identical readings in both environments (exact path). #21 automates this with `npm run test:parity` ([coverage and exclusions](guides/testing.md#cross-runtime-acceptance-21)). It covers the exact path, the UI wiring and the differences between V8 and JavaScriptCore, not the real camera backends; the spikes and the M5 checklist cover those.
 
 **Owner:** Android feature list accepted in #11; the [catalogue and evidence](findings/android-app.md) are the reference for M4/M5.
 

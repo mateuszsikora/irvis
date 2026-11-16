@@ -161,3 +161,7 @@ Photo library tests use the development-only `fake-indexeddb` dependency to exer
 ## Media package
 
 The solution includes `packages/media`, a DOM-capable npm workspace for recording storage and MP4 export. UI and web reference its declaration build. Mediabunny is an MPL-2.0 dependency used without source changes. Only media's TypeScript projects use `skipLibCheck` to avoid duplicate transitive WebCodecs/DOM declarations; source checking remains strict.
+
+### Cross-runtime acceptance
+
+`npm run test:parity` runs the separate Vitest/Playwright Node, Chromium, WebKit and Electron comparison. Install browsers with `npx playwright install chromium webkit` first; see [the testing guide](testing.md#cross-runtime-acceptance-21) for system dependencies, exact comparison semantics and scope. This command is a local acceptance check and is not currently run by CI.

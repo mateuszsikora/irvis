@@ -528,3 +528,13 @@ Status: decided (#20)
 The desktop backend reuses the spike protocol and macOS IOKit helper. It preserves raw TPD fields and sensor bytes under `usb-` names instead of treating them as calibrated correction parameters. Only gain has an established enum mapping. Failed USB access leaves video usable; commands report unavailable. Ambiguous USB matches are rejected instead of selecting the first device.
 
 **Rejected:** decoding cur_vtemp or emissivity into physical units before their scaling and effect on thermal pixels are established.
+
+## Cross-runtime acceptance uses the frozen recording and an isolated Electron shell
+
+Status: decided (#21)
+
+`npm run test:parity` computes a fresh Vitest Node reference from the committed lossless recording, then compares the same replay scenario in Chromium, WebKit and Electron. JSON encodes numeric values as binary64 bits so negative zero, non-finite values and last-bit differences cannot disappear during serialization. Every output in the current scenario belongs to the exact arithmetic contract; there are no tolerance exceptions. The actual React viewer receives each decoded frame through the replay backend, and Playwright checks its visible tracking readouts in all three units.
+
+The Electron test shell loads the same Vite-served modules with sandbox and context isolation enabled. This keeps engine and UI parity independent of platform camera setup. The production shell, preload and packaged assets remain the responsibility of `npm run test:desktop`. The matrix is a separate explicit acceptance command because WebKit system libraries and an Electron display are additional requirements beyond the default Node suite.
+
+**Rejected:** comparing only formatted UI temperatures, because rounding would hide arithmetic differences. **Rejected:** treating identical Node and Electron results alone as cross-engine evidence, because both use V8; WebKit supplies JavaScriptCore. **Rejected:** making the reference a generated golden JSON committed to git, because a fresh Node reference tests engine parity while the existing core fixture tests independently pin decoding correctness.

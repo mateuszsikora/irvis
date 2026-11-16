@@ -275,3 +275,6 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
   - `packages/ui/test/render.test.ts::FrameRenderer::blocks missing or unknown camera gain without falling back to high`
 - **69.** Refreshing the camera list preserves an existing selection, otherwise selects the first available camera, or clears it when no cameras remain.
   - `packages/ui/test/viewer.test.tsx::Viewer::refreshes connected cameras while preserving or replacing the selection`
+
+- **70.** The recorded exact path preserves every raw value and reading between Node, Chromium, WebKit and Electron; the shared viewer displays the same min/max/centre readings in C, F and K.
+  - `packages/ui/test/parity/parity.integration.mjs::preserves exact recorded readings and viewer wiring across runtimes`
