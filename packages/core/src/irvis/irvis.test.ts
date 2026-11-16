@@ -171,6 +171,24 @@ describe('irvis round trip', () => {
     expect(reader.frameAt(1e9)).toBe(5);
   });
 
+  it('starts a keyframe after commands even when the recorded gain is unchanged', async () => {
+    const scene = staticScene({ width: 16, height: 8, frames: 2 });
+    const sink = new MemoryByteSink();
+    const writer = await IrvisWriter.create(sink, options(scene, 8));
+    await writer.appendFrame(
+      thermalFrame(scene, 0, {
+        cameraState: { origin: 'camera', values: { gain: 'high' } },
+      }),
+    );
+    const result = await writer.appendFrame(
+      thermalFrame(scene, 1, {
+        cameraState: { origin: 'camera', values: { gain: 'high', 'command-generation': 2 } },
+      }),
+    );
+    expect(result.chunk).toBe('camera-state');
+    await writer.close();
+  });
+
   it('starts a chunk at the start, every interval, after a gain, camera-state or conversion change and after a NUC', async () => {
     const scene = nucScene(30, 3, 200, small);
     const high: CameraStateSnapshot = {

@@ -78,3 +78,13 @@ The Camera selector lists backend devices in both environments. Profile command 
 ## Cross-runtime acceptance
 
 `npm run test:parity` drives the actual `Viewer` with recorded fixtures through `createReplayBackend` in Chromium, WebKit and Electron. Min/max/centre text in C, F and K is compared with the Node result, alongside full precision measurement parity through `openRecording`. The [testing guide](../guides/testing.md#cross-runtime-acceptance-21) defines coverage and exclusions.
+
+## Camera command controls
+
+`CameraControls.tsx` receives only the selected profile and an optional command dispatcher from `Viewer.tsx`. Browser buttons stay disabled even when a dispatcher is supplied. A synchronous ref guard and disabled buttons prevent overlapping UI requests; status shows `Waiting for camera confirmation…`, then `Camera command confirmed.` or the dispatch error. Desktop gain dispatch resolves only after matching readback.
+
+The P2 Pro panel distinguishes sensor gain from display range and vendor Auto/Manual range. Manual NUC (when absent from the profile), Auto/Manual sensor range and camera correction options stay disabled with explanations of missing protocol evidence. Software analysis corrections remain independent. Persistence is explicitly unverified. The renderer already selects conversion from camera readback; low/unknown gain has no conversion, so it produces neither readings nor new recording frames. A command-generation state change forces a keyframe when recording resumes; omitted low-gain frames cannot be recovered from the recording.
+
+`test/camera-controls.test.tsx` covers browser denial, unsupported NUC, pending requests, completion and errors. Hardware acceptance is tracked in the [M5 checklist](../findings/m5-checklist.md).
+
+The viewer advances `commandSession` on Start and Stop and includes it in the command panel's React key. Each connection therefore gets fresh status and pending state. Completion of a previous panel's asynchronous command cannot update the current panel. The viewer tests cover clearing a completed confirmation on Stop/Start and an old failure arriving while a new session's command is pending.

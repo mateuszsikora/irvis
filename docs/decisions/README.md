@@ -82,3 +82,4 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [Playback follows recorded correction until a host edit](architecture.md#playback-follows-recorded-correction-until-a-host-edit) | [architecture.md](architecture.md) | decided (#19) |
 | [Desktop state preserves unverified USB values](architecture.md#desktop-state-preserves-unverified-usb-values) | [architecture.md](architecture.md) | decided (#20) |
 | [Cross-runtime acceptance uses the frozen recording and an isolated Electron shell](architecture.md#cross-runtime-acceptance-uses-the-frozen-recording-and-an-isolated-electron-shell) | [architecture.md](architecture.md) | decided (#21) |
+| [Camera controls require readback and preserve unsupported states](architecture.md#camera-controls-require-readback-and-preserve-unsupported-states) | [architecture.md](architecture.md) | decided (#22) |

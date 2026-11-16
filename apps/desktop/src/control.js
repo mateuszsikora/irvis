@@ -53,6 +53,8 @@ export async function openControl(profile, helper) {
   let closing;
   let polling = false;
   let busy = false;
+  let commandPending = false;
+  let commandGeneration = 0;
   let closed = false,
     queue = Promise.resolve(),
     snapshot = { origin: 'assumed', values: {} };
@@ -72,6 +74,7 @@ export async function openControl(profile, helper) {
   async function readState() {
     const raw = await camera.state();
     const values = { gain: 'unknown' };
+    if (commandGeneration) values['command-generation'] = commandGeneration;
     for (const [key, value] of Object.entries(raw)) {
       if (
         key === 'gain'
@@ -111,27 +114,50 @@ export async function openControl(profile, helper) {
   }, 1000);
   return {
     get busy() {
-      return busy;
+      return busy || commandPending;
     },
     get snapshot() {
       return snapshot;
     },
     read: () => serial(readState),
-    command: (id) =>
-      serial(async () => {
-        const command = profile.commands.find((c) => c.id === id);
-        if (!command) throw new Error('Unknown camera command');
-        try {
-          await camera.ready();
-          for (const t of [command.transport, ...(command.followUp ?? [])]) {
-            if (t.kind !== 'vendor-control') throw new Error('Unsupported command transport');
-            await camera.transfer(t.requestType, t.request, t.value, t.index, Buffer.from(t.data));
+    async command(id) {
+      if (closed) throw new Error('Camera control is closed');
+      const command = profile.commands.find((c) => c.id === id);
+      if (!command) throw new Error('Unknown camera command');
+      if (commandPending) throw new Error('Camera command is already in progress');
+      commandPending = true;
+      try {
+        await serial(async () => {
+          // Never retain a pre-command gain if a write or its readback fails.
+          commandGeneration++;
+          snapshot = {
+            origin: 'camera',
+            values: { gain: 'unknown', 'command-generation': commandGeneration },
+          };
+          try {
+            await camera.ready();
+            for (const t of [command.transport, ...(command.followUp ?? [])]) {
+              if (t.kind !== 'vendor-control') throw new Error('Unsupported command transport');
+              await camera.transfer(
+                t.requestType,
+                t.request,
+                t.value,
+                t.index,
+                Buffer.from(t.data),
+              );
+            }
+            await camera.ready();
+          } finally {
+            await readState();
           }
-          await camera.ready();
-        } finally {
-          await readState();
-        }
-      }),
+          const expected = id === 'gain-high' ? 'high' : id === 'gain-low' ? 'low' : undefined;
+          if (expected && snapshot.values.gain !== expected)
+            throw new Error('Camera did not confirm the requested gain');
+        });
+      } finally {
+        commandPending = false;
+      }
+    },
     close() {
       if (closing) return closing;
       closed = true;
