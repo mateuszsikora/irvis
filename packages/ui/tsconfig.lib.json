@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": [],
+    "jsx": "react-jsx",
+    "composite": true,
+    "emitDeclarationOnly": true,
+    "rootDir": "src",
+    "outDir": "../../node_modules/.tsbuild/ui",
+    "tsBuildInfoFile": "../../node_modules/.tsbuild/ui.tsbuildinfo"
+  },
+  "references": [{ "path": "../core/tsconfig.lib.json" }],
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
+}

@@ -8,9 +8,21 @@
     "tsBuildInfoFile": "../../node_modules/.tsbuild/web/app.tsbuildinfo"
   },
   "references": [
-    { "path": "../../packages/core/tsconfig.lib.json" },
-    { "path": "../../packages/backend-browser/tsconfig.lib.json" },
-    { "path": "../../packages/backend-electron/tsconfig.lib.json" }
+    {
+      "path": "../../packages/core/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/backend-browser/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/backend-electron/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/backend-replay/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/ui/tsconfig.lib.json"
+    }
   ],
   "include": ["src"]
 }

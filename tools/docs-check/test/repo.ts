@@ -71,6 +71,9 @@ export function makeTemplate(): string {
   }
   for (const args of [
     ['init', '-q', '-b', 'main'],
+    // A template is copied immediately; background repacking can remove objects mid-copy.
+    ['config', 'gc.auto', '0'],
+    ['config', 'maintenance.auto', 'false'],
     ['add', '-A'],
     ['commit', '-q', '-m', 'base'],
     ['switch', '-q', '-c', 'feature'],

@@ -22,9 +22,11 @@ describe('App', () => {
       { id: 'b', name: 'Camera B' },
     ] as CameraProfile[];
     render(<App profiles={profiles} />);
-    expect(screen.getAllByRole('listitem').map((li) => li.textContent)).toEqual([
-      'Camera A',
-      'Camera B',
-    ]);
+    expect(
+      Array.from(
+        screen.getByLabelText('Camera profile').querySelectorAll('option'),
+        (option) => option.textContent,
+      ),
+    ).toEqual(['Camera A', 'Camera B']);
   });
 });

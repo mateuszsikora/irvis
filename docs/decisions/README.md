@@ -71,3 +71,6 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [PNG photos embed a lossless snapshot by default](architecture.md#png-photos-embed-a-lossless-snapshot-by-default) | [architecture.md](architecture.md) | decided (#15) |
 | [Recording defaults use twice the static scene noise](architecture.md#recording-defaults-use-twice-the-static-scene-noise) | [architecture.md](architecture.md) | decided (#16) |
 | [Version 1 freezes without motion vectors](architecture.md#version-1-freezes-without-motion-vectors) | [architecture.md](architecture.md) | decided (#16) |
+| [The viewer adapts existing capture APIs and locks an explicit angle](architecture.md#the-viewer-adapts-existing-capture-apis-and-locks-an-explicit-angle) | [architecture.md](architecture.md) | decided (#17) |
+| [Capture ownership follows the current preload session](architecture.md#capture-ownership-follows-the-current-preload-session) | [architecture.md](architecture.md) | decided (#17) |
+| [Brand marks use outlined SVG letters](architecture.md#brand-marks-use-outlined-svg-letters) | [architecture.md](architecture.md) | decided (#17) |

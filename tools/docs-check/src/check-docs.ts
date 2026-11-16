@@ -145,6 +145,20 @@ export const RULES: readonly Rule[] = [
       'Electron backend changed: update docs/features/backend-electron-technical.md (or docs/features/backend-electron-user.md)',
   },
   {
+    id: 'F9',
+    source: String.raw`^packages/backend-replay/`,
+    docs: String.raw`^docs/features/backend-replay-(user|technical)\.md$`,
+    message:
+      'Replay backend changed: update docs/features/backend-replay-technical.md (or docs/features/backend-replay-user.md)',
+  },
+  {
+    id: 'F10',
+    source: String.raw`^packages/ui/`,
+    docs: String.raw`^docs/features/ui-(user|technical)\.md$`,
+    message:
+      'Viewer UI changed: update docs/features/ui-technical.md (or docs/features/ui-user.md)',
+  },
+  {
     id: 'C2',
     source: String.raw`^\.github/(?!pull_request_template\.md$)`,
     docs: String.raw`^docs/guides/development\.md$`,
