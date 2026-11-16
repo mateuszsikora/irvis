@@ -22,6 +22,9 @@
     },
     {
       "path": "../../packages/ui/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/media/tsconfig.lib.json"
     }
   ],
   "include": ["src"]

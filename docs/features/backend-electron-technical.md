@@ -27,3 +27,9 @@ The web panel stores the first 100 measurement records per start, then stops app
 ## See also
 
 [Desktop technical details](desktop-technical.md), [M3 findings](../findings/m3.md).
+
+## Recording byte storage
+
+`createDesktopRecordingStorage` adapts the optional preload `recordingStorage` function to recording storage and core ByteSink/ByteSource. Append and flush allow one outstanding operation; calls resolve only after the main-process operation finishes. Reads are split into at most 4 MiB IPC requests. The main process owns paths and files. Close is idempotent after a successful close.
+
+Large appends (including a final index) are split into sequential 4 MiB IPC chunks while the sink remains busy. `apps/web/src/recording-storage.test.ts` checks chunking, overlapping-call rejection and idempotent close.

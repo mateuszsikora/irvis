@@ -3,6 +3,7 @@ import { analyze, geometry, type AnalysisSettings } from './measurements.ts';
 import {
   autoRange,
   exportRenderedPng,
+  type JsonValue,
   type ThermalFrame,
   type SnapshotOptions,
   correctFrame,
@@ -42,6 +43,7 @@ export interface ViewSettings {
 /** Mutable frame state belongs to the canvas subscription, never React state. */
 export class FrameRenderer {
   range: TemperatureRange = { minCelsius: 20, maxCelsius: 40 };
+  private recorded: { frame: ThermalFrame; options: SnapshotOptions } | null = null;
   private photo: { frame: ThermalFrame; options: SnapshotOptions } | null = null;
   private readouts: HTMLElement | undefined;
   private onAlarm: ((active: boolean) => void) | undefined;
@@ -70,6 +72,7 @@ export class FrameRenderer {
   }
   draw(input: RawFrame, profile: CameraProfile, mode: VideoMode, settings: ViewSettings) {
     this.photo = null;
+    this.recorded = null;
     if (settings.alarmGeneration !== this.alarmGeneration) {
       this.alarmState = null;
       this.alarmGeneration = settings.alarmGeneration;
@@ -248,7 +251,23 @@ export class FrameRenderer {
         },
       },
     };
+    this.recorded = {
+      frame: structuredClone(thermal),
+      options: {
+        ...this.photo.options,
+        viewState: {
+          ...this.photo.options.viewState,
+          rotation: settings.rotation,
+          mirrorX: settings.mirrorX,
+          mirrorY: settings.mirrorY,
+          analysis: JSON.parse(JSON.stringify(analysis ?? null)) as JsonValue,
+        },
+      },
+    };
     this.bounds.textContent = `${formatTemperature(this.range.minCelsius, analysis?.unit ?? 'C')} — ${formatTemperature(this.range.maxCelsius, analysis?.unit ?? 'C')}`;
+  }
+  recordingFrame() {
+    return this.recorded;
   }
   capturePhoto(): Promise<Uint8Array> {
     const photo = this.photo;

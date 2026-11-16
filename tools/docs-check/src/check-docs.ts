@@ -159,6 +159,13 @@ export const RULES: readonly Rule[] = [
       'Viewer UI changed: update docs/features/ui-technical.md (or docs/features/ui-user.md)',
   },
   {
+    id: 'F11',
+    source: String.raw`^packages/media/`,
+    docs: String.raw`^docs/features/media-(user|technical)\.md$`,
+    message:
+      'Media changed: update docs/features/media-technical.md (or docs/features/media-user.md)',
+  },
+  {
     id: 'C2',
     source: String.raw`^\.github/(?!pull_request_template\.md$)`,
     docs: String.raw`^docs/guides/development\.md$`,

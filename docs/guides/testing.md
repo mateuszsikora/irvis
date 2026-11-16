@@ -85,3 +85,9 @@ describe('App', () => {
 
 - [Development guide](development.md): setup and CI.
 - [Technical document of the documentation contract](../features/docs-contract-technical.md#tests): what the tests cover and what they do not.
+
+## Media browser integration
+
+Run `node packages/media/test/browser.mjs` from the repository root after `npx playwright install chromium`. It needs ffprobe on PATH and an unused localhost port 4179. The script starts Vite, launches headless Chromium with a fake microphone, and drives recording → OPFS → playback/export → deletion plus capture → gallery → annotation/analysis. It inspects MP4 tracks with ffprobe and checks that the microphone tracks ended after Stop. Silent output has only video; microphone output includes AAC. The test uses a synthetic scene, not real hardware, and does not establish a crash-loss bound or Safari support.
+
+The media browser test also opens a two-frame file with a recorded correction change, adds measurements across forward/backward seeks, edits and deletes the selected point, and verifies distinct IDs and temperature readouts without duplicate React keys.

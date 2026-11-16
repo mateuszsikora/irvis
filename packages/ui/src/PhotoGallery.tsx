@@ -1,3 +1,4 @@
+import { PhotoAnnotations } from './PhotoAnnotations.tsx';
 import { useEffect, useState } from 'react';
 import type { PhotoLibrary, SavedPhoto } from './photos.ts';
 
@@ -39,6 +40,8 @@ export function PhotoGallery({
   revision: number;
   onOpen: (photo: SavedPhoto) => void;
 }) {
+  const [selected, setSelected] = useState('');
+  const [annotation, setAnnotation] = useState<SavedPhoto | null>(null);
   const [photos, setPhotos] = useState<SavedPhoto[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -81,14 +84,29 @@ export function PhotoGallery({
       </p>
       {error && <p role="alert">Gallery error: {error}</p>}
       {loading ? <p>Loading photos…</p> : photos.length === 0 ? <p>No saved photos.</p> : null}
+      {annotation && <PhotoAnnotations photo={annotation} />}
       <ul>
         {photos.map((photo) => (
-          <PhotoItem
-            key={photo.id}
-            photo={photo}
-            onOpen={() => onOpen(photo)}
-            onDelete={() => void remove(photo)}
-          />
+          <li key={photo.id}>
+            <label>
+              <input
+                type="radio"
+                name="selected-photo"
+                checked={selected === photo.id}
+                onChange={() => setSelected(photo.id)}
+              />
+              Select {photo.name}
+            </label>
+            <button onClick={() => setAnnotation(photo)}>Annotate {photo.name}</button>
+            <ul>
+              <PhotoItem
+                key={photo.id}
+                photo={photo}
+                onOpen={() => onOpen(photo)}
+                onDelete={() => void remove(photo)}
+              />
+            </ul>
+          </li>
         ))}
       </ul>
     </section>

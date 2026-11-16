@@ -1,0 +1,17 @@
+{
+  "name": "@irvis/media",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@irvis/core": "*",
+    "mediabunny": "^1.66.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.65.1",
+    "vite": "^8.3.8"
+  }
+}

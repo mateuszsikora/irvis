@@ -496,3 +496,27 @@ Status: decided (#18, #19)
 Capture stores the viewer canvas, including overlays, and transforms raw values and uncertainty into the same orientation. A separate flattened export would lose further measurement support; storing an unrotated thermal frame beside a rotated image would violate the existing PNG dimension contract. Both remain native resolution, with host correction metadata separate from raw data. Reopening creates fresh measurement objects and restores correction, while the original captured image remains available in gallery previews and downloads.
 
 The host injects a photo-library interface. Its initial implementation uses IndexedDB for bounded individual photo files in browser and desktop app profiles, with downloads for backup. It does not add a partial recording subsystem: #19 still owns crash-safe streamed recording storage, `packages/media`, video and annotations. The shared UI does not select a storage backend.
+
+## Recording queues drop thermal frames instead of growing
+
+Status: decided (#19)
+
+A live camera cannot wait for disk writes. The recorder accepts at most one cloned thermal frame while an append or flush is pending and drops subsequent submissions, retaining original timestamps. An unbounded promise queue was rejected because a slow disk would grow memory without limit. Audio cannot drop arbitrary container chunks: more than two pending audio chunks stop recording and reports an error instead. Roughly one-second flushes improve crash recovery but cannot guarantee durability while the operating system or storage is stalled.
+
+## Microphone audio uses a versioned sidecar
+
+Status: decided (#19)
+
+The frozen `.irvis` v1 binary format stays unchanged. Optional audio is recorded as `<recording-stem>.audio-v1.webm`, WebM/Opus from MediaRecorder, with `audio` metadata in the existing extensible header view state: `version: 1`, `file`, and `offsetMs: 0`. Microphone permission precedes thermal recording; its start and the first retained thermal frame are aligned approximately within acquisition/setup latency, not sample-accurately. Export decodes the sidecar and encodes AAC alongside the thermal video. A silent recording creates no audio track. An embedded binary audio record was rejected because it would change the frozen format. Raw downloads need the separate sidecar for audio; MP4 packages both.
+
+## MP4 export uses Mediabunny without modifying its source
+
+Status: decided (#19)
+
+Mediabunny supplies the MP4 muxer and WebCodecs encoding with awaited submissions. The installed dependency uses MPL-2.0; its source is unmodified and its licence is retained in the dependency. Export buffers the output in memory. A custom muxer was rejected because container correctness would require substantial independent implementation and validation.
+
+## Playback follows recorded correction until a host edit
+
+Status: decided (#19)
+
+Opening a recording resets host correction from validated file metadata; seeking and playback follow its accumulated correction changes. An explicit Apply correction or Reset parameters action overrides correction until the file is reopened. Always reapplying metadata would undo intentional analysis edits, while inheriting correction from the previous source would change readings merely because another recording had been opened first. Only correction draft fields are synchronized when the applied recorded correction changes so the controls describe the measurement actually shown. The measurement controls remain mounted: resetting the whole panel would reset its ID counter while existing measurement objects remain, creating duplicate identifiers and coupling their edits/deletion.

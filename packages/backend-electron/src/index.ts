@@ -10,6 +10,13 @@ export interface ReferenceFrame extends YuyvFrame {
   receivedAt: number;
 }
 export interface DesktopBridge {
+  recordingStorage?: (
+    op: string,
+    name?: string,
+    bytes?: Uint8Array,
+    offset?: number,
+    length?: number,
+  ) => Promise<unknown>;
   start(options: { profileId: string; modeId: string; device: number }): Promise<void>;
   stop(): Promise<void>;
   subscribe(frame: (value: ReferenceFrame) => void, error: (message: string) => void): () => void;
@@ -79,3 +86,5 @@ export function compare(
     planar,
   };
 }
+
+export { createDesktopRecordingStorage } from './recordings.ts';

@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "ESNext.Disposable"],
+    "types": ["node", "vitest"],
+    "noEmit": true,
+    "tsBuildInfoFile": "../../node_modules/.tsbuild/media-test.tsbuildinfo",
+    "skipLibCheck": true
+  },
+  "references": [
+    {
+      "path": "./tsconfig.lib.json"
+    },
+    {
+      "path": "../core/tsconfig.lib.json"
+    }
+  ],
+  "include": ["test", "vitest.config.ts"]
+}

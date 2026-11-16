@@ -397,3 +397,7 @@ is not covered.
 ### Rendered thermal photos
 
 `exportRenderedPng(frame, rgba, options)` accepts a caller-rendered RGBA image including overlays. Its dimensions must match the thermal frame; it throws `Rendered photo dimensions must match the thermal frame.` on a byte-count mismatch. It copies pixels and starts the lossless snapshot before yielding, preserving data when callers reuse their buffers. The PNG and private `irVs` format are unchanged. Callers must transform both image and thermal arrays together when rotating or mirroring. `export/export.test.ts` checks visible scanlines, raw round-trip, buffer reuse and validation.
+
+## Recording player contract
+
+`RecordingPlayer` in `src/player.ts` extends `Player` with the open `IrvisReader`, thermal-frame, recorded-view-state and error subscriptions, and `close`. The replay backend implements it; the web host injects its opener into UI. UI does not import backend packages.
