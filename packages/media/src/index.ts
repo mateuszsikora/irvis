@@ -92,7 +92,8 @@ export function createBrowserRecordingStorage(): RecordingStorage {
       return `${persistent ? 'Persistent storage enabled.' : 'Storage is not persistent; the browser may remove recordings.'} Estimated uncompressed capacity: ${seconds} seconds. Download backups.`;
     },
     async create(name) {
-      if (!/^[a-zA-Z0-9_.-]+\.(irvis|webm)$/.test(name)) throw new Error('Invalid recording name.');
+      if (!/^[a-zA-Z0-9_.-]+\.(irvis|webm|pcm)$/.test(name))
+        throw new Error('Invalid recording name.');
       if (opfs) return workerSink(name);
       if (memory.has(name)) throw new Error('Recording already exists.');
       const chunks: Uint8Array[] = [];
@@ -127,7 +128,9 @@ export function createBrowserRecordingStorage(): RecordingStorage {
       for await (const handle of entries.values()) {
         if (
           handle.kind === 'file' &&
-          (handle.name.endsWith('.irvis') || handle.name.endsWith('.webm'))
+          (handle.name.endsWith('.irvis') ||
+            handle.name.endsWith('.webm') ||
+            handle.name.endsWith('.pcm'))
         ) {
           const file = await handle.getFile();
           result.push({ name: file.name, source: fileByteSource(file) });

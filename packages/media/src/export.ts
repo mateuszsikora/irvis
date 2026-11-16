@@ -1,3 +1,4 @@
+import { alignAudio } from './audio-sidecar.ts';
 import { AudioBufferSource, BufferTarget, CanvasSource, Mp4OutputFormat, Output } from 'mediabunny';
 import { IrvisReader, type ByteSource, type ThermalFrame, type ViewStateValues } from '@irvis/core';
 
@@ -19,20 +20,34 @@ export async function exportMp4(
     sizeChangeBehavior: 'contain',
   });
   output.addVideoTrack(video, { frameRate: reader.header.fps });
+  const origin = reader.frames[0]!.timestamp;
+  const durationMs = reader.frames.at(-1)!.timestamp - origin + 1000 / reader.header.fps;
   let audioBuffer: AudioBuffer | undefined;
   const audioSource = audio ? new AudioBufferSource({ codec: 'aac', bitrate: 128000 }) : null;
   if (audioSource && audio) {
-    const context = new AudioContext({ sampleRate: 44100 });
-    try {
-      audioBuffer = await context.decodeAudioData(await audio.arrayBuffer());
-    } finally {
-      await context.close();
+    if (audio.type === 'application/x-irvis-audio') {
+      const aligned = alignAudio(new Uint8Array(await audio.arrayBuffer()), origin, durationMs);
+      const context = new OfflineAudioContext(1, Math.ceil(durationMs * 44.1), 44100);
+      const buffer = context.createBuffer(1, aligned.samples.length, aligned.sampleRate);
+      buffer.copyToChannel(aligned.samples, 0);
+      const source = context.createBufferSource();
+      source.buffer = buffer;
+      source.connect(context.destination);
+      source.start();
+      audioBuffer = await context.startRendering();
+    } else {
+      // Read compatibility for the initial version 1 WebM sidecars.
+      const context = new AudioContext({ sampleRate: 44100 });
+      try {
+        audioBuffer = await context.decodeAudioData(await audio.arrayBuffer());
+      } finally {
+        await context.close();
+      }
     }
     output.addAudioTrack(audioSource);
   }
   let view = reader.header.viewState;
   let changeIndex = 0;
-  const origin = reader.frames[0]!.timestamp;
   try {
     await output.start();
     if (audioSource && audioBuffer) {

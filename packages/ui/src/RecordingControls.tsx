@@ -20,7 +20,7 @@ export interface RecordingControlsProps {
   profile: CameraProfile;
   live: boolean;
   failure: string;
-  frame: () => { frame: ThermalFrame; options: SnapshotOptions } | null;
+  frame: () => { frame: ThermalFrame; options: SnapshotOptions; receivedAt?: number } | null;
   onExport: (
     file: RecordingFile,
     scale: number,
@@ -43,6 +43,7 @@ export function RecordingControls({
   const microphone = useRef<MicrophoneRecording | null>(null);
   const [autoExport, setAutoExport] = useState(false);
   const currentName = useRef('');
+  const startedAt = useRef(0);
   const [selected, setSelected] = useState('');
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [exportScale, setExportScale] = useState(1);
@@ -126,9 +127,10 @@ export function RecordingControls({
     const timer = setInterval(() => {
       const snapshot = getFrame.current();
       setElapsed((performance.now() - start) / 1000);
-      if (snapshot && snapshot.frame.timestamp !== previous) {
-        if (recorder.current?.append(snapshot.frame, snapshot.options.viewState))
-          previous = snapshot.frame.timestamp;
+      const timestamp = snapshot?.receivedAt ?? snapshot?.frame.timestamp ?? -Infinity;
+      if (snapshot && timestamp >= startedAt.current && timestamp !== previous) {
+        if (recorder.current?.append({ ...snapshot.frame, timestamp }, snapshot.options.viewState))
+          previous = timestamp;
       }
     }, 16);
     return () => clearInterval(timer);
@@ -139,9 +141,17 @@ export function RecordingControls({
     const token = ++startGeneration.current;
     setBusy(true);
     setError('');
+    const name = `irvis-${Date.now()}-${crypto.randomUUID()}.irvis`;
+    const audioName = name.replace(/\.irvis$/, '.audio-v2.pcm');
+    let started = false;
     try {
-      const name = `irvis-${Date.now()}-${crypto.randomUUID()}.irvis`;
-      const audioName = name.replace(/\.irvis$/, '.audio-v1.webm');
+      setNotice(
+        await storage.prepare(
+          profile.sensor.width * profile.sensor.height * 2 * (profile.videoModes[0]?.fps ?? 25) +
+            (audioEnabled ? 192000 * 4 : 0),
+        ),
+      );
+      startedAt.current = performance.now();
       if (audioEnabled)
         microphone.current = await startMicrophone(await storage.create(audioName), (e) => {
           setError(String(e));
@@ -161,7 +171,9 @@ export function RecordingControls({
           ...snapshot.options,
           viewState: {
             ...snapshot.options.viewState,
-            ...(audioEnabled ? { audio: { version: 1, file: audioName, offsetMs: 0 } } : {}),
+            ...(audioEnabled
+              ? { audio: { version: 2, file: audioName, clock: 'performance' } }
+              : {}),
           },
           width: snapshot.frame.width,
           height: snapshot.frame.height,
@@ -180,7 +192,7 @@ export function RecordingControls({
       }
       currentName.current = name;
       recorder.current = active;
-      active.append(snapshot.frame, snapshot.options.viewState);
+      started = true;
       setElapsed(0);
       setRecording(true);
     } catch (e) {
@@ -188,6 +200,10 @@ export function RecordingControls({
       microphone.current = null;
       setError(String(e));
     } finally {
+      if (!started) {
+        await storage.remove(name).catch(() => {});
+        await storage.remove(audioName).catch(() => {});
+      }
       setBusy(false);
     }
   }
@@ -406,8 +422,10 @@ export function RecordingControls({
                 void storage
                   ?.list()
                   .then(async (items) => {
-                    const audio = items.find(
-                      (f) => f.name === file.name.replace(/\.irvis$/, '.audio-v1.webm'),
+                    const audio = items.find((f) =>
+                      ['.audio-v2.pcm', '.audio-v1.webm'].some(
+                        (suffix) => f.name === file.name.replace(/\.irvis$/, suffix),
+                      ),
                     );
                     if (!audio) throw new Error('This recording has no microphone sidecar.');
                     await download(audio);
@@ -423,8 +441,10 @@ export function RecordingControls({
               onClick={() => {
                 void (async () => {
                   await storage?.remove(file.name);
-                  const audio = (await storage?.list())?.find(
-                    (item) => item.name === file.name.replace(/\.irvis$/, '.audio-v1.webm'),
+                  const audio = (await storage?.list())?.find((item) =>
+                    ['.audio-v2.pcm', '.audio-v1.webm'].some(
+                      (suffix) => item.name === file.name.replace(/\.irvis$/, suffix),
+                    ),
                   );
                   if (audio) await storage?.remove(audio.name);
                   await refresh();

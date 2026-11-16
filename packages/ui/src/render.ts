@@ -35,6 +35,7 @@ export interface ViewSettings {
   uncertain: boolean;
   gain: string;
   analysis?: AnalysisSettings;
+  receivedAt?: number;
   captureMetadata?: Pick<SnapshotOptions, 'profile' | 'fps' | 'path'>;
   /** Identity of the frame source; a new source starts without alarm hysteresis. */
   alarmGeneration?: number;
@@ -43,7 +44,8 @@ export interface ViewSettings {
 /** Mutable frame state belongs to the canvas subscription, never React state. */
 export class FrameRenderer {
   range: TemperatureRange = { minCelsius: 20, maxCelsius: 40 };
-  private recorded: { frame: ThermalFrame; options: SnapshotOptions } | null = null;
+  private recorded: { frame: ThermalFrame; options: SnapshotOptions; receivedAt: number } | null =
+    null;
   private photo: { frame: ThermalFrame; options: SnapshotOptions } | null = null;
   private readouts: HTMLElement | undefined;
   private onAlarm: ((active: boolean) => void) | undefined;
@@ -252,6 +254,7 @@ export class FrameRenderer {
       },
     };
     this.recorded = {
+      receivedAt: settings.receivedAt ?? thermal.timestamp,
       frame: structuredClone(thermal),
       options: {
         ...this.photo.options,

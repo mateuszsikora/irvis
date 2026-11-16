@@ -18,6 +18,7 @@ export async function createRecorder(
   let writer: IrvisWriter;
   try {
     writer = await IrvisWriter.create(sink, options);
+    await writer.flush();
   } catch (error) {
     await sink.close().catch(() => {});
     throw error;
@@ -26,20 +27,24 @@ export async function createRecorder(
   let stopped = false;
   let failure: unknown;
   let finishing: Promise<void> | undefined;
+  function fail(error: unknown) {
+    if (failure) return;
+    failure = error;
+    stopped = true;
+    onError(error);
+  }
   function run(operation: () => Promise<unknown>) {
+    const deadline = setTimeout(
+      () => fail(new Error('Recording storage is too slow; recording stopped.')),
+      1000,
+    );
     pending = operation()
-      .catch((error: unknown) => {
-        failure = error;
-        stopped = true;
-        onError(error);
-      })
+      .catch(fail)
       .finally(() => {
+        clearTimeout(deadline);
         pending = null;
       });
   }
-  const timer = setInterval(() => {
-    if (!pending && !stopped) run(() => writer.flush());
-  }, 1000);
   return {
     append(frame, view) {
       if (pending || stopped) return false;
@@ -48,13 +53,13 @@ export async function createRecorder(
       run(async () => {
         if (values) await writer.appendViewState(copy.timestamp, values);
         await writer.appendFrame(copy);
+        await writer.flush();
       });
       return true;
     },
     stop() {
       finishing ??= (async () => {
         stopped = true;
-        clearInterval(timer);
         await pending;
         try {
           if (failure)

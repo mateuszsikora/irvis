@@ -20,7 +20,7 @@ export function installRecordingStorage(ipcMain, directory, authorize) {
     }
   }
   function path(name) {
-    if (typeof name !== 'string' || !/^[a-zA-Z0-9_.-]+\.(irvis|webm)$/.test(name))
+    if (typeof name !== 'string' || !/^[a-zA-Z0-9_.-]+\.(irvis|webm|pcm)$/.test(name))
       throw new Error('Invalid recording name.');
     return join(directory, name);
   }
@@ -32,7 +32,7 @@ export function installRecordingStorage(ipcMain, directory, authorize) {
     if (token !== generation) throw new Error('Recording session closed.');
     if (op === 'list')
       return (await readdir(directory)).filter(
-        (name) => name.endsWith('.irvis') || name.endsWith('.webm'),
+        (name) => name.endsWith('.irvis') || name.endsWith('.webm') || name.endsWith('.pcm'),
       );
     const filename = path(name);
     if (op === 'size') return (await stat(filename)).size;

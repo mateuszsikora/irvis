@@ -255,3 +255,10 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
 
 - **63.** Recorded correction changes preserve measurement identities and their monotonic ID counter, so editing or deleting a selected object leaves other measurements intact.
   - `packages/ui/test/playback-correction.test.tsx::playback correction::preserves measurement identities and independent edits across recorded correction changes`
+
+- **64.** A recorder flushes each accepted frame before releasing backpressure; losing every unflushed byte preserves the preceding complete frames. A one-second stalled operation stops further submissions and cannot report successful finalization.
+  - `packages/media/test/recorder.test.ts::recorder::recovers the last durable frame when a crash discards the next unflushed write`
+  - `packages/media/test/recorder.test.ts::recorder::stops accepting frames after one second of stalled storage`
+- **65.** Audio packets align to thermal timestamps with pre-roll trimmed and gaps/end padded; incomplete or corrupt final packets do not invalidate earlier audio.
+  - `packages/media/test/audio-sidecar.test.ts::audio sidecar::aligns samples to the thermal clock, trimming pre-roll and padding gaps and the end`
+  - `packages/media/test/audio-sidecar.test.ts::audio sidecar::recovers all complete packets at every torn-write boundary and rejects corrupt tails`

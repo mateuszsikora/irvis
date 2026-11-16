@@ -501,13 +501,13 @@ The host injects a photo-library interface. Its initial implementation uses Inde
 
 Status: decided (#19)
 
-A live camera cannot wait for disk writes. The recorder accepts at most one cloned thermal frame while an append or flush is pending and drops subsequent submissions, retaining original timestamps. An unbounded promise queue was rejected because a slow disk would grow memory without limit. Audio cannot drop arbitrary container chunks: more than two pending audio chunks stop recording and reports an error instead. Roughly one-second flushes improve crash recovery but cannot guarantee durability while the operating system or storage is stalled.
+A live camera cannot wait for disk writes. The recorder accepts at most one cloned thermal frame while append/flush is pending and drops subsequent submissions, retaining host receipt timestamps. Each accepted frame is flushed before releasing the slot. A one-second append/flush deadline stops recording on stalled storage. This replaces idle-only periodic flushing, which could starve under continuous writes. An unbounded promise queue was rejected because a slow disk would grow both memory and the crash-loss window. The audio worklet permits at most two unacknowledged packets and stops capture on overflow. Filesystem flush/fsync is the durability boundary; the memory fallback explicitly offers no crash recovery.
 
 ## Microphone audio uses a versioned sidecar
 
 Status: decided (#19)
 
-The frozen `.irvis` v1 binary format stays unchanged. Optional audio is recorded as `<recording-stem>.audio-v1.webm`, WebM/Opus from MediaRecorder, with `audio` metadata in the existing extensible header view state: `version: 1`, `file`, and `offsetMs: 0`. Microphone permission precedes thermal recording; its start and the first retained thermal frame are aligned approximately within acquisition/setup latency, not sample-accurately. Export decodes the sidecar and encodes AAC alongside the thermal video. A silent recording creates no audio track. An embedded binary audio record was rejected because it would change the frozen format. Raw downloads need the separate sidecar for audio; MP4 packages both.
+The frozen `.irvis` v1 binary format stays unchanged. Optional audio uses `<recording-stem>.audio-v2.pcm`, timestamped mono PCM packets with a CRC and an extensible header view-state reference. [Audio sidecar version 2](../audio-sidecar-format.md) specifies the bytes, common host clock, queue bounds, recovery and AAC export. The viewer records camera receipt times on that clock, and export crops/pads audio against retained thermal timestamps. This replaces the initial MediaRecorder WebM/Opus implementation and guessed zero offset; version 1 sidecars remain readable for export. Raw PCM uses more storage but makes packet time and crash recovery explicit without depending on container chunk timing. A silent recording creates no audio track. An embedded binary audio record was rejected because it would change the frozen format. Raw backups need both files; MP4 packages both.
 
 ## MP4 export uses Mediabunny without modifying its source
 

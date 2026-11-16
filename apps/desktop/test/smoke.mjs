@@ -14,6 +14,9 @@ import assert from 'node:assert/strict';
 
 const dist = resolve('../web/dist');
 const video = resolve(dist, 'smoke.webm');
+const audioWorklet =
+  '/assets/' +
+  readdirSync(resolve(dist, 'assets')).find((name) => /^audio-worklet-.*\.js$/.test(name));
 const worker =
   '/assets/' + readdirSync(resolve(dist, 'assets')).find((name) => /^worker-.*\.js$/.test(name));
 execFileSync(
@@ -62,6 +65,35 @@ try {
   await page.reload();
   await page.waitForSelector('h1');
   assert.equal(await page.locator('h1').textContent(), 'irvis');
+  const audioSamples = await page.evaluate(async (url) => {
+    const context = new AudioContext();
+    try {
+      await context.audioWorklet.addModule(url);
+      const oscillator = context.createOscillator();
+      const node = new AudioWorkletNode(context, 'irvis-microphone');
+      oscillator.connect(node);
+      node.connect(context.destination);
+      const captured = new Promise((resolve, reject) => {
+        const timer = setTimeout(
+          () => reject(new Error('Packaged audio worklet did not run.')),
+          3000,
+        );
+        node.port.onmessage = ({ data }) => {
+          if (data.samples) {
+            clearTimeout(timer);
+            node.port.postMessage('ack');
+            resolve(data.samples.length);
+          }
+        };
+      });
+      oscillator.start();
+      await context.resume();
+      return await captured;
+    } finally {
+      await context.close();
+    }
+  }, audioWorklet);
+  assert.equal(audioSamples, 2048);
   const storageResult = await page.evaluate(async () => {
     const storage = window.irvisDesktop.recordingStorage;
     const name = `smoke-${crypto.randomUUID()}.irvis`;
@@ -78,9 +110,15 @@ try {
       rejected = true;
     }
     await storage('remove', name);
-    return { size, bytes: [...bytes], rejected };
+    const audioName = name.replace('.irvis', '.audio-v2.pcm');
+    await storage('open', audioName);
+    await storage('append', audioName, new Uint8Array([1]));
+    await storage('close', audioName);
+    const audioListed = (await storage('list')).includes(audioName);
+    await storage('remove', audioName);
+    return { audioListed, size, bytes: [...bytes], rejected };
   });
-  assert.deepEqual(storageResult, { size: 3, bytes: [2, 3], rejected: true });
+  assert.deepEqual(storageResult, { audioListed: true, size: 3, bytes: [2, 3], rejected: true });
 
   const sink = new MemoryByteSink();
   const profile = cameraProfiles[0];

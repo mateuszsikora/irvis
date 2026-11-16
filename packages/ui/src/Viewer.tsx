@@ -187,6 +187,7 @@ export function Viewer({
     frame: RawFrame;
     mode: VideoMode;
     generation: number;
+    receivedAt?: number;
     captureMetadata?: Pick<SnapshotOptions, 'profile' | 'fps' | 'path'>;
   } | null>(null);
   const active = useRef<CameraSession | null>(null);
@@ -235,6 +236,7 @@ export function Viewer({
           renderer.draw(value.frame, profile, value.mode, {
             ...current.current,
             alarmGeneration: value.generation,
+            ...(value.receivedAt === undefined ? {} : { receivedAt: value.receivedAt }),
             ...(value.captureMetadata ? { captureMetadata: value.captureMetadata } : {}),
           });
         } catch (e) {
@@ -263,7 +265,12 @@ export function Viewer({
         received = true;
         setHasFrame(true);
       }
-      latest.current = { frame, mode: session.mode, generation: token };
+      latest.current = {
+        frame,
+        mode: session.mode,
+        generation: token,
+        receivedAt: performance.now(),
+      };
     });
   }, [session]);
   async function connect() {
@@ -565,13 +572,19 @@ export function Viewer({
                 document.createElement('p'),
                 document.createElement('output'),
               );
-              const sidecar = (await recordingStorage?.list())?.find(
-                (item) => item.name === file.name.replace(/\.irvis$/, '.audio-v1.webm'),
+              const sidecar = (await recordingStorage?.list())?.find((item) =>
+                ['.audio-v2.pcm', '.audio-v1.webm'].some(
+                  (suffix) => item.name === file.name.replace(/\.irvis$/, suffix),
+                ),
               );
               const audio = sidecar
                 ? new Blob(
                     [(await sidecar.source.read(0, await sidecar.source.size())).slice().buffer],
-                    { type: 'audio/webm' },
+                    {
+                      type: sidecar.name.endsWith('.pcm')
+                        ? 'application/x-irvis-audio'
+                        : 'audio/webm',
+                    },
                   )
                 : undefined;
               const bytes = await exportMp4(
