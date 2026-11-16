@@ -278,3 +278,17 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
 
 - **70.** The recorded exact path preserves every raw value and reading between Node, Chromium, WebKit and Electron; the shared viewer displays the same min/max/centre readings in C, F and K.
   - `packages/ui/test/parity/parity.integration.mjs::preserves exact recorded readings and viewer wiring across runtimes`
+
+- **71.** Desktop commands cannot overlap, and gain commands resolve only after matching readback; thrown readback cannot retain the old gain.
+  - `apps/desktop/test/capture.test.js::desktop capture::rejects overlapping commands and confirms gain readback`
+  - `apps/desktop/test/capture.test.js::desktop capture::discards stale gain when command readback throws`
+
+- **72.** Browser camera controls cannot dispatch commands, even if given a dispatcher.
+  - `packages/ui/test/camera-controls.test.tsx::CameraControls::disables commands in the browser even with a dispatcher`
+
+- **73.** A command-generation change starts a recording keyframe even when the gain before and after the omitted frames is identical.
+  - `packages/core/src/irvis/irvis.test.ts::irvis round trip::starts a keyframe after commands even when the recorded gain is unchanged`
+
+- **74.** Camera command feedback belongs to one connection: Stop/Start clears it, and an old command's completion cannot change the new connection's status or pending state.
+  - `packages/ui/test/viewer.test.tsx::Viewer::clears camera command confirmation on Stop and Start`
+  - `packages/ui/test/viewer.test.tsx::Viewer::ignores an old command failure while a new session waits for confirmation`

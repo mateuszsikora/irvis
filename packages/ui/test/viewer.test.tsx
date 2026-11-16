@@ -100,6 +100,89 @@ describe('Viewer', () => {
       expect(screen.getByRole<HTMLButtonElement>('button', { name: c.label }).disabled).toBe(true);
     expect(screen.getByRole('link', { name: 'Download desktop app' })).toBeTruthy();
   });
+  function controlledBackend(command: (id: string) => Promise<void>): CameraBackend {
+    return {
+      ...backend(),
+      id: 'electron',
+      capabilities: { exactRaw: true, deviceControl: true, concurrentWith: [] },
+      open: () =>
+        Promise.resolve({
+          device: { id: 'cam', label: 'Camera' },
+          profile,
+          mode: profile.videoModes[0]!,
+          frames: { subscribe: () => () => {} },
+          command,
+          close: async () => {},
+        }),
+    };
+  }
+  async function startCamera() {
+    await waitFor(() =>
+      expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Start' }).disabled).toBe(false),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole<HTMLButtonElement>('button', { name: 'High gain', hidden: true }).disabled,
+      ).toBe(false),
+    );
+    fireEvent.click(screen.getByText('Camera commands'));
+  }
+  function commandStatus() {
+    return screen.getByText('Camera commands').parentElement!.querySelector('[role="status"]')!;
+  }
+  it('clears camera command confirmation on Stop and Start', async () => {
+    const command = vi.fn(async () => {});
+    render(<Viewer profile={profile} backend={controlledBackend(command)} />);
+    await startCamera();
+    fireEvent.click(screen.getByRole('button', { name: 'High gain' }));
+    await waitFor(() => expect(commandStatus().textContent).toBe('Camera command confirmed.'));
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
+    expect(commandStatus().textContent).toBe('');
+    await startCamera();
+    expect(commandStatus().textContent).toBe('');
+    expect(command).toHaveBeenCalledTimes(1);
+  });
+  it('ignores an old command failure while a new session waits for confirmation', async () => {
+    let rejectOld!: (error: Error) => void;
+    let finishNew!: () => void;
+    const command = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((_resolve, reject) => {
+            rejectOld = reject;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finishNew = resolve;
+          }),
+      );
+    render(<Viewer profile={profile} backend={controlledBackend(command)} />);
+    await startCamera();
+    fireEvent.click(screen.getByRole('button', { name: 'High gain' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
+    await startCamera();
+    fireEvent.click(screen.getByRole('button', { name: 'Low gain' }));
+    await act(async () => {
+      rejectOld(new Error('Old camera disconnected'));
+      await Promise.resolve();
+    });
+    expect(commandStatus().textContent).toBe('Waiting for camera confirmation…');
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'High gain' }).disabled).toBe(
+      true,
+    );
+    await act(async () => {
+      finishNew();
+      await Promise.resolve();
+    });
+    expect(commandStatus().textContent).toBe('Camera command confirmed.');
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'High gain' }).disabled).toBe(
+      false,
+    );
+  });
   it('closes an open that resolves after unmount', async () => {
     const source = backend();
     let resolve!: (s: CameraSession) => void;

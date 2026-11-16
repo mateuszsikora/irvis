@@ -68,7 +68,7 @@ describe('desktop capture', () => {
       const count = usb.device.controlTransfer.mock.calls.length;
       await expect(control.command('not-a-command')).rejects.toThrow('Unknown camera command');
       expect(usb.device.controlTransfer).toHaveBeenCalledTimes(count);
-      await control.command('gain-high');
+      await expect(control.command('gain-high')).rejects.toThrow('Camera did not confirm');
       expect(
         usb.device.controlTransfer.mock.calls.some(
           (c) =>
@@ -95,7 +95,7 @@ describe('desktop capture', () => {
     const control = await openControl(profile);
     try {
       expect((await control.read()).values.gain).toBe('low');
-      await control.command('gain-low');
+      await expect(control.command('gain-low')).rejects.toThrow('Camera did not confirm');
       expect(control.snapshot.values.gain).toBe('unknown');
       expect(
         profile.conversions.find((c) => c.gain === control.snapshot.values.gain),
@@ -103,6 +103,36 @@ describe('desktop capture', () => {
       expect((await control.read()).values.gain).toBe('unknown');
       expect((await control.read()).values.gain).toBe('high');
       expect(state).toHaveBeenCalledTimes(4);
+    } finally {
+      await control.close();
+    }
+  });
+  it('rejects overlapping commands and confirms gain readback', async () => {
+    vi.spyOn(CameraUsb.prototype, 'state').mockResolvedValue({ gain: 1 });
+    const control = await openControl(profile);
+    try {
+      const first = control.command('gain-high');
+      expect(control.busy).toBe(true);
+      await expect(control.command('gain-low')).rejects.toThrow('already in progress');
+      await first;
+      expect(control.snapshot.values.gain).toBe('high');
+      expect(control.busy).toBe(false);
+      expect(control.snapshot.values['command-generation']).toBe(1);
+      expect((await control.read()).values['command-generation']).toBe(1);
+    } finally {
+      await control.close();
+    }
+  });
+  it('discards stale gain when command readback throws', async () => {
+    vi.spyOn(CameraUsb.prototype, 'state')
+      .mockResolvedValueOnce({ gain: 1 })
+      .mockRejectedValueOnce(new Error('Disconnected'));
+    const control = await openControl(profile);
+    try {
+      await control.read();
+      await expect(control.command('gain-low')).rejects.toThrow('Disconnected');
+      expect(control.snapshot.values.gain).toBe('unknown');
+      expect(control.busy).toBe(false);
     } finally {
       await control.close();
     }

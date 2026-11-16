@@ -538,3 +538,13 @@ Status: decided (#21)
 The Electron test shell loads the same Vite-served modules with sandbox and context isolation enabled. This keeps engine and UI parity independent of platform camera setup. The production shell, preload and packaged assets remain the responsibility of `npm run test:desktop`. The matrix is a separate explicit acceptance command because WebKit system libraries and an Electron display are additional requirements beyond the default Node suite.
 
 **Rejected:** comparing only formatted UI temperatures, because rounding would hide arithmetic differences. **Rejected:** treating identical Node and Electron results alone as cross-engine evidence, because both use V8; WebKit supplies JavaScriptCore. **Rejected:** making the reference a generated golden JSON committed to git, because a fresh Node reference tests engine parity while the existing core fixture tests independently pin decoding correctness.
+
+## Camera controls require readback and preserve unsupported states
+
+Status: decided (#22)
+
+The desktop exposes the existing profile gain commands and confirms their requested state before resolving. A host command-generation snapshot field forces the next recorded frame to start a chunk even if intermediate unsupported gain frames were omitted. This does not establish sensor exposure timing.
+
+NUC, vendor Auto/Manual range and camera correction remain unavailable until command semantics are verified. Low gain retains no temperature conversion. Persistence after reconnect or power loss remains hardware acceptance work.
+
+**Rejected:** mapping Android Low/High directly to sensor gain, guessing NUC opcodes or interpreting raw correction fields as calibrated settings. The audit and USB measurements do not establish those meanings.

@@ -1,3 +1,4 @@
+import { CameraControls } from './CameraControls.tsx';
 import { recordedView } from './recorded-view.ts';
 import { exportMp4, fileByteSource, saveRecordingFile } from '@irvis/media';
 import { RecordingControls } from './RecordingControls.tsx';
@@ -49,6 +50,7 @@ export function Viewer({
   const [enumerating, setEnumerating] = useState(true);
   const [modeId, setModeId] = useState(profile.videoModes.find((m) => m.layout)?.id ?? '');
   const [session, setSession] = useState<CameraSession | null>(null);
+  const [commandSession, setCommandSession] = useState(0);
   const [hasFrame, setHasFrame] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -286,6 +288,7 @@ export function Viewer({
     });
   }, [session]);
   async function connect() {
+    setCommandSession((value) => value + 1);
     playbackRef.current?.close();
     playbackRef.current = null;
     photoGeneration.current++;
@@ -313,6 +316,7 @@ export function Viewer({
     }
   }
   async function stop() {
+    setCommandSession((value) => value + 1);
     playbackRef.current?.pause();
     generation.current++;
     setTriggered(false);
@@ -894,34 +898,16 @@ export function Viewer({
               </button>
             </section>
           )}
-          <details className="settings-disclosure">
-            <summary>Camera commands</summary>
-            <div className="command-controls">
-              {profile.commands.map((c) => (
-                <button
-                  key={c.id}
-                  disabled={
-                    !session || !backend.capabilities.deviceControl || !(command ?? session.command)
-                  }
-                  onClick={() => {
-                    void (command ?? session?.command)?.(c.id).catch((e) => setError(String(e)));
-                  }}
-                >
-                  {c.label}
-                </button>
-              ))}
-              {backend.id === 'browser' ? (
-                <p className="setting-help">
-                  available in the desktop app ·{' '}
-                  <a href="https://github.com/mateuszsikora/irvis/releases">Download desktop app</a>
-                </p>
-              ) : (
-                !backend.capabilities.deviceControl && (
-                  <p className="setting-help">Camera commands are unavailable in this backend.</p>
-                )
-              )}
-            </div>
-          </details>
+          <CameraControls
+            key={backend.id + profile.id + commandSession}
+            profile={profile}
+            browser={backend.id === 'browser'}
+            command={
+              session && backend.capabilities.deviceControl
+                ? (command ?? session.command)
+                : undefined
+            }
+          />
         </aside>
       </div>
     </section>

@@ -157,7 +157,7 @@ Targets for the reconstruction (from the specification): Y matches the low bytes
 
 | Issue | Pull request |
 | --- | --- |
-| [#22](https://github.com/mateuszsikora/irvis/issues/22) | `command()` through the preload, limited to the profile's allow-list; NUC, gain and camera settings in the UI; greyed out in the browser; `findings/m5-checklist.md` (planned, M5) |
+| [#22](https://github.com/mateuszsikora/irvis/issues/22) | `command()` through the preload, limited to the profile's allow-list; NUC, gain and camera settings in the UI; greyed out in the browser; [M5 checklist](findings/m5-checklist.md) |
 
 **Acceptance (from the specification):** every option works on the real camera.
 
