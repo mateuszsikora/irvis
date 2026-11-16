@@ -1,10 +1,15 @@
 # The .irvis format
 
-Version: 1 (draft)
+Version: 1 (frozen)
 
 The specification of `.irvis`, the file irvis records temperatures in: a recording of any length, and a snapshot, which is a recording with one frame. It is for anyone who writes a reader or a writer, in irvis or elsewhere. A file holds the raw value of every pixel in every frame, within a stated error bound T, and everything needed to turn the values into degrees Celsius, so it can be read without the camera profile. MP4 is an export from it ([decision](decisions/architecture.md#recordings-are-irvis-files-and-mp4-is-an-export)).
 
-Version 1 is a draft: it may still change without a version bump until the fixtures issue ([#16](https://github.com/mateuszsikora/irvis/issues/16)) measures the codec on real frames and freezes it. From then on, a change to the layout, a new record type or a new frame field needs a new version, and this document says what changed between versions. The implementation is `packages/core/src/irvis/` ([core: technical](features/core-technical.md#interfaces)).
+Version 1 is frozen by [#16](https://github.com/mateuszsikora/irvis/issues/16).
+A change to the layout, a new record type or a new frame field needs a new
+version. Encoder tuning and application-defined keys in the existing JSON
+view-state object do not change the wire format. The implementation is
+`packages/core/src/irvis/` ([core: technical](features/core-technical.md#interfaces)).
+Real-frame measurements and their limits are in [codec findings](findings/irvis-codec.md).
 
 ## Encoding conventions
 
@@ -77,7 +82,7 @@ A keyframe depends on no earlier frame, so playback can start at any chunk. irvi
 3. at the first frame after a NUC that the data show, because the browser cannot ask the camera and the camera calibrates on its own: the first frame that differs after a run of at least 2 (`NUC_MIN_FROZEN`) frames that repeat the previous one exactly (the camera holds the picture while the shutter is closed; a single repeated frame is a backend delivering a frame twice and is ignored), or a frame whose mean differs from the previous frame's by more than 0.5 K (`NUC_MIN_STEP_KELVIN`, through the slope of the conversion) and by more than 10 times (`NUC_STEP_FACTOR`) the median of the last 25 (`NUC_HISTORY`) frame-to-frame steps;
 4. when 10 s (`DEFAULT_KEYFRAME_INTERVAL_MS`) of frame time have passed since the chunk started.
 
-A step of the mean also fires when the scene itself changes that much (a hot object filling the view), which costs one extra keyframe. These thresholds are tuned on synthetic data only; the fixtures issue (#16) tunes them on real NUC events. Only rule 2 is required of a writer: a reader takes the conversion and the camera state of a frame from its chunk.
+A step of the mean also fires when the scene itself changes that much (a hot object filling the view), which costs one extra keyframe. These heuristics were exercised on a real static-wall series without retuning; frozen sequences and steps are candidates, not independently confirmed shutter events. Only rule 2 is required of a writer: a reader takes the conversion and the camera state of a frame from its chunk.
 
 ## Frame records
 
@@ -118,7 +123,7 @@ A decoder needs only the rules above; this is how irvis's encoder (`FrameEncoder
 2. The target of each pixel is round(e) clamped to [m − (T − h), m + (T − h)]. Every value it stores is the nearest value of the form prediction + q × step to the target, which is within h of it, so |m − stored| ≤ (T − h) + h = T. Clamping to 0…65535 only moves a value towards its target.
 3. In a frame that is not a keyframe, a pixel is outside T when |m − p| > T. A block with no pixel outside T is skipped. Otherwise the encoder estimates the cost of both other modes with the Elias gamma length of each residual's zigzag code, plus one bit per pixel for the mask of a sparse block, and resends the block whole (dense, every pixel moved to its target) when that costs at most as much as sending only the pixels outside T (sparse). Skipped pixels and clear mask bits keep p, which is within T by the test.
 
-Placing values near the denoised estimate, not at the edge of the tolerance, keeps the next frame's noise within T, so a static scene stays skipped; that and the per-block choice are why the [benchmark](#benchmark) beats the earlier simulation. These settings (`DEFAULT_TUNING`: precision 0.25, weight 0.25, dense bias 1) change file sizes, not the format, and the fixtures issue (#16) tunes them on real frames.
+Placing values near the denoised estimate, not at the edge of the tolerance, keeps the next frame's noise within T, so a static scene stays skipped; that and the per-block choice are why the [benchmark](#benchmark) beats the earlier simulation. These settings (`DEFAULT_TUNING`: precision 0.25, weight 0.25, dense bias 1) change file sizes, not the format, and remain unchanged after the static-wall benchmark in #16.
 
 ## View-state records
 
@@ -133,7 +138,7 @@ The payload is a JSON object `{ "timestamp": <ms>, "values": { … } }`: the vie
 | `alarms` | `AlarmSettings`: `{ "highCelsius", "lowCelsius", "hysteresis" }`, a threshold a number or `null` |
 | `isotherms` | a list of `Isotherm`: `{ "kind": "above" \| "below", "celsius", "color": [r, g, b] }` or `{ "kind": "between", "minCelsius", "maxCelsius", "color" }` |
 
-These are the user's settings. What the camera applied itself is in the chunk's `cameraState` (`emissivity`, `reflected-temperature`), and readings are corrected relative to it ([decision](decisions/architecture.md#the-software-correction-works-relative-to-what-the-camera-applied)). Photo exports (#15) use the types from [#12](https://github.com/mateuszsikora/irvis/issues/12): `palette`, a `PaletteId` (`"iron"`, `"white-hot"`, `"black-hot"`, `"rainbow"`, `"red-hot"` or `"cold-blue"`); `range`, `"auto"` or a `TemperatureRange` `{ "minCelsius", "maxCelsius" }`; and `measurements`, whose schema waits for several measurements at once (#18). Photo exports write the resolved numeric range and correction settings as specified in [PNG photos](#png-photos). TODO(owner): fix the remaining view-setting names and schemas, with code that writes and reads them, before v1 is frozen in #16.
+These are the user's settings. What the camera applied itself is in the chunk's `cameraState` (`emissivity`, `reflected-temperature`), and readings are corrected relative to it ([decision](decisions/architecture.md#the-software-correction-works-relative-to-what-the-camera-applied)). Photo exports (#15) use the types from [#12](https://github.com/mateuszsikora/irvis/issues/12): `palette`, a `PaletteId` (`"iron"`, `"white-hot"`, `"black-hot"`, `"rainbow"`, `"red-hot"` or `"cold-blue"`); `range`, `"auto"` or a `TemperatureRange` `{ "minCelsius", "maxCelsius" }`; and `measurements`, whose schema waits for several measurements at once (#18). Photo exports write the resolved numeric range and correction settings as specified in [PNG photos](#png-photos). Version 1 treats view state as an extensible JSON object; unknown application keys are preserved by the container and may be ignored by a UI. Future measurement-setting schemas can add keys without changing the binary layout.
 
 ## Index and trailer
 
@@ -175,19 +180,40 @@ A file with threshold T1 can be re-encoded to a threshold T2 ≥ T1, never to a 
 | moving hand | 8 | 4.72 | 58.1% | 7.9% | 34.0% | 1.30 | 0.47 | 8 |
 | moving hand | 16 | 2.72 | 89.1% | 6.3% | 4.6% | 1.12 | 0.40 | 16 |
 
-The earlier simulation estimated, for T = 0.125 K (8 raw), 2.4 to 4.2 MB/min static and 5.5 to 8.3 MB/min with movement, and for T = 0.25 K (16 raw), 0.28 to 0.81 and 3.0 to 3.3 MB/min ([decision](decisions/architecture.md#recordings-are-irvis-files-and-mp4-is-an-export)). With the same noise model the codec does better in every case. Real frames have drift, dead pixels, shutter events and noise that is not Gaussian; until the fixtures issue (#16) runs the benchmark on them, these numbers are an upper bound on what synthetic data can show, not a prediction. Sending only the pixels outside T was the cheapest in a static scene at T = 8, resending whole blocks wins in places with movement, and skip dominates at T = 16, so no single block mode wins everywhere. Deflate level 9 instead of 6 (`npm run bench:irvis -- --level 9`) saved under 1%: 1.04 instead of 1.05 MB/min for the static scene and 4.71 instead of 4.72 for the moving hand at T = 8.
+The earlier simulation estimated, for T = 0.125 K (8 raw), 2.4 to 4.2 MB/min static and 5.5 to 8.3 MB/min with movement, and for T = 0.25 K (16 raw), 0.28 to 0.81 and 3.0 to 3.3 MB/min ([decision](decisions/architecture.md#recordings-are-irvis-files-and-mp4-is-an-export)). With the same noise model the codec does better in every case. Real frames have drift, dead pixels, shutter events and noise that is not Gaussian; these synthetic numbers are not a prediction. The real static-wall benchmark is recorded separately in [codec findings](findings/irvis-codec.md). Sending only the pixels outside T was the cheapest in a static scene at T = 8, resending whole blocks wins in places with movement, and skip dominates at T = 16, so no single block mode wins everywhere. Deflate level 9 instead of 6 (`npm run bench:irvis -- --level 9`) saved under 1%: 1.04 instead of 1.05 MB/min for the static scene and 4.71 instead of 4.72 for the moving hand at T = 8.
+
+### Captured series
+
+Run `npm run bench:irvis -- --capture <directory> --start 150` on an original
+capture directory containing `meta.json` and gzipped frame files. `--start`
+is a zero-based frame index (default 0); `--count <n>` optionally limits the
+selected range (default all remaining frames). Selection is explicit: the tool
+does not detect or remove startup, frozen frames or shutter events. Do not skip
+150 frames again when using an excerpt that already excludes startup.
+
+The input must be a complete packed `infiray-p2pro` capture: version 1,
+256×384 YUYV at 25 fps, `pixelFormat: "yuyv422"`, 196608 bytes per frame and no
+trailing bytes. Each gzip is decoded through `decodeYuyvRaw`. Arrival timestamps
+are preserved; MB/min uses last minus first arrival plus one nominal frame
+period (40 ms), so buffering and jitter affect this rate. The table also gives
+actual complete `.irvis` file bytes and frame counts, without extrapolation.
+Thresholds default to 0, 8 and 16 raw units; `--threshold <0-32767>` selects a single threshold. Motion compensation is off; the existing
+writer's NUC detector and keyframe policy remain enabled. Every decoded pixel
+is compared with its input; an error above T fails the command. All selected
+raw frames and the encoded file are held in memory; use `--count` for a bounded
+run on very long captures. `--level <0-9>` also applies to captured series.
 
 ## Not decided yet
 
-- Motion compensation: [postponed](decisions/architecture.md#motion-compensation-in-irvis-is-postponed) until the codec is measured on real frames (#16).
+- Motion compensation is absent from frozen v1; a moving-camera comparison remains future work ([decision](decisions/architecture.md#version-1-freezes-without-motion-vectors)).
 - An own entropy coder instead of deflate: not tried; it would need a measured gain first.
-- The names and schemas of the view settings ([view state](#view-state-records)).
+- Application-specific schemas for future view settings; the JSON object itself is frozen ([view state](#view-state-records)).
 
 ## Versions
 
 | Version | Changes |
 | --- | --- |
-| 1 (draft) | First version ([#14](https://github.com/mateuszsikora/irvis/issues/14)) |
+| 1 | First version (#14), frozen in #16 without binary-layout changes; real-frame compatibility fixture added |
 
 ## See also
 
@@ -196,7 +222,7 @@ The earlier simulation estimated, for T = 0.125 K (8 raw), 2.4 to 4.2 MB/min sta
 
 ## PNG photos
 
-Version 1 (draft) also defines the private ancillary chunk `irVs`. The payload
+Version 1 also defines the private ancillary chunk `irVs`. The payload
 is exactly one complete version-1 .irvis file, including signature, index and
 trailer, with one frame. Its dimensions must equal PNG IHDR dimensions.
 There is exactly one `irVs` chunk, after IHDR and before IEND; the writer

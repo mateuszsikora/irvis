@@ -1,0 +1,109 @@
+{
+  "sourceSession": "m1-scenes-1794808411555",
+  "sourceScene": "static-wall-full",
+  "capturedAt": "2026-11-16T05:55:06.823Z",
+  "profile": "infiray-p2pro",
+  "profileVersion": 2,
+  "width": 256,
+  "height": 384,
+  "frameBytes": 196608,
+  "noise": {
+    "frames": 256,
+    "firstFrame": 1725,
+    "medianMk": 75.45446351476191,
+    "meanMk": 76.08756640857847,
+    "medianDetrendedMk": 46.52281811928624
+  },
+  "frames": [
+    {
+      "file": "000000.yuyv.gz",
+      "sourceFrame": 1875,
+      "timestamp": 76179.26974999999,
+      "sha256": "f122596940176acb72423862c4d7a8885ef3f84caa0331b7ceba6f746d9ef727",
+      "minRaw": 18740,
+      "maxRaw": 19072,
+      "centreRaw": 18784
+    },
+    {
+      "file": "000001.yuyv.gz",
+      "sourceFrame": 1876,
+      "timestamp": 76215.710916,
+      "sha256": "17da2e3abf7ebcc187d4c026a97185fd086d6c4bb5eafef4f10eac3bcf61d529",
+      "minRaw": 18752,
+      "maxRaw": 19096,
+      "centreRaw": 18788
+    },
+    {
+      "file": "000002.yuyv.gz",
+      "sourceFrame": 1877,
+      "timestamp": 76263.372708,
+      "sha256": "76179a1f2536834039f0a6bd8e3b40426ec739a6d9e6d80055a835021b737ef6",
+      "minRaw": 18756,
+      "maxRaw": 19096,
+      "centreRaw": 18788
+    },
+    {
+      "file": "000003.yuyv.gz",
+      "sourceFrame": 1878,
+      "timestamp": 76298.33475,
+      "sha256": "37e9b3ec8f75cd8e634add921326eefef540c4c139aad71721e881e655ae0829",
+      "minRaw": 18760,
+      "maxRaw": 19096,
+      "centreRaw": 18788
+    },
+    {
+      "file": "000004.yuyv.gz",
+      "sourceFrame": 1879,
+      "timestamp": 76345.88541599999,
+      "sha256": "9374c75063363decca1b48bf5b9c6584fb5fbbe364987cb9637cd2ef7da9d0ab",
+      "minRaw": 18760,
+      "maxRaw": 19096,
+      "centreRaw": 18788
+    },
+    {
+      "file": "000005.yuyv.gz",
+      "sourceFrame": 1880,
+      "timestamp": 76380.640583,
+      "sha256": "fc420480b304923fb548c2ef1a6e6cc22d1e3f08c7da8fa2639b59e4ed288aab",
+      "minRaw": 18760,
+      "maxRaw": 19088,
+      "centreRaw": 18788
+    },
+    {
+      "file": "000006.yuyv.gz",
+      "sourceFrame": 1881,
+      "timestamp": 76418.53199999999,
+      "sha256": "17451356aa2428632dc0d9324847e065435c895a482af4fe582137be96abef91",
+      "minRaw": 18760,
+      "maxRaw": 19088,
+      "centreRaw": 18788
+    },
+    {
+      "file": "000007.yuyv.gz",
+      "sourceFrame": 1882,
+      "timestamp": 76455.33495799999,
+      "sha256": "7063e9c4cd0a8b35fae6649f707026e5e0e8655570e4d719e1023bf9762ebd54",
+      "minRaw": 18760,
+      "maxRaw": 19088,
+      "centreRaw": 18788
+    },
+    {
+      "file": "000008.yuyv.gz",
+      "sourceFrame": 1883,
+      "timestamp": 76503.42866599999,
+      "sha256": "6911b26304f4d095e010ff59796195b60ea4838e653f00c39e9e0efd354f71d9",
+      "minRaw": 18760,
+      "maxRaw": 19088,
+      "centreRaw": 18788
+    },
+    {
+      "file": "000009.yuyv.gz",
+      "sourceFrame": 1884,
+      "timestamp": 76540.329166,
+      "sha256": "c01f7f4b3f4a46d6e0a1b04e6df0fc47bd90a925d7601b1fb5c5d7fef398f53e",
+      "minRaw": 18764,
+      "maxRaw": 19088,
+      "centreRaw": 18788
+    }
+  ]
+}

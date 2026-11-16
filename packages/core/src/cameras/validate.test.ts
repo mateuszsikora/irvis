@@ -31,6 +31,23 @@ function withMode(changes: Partial<VideoMode>): CameraProfile {
 }
 
 describe('validateProfile', () => {
+  it('rejects recording thresholds outside the codec range', () => {
+    for (const recordingThreshold of [-1, 0.5, 32768, Infinity, NaN]) {
+      const conversions = base.conversions.map((c) => ({ ...c, recordingThreshold }));
+      expect(validateProfile({ ...base, conversions })).toContain(
+        `conversions.${conversions[0]?.gain ?? ''}: recordingThreshold must be an integer from 0 to 32767`,
+      );
+    }
+    for (const recordingThreshold of [0, 32767]) {
+      expect(
+        validateProfile({
+          ...base,
+          conversions: base.conversions.map((c) => ({ ...c, recordingThreshold })),
+        }),
+      ).toEqual([]);
+    }
+  });
+
   it('accepts a consistent profile', () => {
     expect(validateProfile(base)).toEqual([]);
   });

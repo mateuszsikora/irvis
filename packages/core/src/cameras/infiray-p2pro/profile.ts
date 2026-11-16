@@ -4,7 +4,7 @@ import type { CameraProfile } from '../profile.ts';
 
 export const profile: CameraProfile = {
   id: 'infiray-p2pro',
-  version: 1,
+  version: 2,
   name: 'InfiRay P2 Pro',
   identification: {
     // Realtek bridge; the TOPDON TC001 reports the same pair.
@@ -29,10 +29,23 @@ export const profile: CameraProfile = {
     },
     { id: 'yuyv-256x192', width: 256, height: 192, fps: 25, pixelFormat: 'yuyv', layout: null },
   ],
-  sensor: { width: 256, height: 192, ranges: [] },
+  sensor: {
+    width: 256,
+    height: 192,
+    ranges: [],
+    netd: {
+      kelvin: 0.07545446351476191,
+      source:
+        'TOOLTOP T7 static wall, 2026-11-16, session m1-scenes-1794808411555; median temporal population SD over original frames 1875–2130; scene estimate, not calibrated NETD',
+      confidence: 'measured',
+    },
+  },
   conversions: [
     {
       gain: 'high',
+      // k = 2 times the measured scene noise, rounded up to whole raw units.
+      // docs/decisions/architecture.md#recording-defaults-use-twice-the-static-scene-noise
+      recordingThreshold: 10,
       // raw is in 1/64 K: °C = raw / 64 − 273.15. 1/64 is exact in binary.
       conversion: { kind: 'linear', scale: 1 / 64, offset: -273.15 },
       source:
