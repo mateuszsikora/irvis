@@ -3,6 +3,90 @@ import { cameraProfiles, IrvisReader, memoryByteSource, type ThermalFrame } from
 import { initialAnalysis } from '../src/measurements.ts';
 import { FrameRenderer, type ViewSettings } from '../src/render.ts';
 describe('FrameRenderer', () => {
+  it('refuses a camera-reported gain without a conversion despite the host assumption', () => {
+    const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+    try {
+      const warning = document.createElement('p');
+      const bounds = document.createElement('output');
+      const renderer = new FrameRenderer(
+        document.createElement('canvas'),
+        document.createElement('canvas'),
+        bounds,
+        warning,
+      );
+      const profile = cameraProfiles[0]!;
+      renderer.draw(
+        {
+          kind: 'yuyv',
+          width: 256,
+          height: 384,
+          timestamp: 0,
+          data: new Uint8Array(256 * 384 * 2),
+          cameraState: { origin: 'camera', values: { gain: 'low' } },
+        },
+        profile,
+        profile.videoModes[0]!,
+        {
+          palette: 'iron',
+          range: null,
+          locked: false,
+          rotation: 0,
+          mirrorX: false,
+          mirrorY: false,
+          smooth: false,
+          uncertain: false,
+          gain: 'high',
+        },
+      );
+      expect(bounds.textContent).toBe('Readings unavailable');
+      expect(warning.textContent).toContain('No verified conversion');
+    } finally {
+      context.mockRestore();
+    }
+  });
+  it('blocks missing or unknown camera gain without falling back to high', () => {
+    for (const values of [{}, { gain: 'unknown' }]) {
+      const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+      try {
+        const warning = document.createElement('p');
+        const bounds = document.createElement('output');
+        const renderer = new FrameRenderer(
+          document.createElement('canvas'),
+          document.createElement('canvas'),
+          bounds,
+          warning,
+        );
+        const profile = cameraProfiles[0]!;
+        renderer.draw(
+          {
+            kind: 'yuyv',
+            width: 256,
+            height: 384,
+            timestamp: 0,
+            data: new Uint8Array(256 * 384 * 2),
+            cameraState: { origin: 'camera', values },
+          },
+          profile,
+          profile.videoModes[0]!,
+          {
+            palette: 'iron',
+            range: null,
+            locked: false,
+            rotation: 0,
+            mirrorX: false,
+            mirrorY: false,
+            smooth: false,
+            uncertain: false,
+            gain: 'high',
+          },
+        );
+        expect(bounds.textContent).toBe('Readings unavailable');
+        expect(warning.textContent).toContain('No verified conversion');
+      } finally {
+        context.mockRestore();
+      }
+    }
+  });
   it('resets alarm hysteresis when the frame source changes', () => {
     const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
     try {

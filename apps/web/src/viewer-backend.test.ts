@@ -11,7 +11,11 @@ describe('viewer backend', () => {
   it('selects Electron from preload and releases the bridge once', async () => {
     const stop = vi.fn(() => Promise.resolve());
     const unsubscribe = vi.fn();
+    const command = vi.fn(() => Promise.resolve());
+    const listDevices = vi.fn(() => Promise.resolve([{ id: '/dev/video3', label: 'Thermal' }]));
     window.irvisDesktop = {
+      command,
+      listDevices,
       start: vi.fn(() => Promise.resolve()),
       stop,
       subscribe: vi.fn(() => unsubscribe),
@@ -19,13 +23,18 @@ describe('viewer backend', () => {
     const backend = liveBackend(vi.fn());
     expect(backend.id).toBe('electron');
     expect(backend.capabilities.exactRaw).toBe(true);
+    expect(backend.capabilities.deviceControl).toBe(true);
+    expect(await backend.listDevices()).toEqual([{ id: '/dev/video3', label: 'Thermal' }]);
     const profile = cameraProfiles[0]!;
     const session = await backend.open({
       deviceId: '0',
       profile,
       modeId: profile.videoModes[0]!.id,
     });
+    await session.command?.('gain-high');
+    expect(command).toHaveBeenCalledWith('gain-high');
     await session.close();
+    await expect(session.command?.('gain-high')).rejects.toThrow('Camera session is closed');
     await session.close();
     expect(stop).toHaveBeenCalledOnce();
     expect(unsubscribe).toHaveBeenCalledOnce();

@@ -21,7 +21,15 @@ export function analyse(frame: Yuv420Frame, mode: VideoMode, info: FrameMetadata
   }
   return {
     info,
-    frame,
+    frame: {
+      ...frame,
+      reconstructed: {
+        width: result.width,
+        height: result.height,
+        raw: result.raw,
+        uncertain: result.uncertain,
+      },
+    } as Yuv420Frame,
     reconstructionMs,
     statistics: {
       centerRaw:

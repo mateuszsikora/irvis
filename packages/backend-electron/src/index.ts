@@ -1,5 +1,7 @@
 import {
   compareFrames,
+  type CameraDevice,
+  type BackendId,
   reconstructPlanar,
   simulateYUYVtoI420,
   type VideoMode,
@@ -10,6 +12,9 @@ export interface ReferenceFrame extends YuyvFrame {
   receivedAt: number;
 }
 export interface DesktopBridge {
+  readonly concurrentWith?: readonly BackendId[];
+  listDevices?: () => Promise<readonly CameraDevice[]>;
+  command?: (id: string) => Promise<void>;
   recordingStorage?: (
     op: string,
     name?: string,
@@ -17,7 +22,7 @@ export interface DesktopBridge {
     offset?: number,
     length?: number,
   ) => Promise<unknown>;
-  start(options: { profileId: string; modeId: string; device: number }): Promise<void>;
+  start(options: { profileId: string; modeId: string; device: number | string }): Promise<void>;
   stop(): Promise<void>;
   subscribe(frame: (value: ReferenceFrame) => void, error: (message: string) => void): () => void;
 }

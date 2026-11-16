@@ -29,6 +29,10 @@ const fake = resolve(scratch, 'ffmpeg.cjs');
 writeFileSync(
   fake,
   `#!/usr/bin/env node
+if (process.argv.includes('-list_devices')) {
+  process.stderr.write('AVFoundation video devices:\\n[0] Test camera\\n');
+  process.exit(0);
+}
 const fs = require('node:fs');
 const path = require('node:path');
 const marker = name => path.join(__dirname, name);
@@ -45,7 +49,15 @@ const timer = setInterval(() => {
   process.stderr.write(format.slice(4) + ', 256x384\\n');
   setTimeout(() => {
     process.stdout.write(data.subarray(0, 13));
-    setTimeout(() => process.stdout.write(data.subarray(13)), 20);
+    setTimeout(() => {
+      process.stdout.write(data.subarray(13));
+      // Real capture continues after a startup frame is dropped.
+      const next = () => {
+        if (process.stdout.write(data)) setTimeout(next, 100);
+        else process.stdout.once('drain', () => setTimeout(next, 100));
+      };
+      setTimeout(next, 100);
+    }, 20);
   }, 50);
 }, 10);
 setInterval(() => {}, 1000);
@@ -66,7 +78,9 @@ try {
   await page.waitForSelector('h1');
   assert.equal(await page.locator('h1').textContent(), 'irvis');
   const audioSamples = await page.evaluate(async (url) => {
-    const context = new AudioContext();
+    // Check the packaged processor and CSP without a real-time audio device.
+    const context = new OfflineAudioContext(1, 2048, 48000);
+    let timer;
     try {
       await context.audioWorklet.addModule(url);
       const oscillator = context.createOscillator();
@@ -74,26 +88,27 @@ try {
       oscillator.connect(node);
       node.connect(context.destination);
       const captured = new Promise((resolve, reject) => {
-        const timer = setTimeout(
-          () => reject(new Error('Packaged audio worklet did not run.')),
-          3000,
-        );
+        timer = setTimeout(() => reject(new Error('Packaged audio worklet did not run.')), 15000);
         node.port.onmessage = ({ data }) => {
           if (data.samples) {
             clearTimeout(timer);
             node.port.postMessage('ack');
-            resolve(data.samples.length);
+            resolve({
+              length: data.samples.length,
+              hasSignal: data.samples.some((value) => value !== 0),
+            });
           }
         };
       });
       oscillator.start();
-      await context.resume();
-      return await captured;
+      const [samples] = await Promise.all([captured, context.startRendering()]);
+      return samples;
     } finally {
-      await context.close();
+      clearTimeout(timer);
     }
   }, audioWorklet);
-  assert.equal(audioSamples, 2048);
+  assert.equal(audioSamples.length, 2048);
+  assert.equal(audioSamples.hasSignal, true);
   const storageResult = await page.evaluate(async () => {
     const storage = window.irvisDesktop.recordingStorage;
     const name = `smoke-${crypto.randomUUID()}.irvis`;
@@ -250,11 +265,29 @@ try {
     assert.equal(metrics.exactMatch, 1);
     const downloadPath = resolve(scratch, 'frame-pair.json');
     await app.evaluate(({ session }, path) => {
-      session.defaultSession.once('will-download', (_event, item) => item.setSavePath(path));
+      // Electron owns this download; Playwright's page download event is not emitted.
+      globalThis.irvisSmokeDownload = new Promise((resolve) => {
+        const onDownload = (_event, item) => {
+          item.setSavePath(path);
+          item.once('done', (_event, state) => {
+            clearTimeout(timer);
+            resolve(state);
+          });
+        };
+        const timer = setTimeout(() => {
+          session.defaultSession.removeListener('will-download', onDownload);
+          resolve('timeout');
+        }, 15000);
+        session.defaultSession.once('will-download', onDownload);
+      });
     }, downloadPath);
     await page.getByRole('button', { name: 'Download frame pair', exact: true }).click();
-    for (let tries = 0; tries < 100 && !existsSync(downloadPath); tries++)
-      await page.waitForTimeout(100);
+    const downloadState = await app.evaluate(async () => {
+      const state = await globalThis.irvisSmokeDownload;
+      delete globalThis.irvisSmokeDownload;
+      return state;
+    });
+    assert.equal(downloadState, 'completed', 'Frame-pair download did not complete');
     const dump = JSON.parse(readFileSync(downloadPath, 'utf8'));
     assert.equal(dump.pair.metrics.exactMatch, 1);
     assert.equal(dump.reference.data.length, 256 * 384 * 2);

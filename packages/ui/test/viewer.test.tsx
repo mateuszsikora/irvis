@@ -45,6 +45,35 @@ function backend(): CameraBackend {
   };
 }
 describe('Viewer', () => {
+  it('refreshes connected cameras while preserving or replacing the selection', async () => {
+    const source = backend();
+    let devices: { id: string; label: string }[] = [];
+    source.listDevices = vi.fn(() => Promise.resolve(devices));
+    render(<Viewer profile={profile} backend={source} />);
+    fireEvent.click(screen.getByText('Camera setup'));
+    const refresh = screen.getByRole('button', { name: 'Refresh cameras' });
+    const camera = screen.getByLabelText<HTMLSelectElement>('Camera');
+    await waitFor(() => expect((refresh as HTMLButtonElement).disabled).toBe(false));
+    expect(camera.value).toBe('');
+    devices = [
+      { id: 'cam', label: 'Thermal camera' },
+      { id: 'second', label: 'Other camera' },
+    ];
+    fireEvent.click(refresh);
+    await waitFor(() => expect(camera.value).toBe('cam'));
+    fireEvent.change(camera, { target: { value: 'second' } });
+    devices = [...devices, { id: 'new', label: 'New camera' }];
+    fireEvent.click(refresh);
+    await screen.findByRole('option', { name: 'New camera' });
+    expect(camera.value).toBe('second');
+    devices = [{ id: 'new', label: 'New camera' }];
+    fireEvent.click(refresh);
+    await waitFor(() => expect(camera.value).toBe('new'));
+    devices = [];
+    fireEvent.click(refresh);
+    await waitFor(() => expect(camera.value).toBe(''));
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Start' }).disabled).toBe(true);
+  });
   it('offers six palettes and rejects reversed manual bounds', () => {
     render(<Viewer profile={profile} backend={backend()} />);
     expect(screen.getByRole('group', { name: 'Palette' }).querySelectorAll('button')).toHaveLength(

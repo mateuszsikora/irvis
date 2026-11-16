@@ -401,3 +401,7 @@ is not covered.
 ## Recording player contract
 
 `RecordingPlayer` in `src/player.ts` extends `Player` with the open `IrvisReader`, thermal-frame, recorded-view-state and error subscriptions, and `close`. The replay backend implements it; the web host injects its opener into UI. UI does not import backend packages.
+
+## Live backend integration
+
+CameraSession has an optional asynchronous `command(id)` method. YuyvFrame can carry a CameraStateSnapshot; Yuv420Frame can carry optional Worker-computed `reconstructed` dimensions, raw values and uncertainty mask. Consumers can still decode frames without these optional fields.

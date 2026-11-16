@@ -5,12 +5,13 @@
   "type": "module",
   "main": "dist/main.cjs",
   "scripts": {
-    "build": "esbuild src/main.js --bundle --platform=node --external:electron --outfile=dist/main.cjs && esbuild src/preload.cjs --bundle --platform=node --external:electron --outfile=dist/preload.cjs",
+    "build": "esbuild src/main.js --bundle --platform=node --external:electron --outfile=dist/main.cjs && esbuild src/preload.cjs --bundle --platform=node --external:electron --outfile=dist/preload.cjs && node src/permissions.js",
     "start": "electron .",
     "test:smoke": "node test/smoke.mjs"
   },
   "dependencies": {
-    "@irvis/core": "*"
+    "@irvis/core": "*",
+    "usb": "^2.19.1"
   },
   "devDependencies": {
     "electron": "^45.3.2",

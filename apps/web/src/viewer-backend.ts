@@ -9,9 +9,14 @@ export function liveBackend(onError: (message: string) => void): CameraBackend {
   const bridge = desktopBridge();
   return {
     id: bridge ? 'electron' : 'browser',
-    capabilities: { exactRaw: !!bridge, deviceControl: false, concurrentWith: [] },
+    capabilities: {
+      exactRaw: !!bridge,
+      deviceControl: !!bridge?.command,
+      concurrentWith: bridge?.concurrentWith ?? [],
+    },
     async listDevices() {
-      if (bridge) return [{ id: '0', label: 'Camera 0' }];
+      if (bridge)
+        return bridge.listDevices ? bridge.listDevices() : [{ id: '0', label: 'Camera 0' }];
       if (!navigator.mediaDevices) throw new Error('Camera access requires HTTPS or localhost.');
       const devices = await navigator.mediaDevices.enumerateDevices();
       return [
@@ -41,7 +46,7 @@ export function liveBackend(onError: (message: string) => void): CameraBackend {
       if (bridge) {
         const unsubscribe = bridge.subscribe(emit, reportError);
         try {
-          await bridge.start({ profileId: profile.id, modeId, device: Number(deviceId) });
+          await bridge.start({ profileId: profile.id, modeId, device: deviceId });
         } catch (error) {
           unsubscribe();
           if (owners.get(bridge) === owner) owners.delete(bridge);
@@ -66,6 +71,14 @@ export function liveBackend(onError: (message: string) => void): CameraBackend {
             };
           },
         },
+        ...(bridge?.command
+          ? {
+              command: async (id: string) => {
+                if (!isCurrent()) throw new Error('Camera session is closed');
+                await bridge.command!(id);
+              },
+            }
+          : {}),
         async close() {
           if (closed) return;
           closed = true;

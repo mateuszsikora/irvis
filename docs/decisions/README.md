@@ -80,3 +80,4 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [Microphone audio uses a versioned sidecar](architecture.md#microphone-audio-uses-a-versioned-sidecar) | [architecture.md](architecture.md) | decided (#19) |
 | [MP4 export uses Mediabunny without modifying its source](architecture.md#mp4-export-uses-mediabunny-without-modifying-its-source) | [architecture.md](architecture.md) | decided (#19) |
 | [Playback follows recorded correction until a host edit](architecture.md#playback-follows-recorded-correction-until-a-host-edit) | [architecture.md](architecture.md) | decided (#19) |
+| [Desktop state preserves unverified USB values](architecture.md#desktop-state-preserves-unverified-usb-values) | [architecture.md](architecture.md) | decided (#20) |

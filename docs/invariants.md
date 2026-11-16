@@ -262,3 +262,16 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
 - **65.** Audio packets align to thermal timestamps with pre-roll trimmed and gaps/end padded; incomplete or corrupt final packets do not invalidate earlier audio.
   - `packages/media/test/audio-sidecar.test.ts::audio sidecar::aligns samples to the thermal clock, trimming pre-roll and padding gaps and the end`
   - `packages/media/test/audio-sidecar.test.ts::audio sidecar::recovers all complete packets at every torn-write boundary and rejects corrupt tails`
+
+- **66.** Desktop USB control rejects ambiguous device matches and only dispatches commands from the selected profile.
+  - `apps/desktop/test/capture.test.js::desktop capture::refuses ambiguous USB selection`
+  - `apps/desktop/test/capture.test.js::desktop capture::reads state, allow-lists commands and refreshes per-frame sensor bytes`
+
+- **67.** A camera-reported gain without a verified conversion disables readings even when the host assumes high gain.
+  - `packages/ui/test/render.test.ts::FrameRenderer::refuses a camera-reported gain without a conversion despite the host assumption`
+
+- **68.** Failed or invalid camera gain readback blocks conversion instead of restoring the host's high-gain assumption; a subsequent valid state read restores the known gain.
+  - `apps/desktop/test/capture.test.js::desktop capture::blocks gain conversion after failed readback and recovers only on a valid read`
+  - `packages/ui/test/render.test.ts::FrameRenderer::blocks missing or unknown camera gain without falling back to high`
+- **69.** Refreshing the camera list preserves an existing selection, otherwise selects the first available camera, or clears it when no cameras remain.
+  - `packages/ui/test/viewer.test.tsx::Viewer::refreshes connected cameras while preserving or replacing the selection`
