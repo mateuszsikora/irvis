@@ -177,3 +177,11 @@ Status: decided (#4)
 Revisited in #30, when the check moved to TypeScript: Node is now there anyway, but the TypeScript compiler API is not, so the decision stands.
 
 **Rejected:** the TypeScript compiler API (the `typescript` package), because the check would import an npm package, so both documentation jobs would need `npm ci` before they run and the check would fail on a fresh clone without it; the gain, verified nesting, covers a limitation that review catches today. `tree-sitter` is rejected for the same reason. **Rejected:** asking Vitest for its test list (`vitest list`), because the check would need `npm ci` before it runs, would run every test file's imports, and the integrity job on `main` would depend on the whole TypeScript toolchain. **Rejected:** matching brackets to recover the nesting, because strings, comments, template literals and regex literals make a bracket counter wrong in exactly the files that are hard to read.
+
+## Android audit captures remain private
+
+Status: decided (#11)
+
+The Android audit's screenshots and recordings show the owner's home. The owner requested a text-only deliverable for the future public repository. Keep these captures and derived galleries or bundles in the gitignored `.context/android-audit/` directory; do not publish them in git or GitHub attachments. The feature catalogue retains observations, coverage limits and local capture IDs. The accepted catalogue and implementation handoff satisfy #11 without public screenshots.
+
+**Rejected:** publishing the original screenshots as review evidence, because the text inventory is sufficient and the images expose private surroundings.

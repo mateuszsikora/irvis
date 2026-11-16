@@ -28,6 +28,7 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [Plans and spike reports live in docs/ as marked exceptions](docs.md#plans-and-spike-reports-live-in-docs-as-marked-exceptions) | [docs.md](docs.md) | decided (#3) |
 | [package.json bumps are compared as parsed JSON](docs.md#packagejson-bumps-are-compared-as-parsed-json) | [docs.md](docs.md) | decided (#4) |
 | [Vitest test ids are checked by text search](docs.md#vitest-test-ids-are-checked-by-text-search) | [docs.md](docs.md) | decided (#4) |
+| [Android audit captures remain private](docs.md#android-audit-captures-remain-private) | [docs.md](docs.md) | decided (#11) |
 
 ## Architecture
 
@@ -43,6 +44,7 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [Alarms and isotherms skip uncertain pixels](architecture.md#alarms-and-isotherms-skip-uncertain-pixels) | [architecture.md](architecture.md) | decided (#13) |
 | [Palettes are 256-colour ramps defined by stops](architecture.md#palettes-are-256-colour-ramps-defined-by-stops) | [architecture.md](architecture.md) | decided (#12) |
 | [The UI is written in React](architecture.md#the-ui-is-written-in-react) | [architecture.md](architecture.md) | decided (#3) |
+| [The UI uses simple English only](architecture.md#the-ui-uses-simple-english-only) | [architecture.md](architecture.md) | decided (#17) |
 | [Workspace packages are consumed as TypeScript source](architecture.md#workspace-packages-are-consumed-as-typescript-source) | [architecture.md](architecture.md) | decided (#5) |
 | [TypeScript stays on 6.0 until typescript-eslint supports 7](architecture.md#typescript-stays-on-60-until-typescript-eslint-supports-7) | [architecture.md](architecture.md) | decided (#5) |
 | [Frames and state in core are subscriptions](architecture.md#frames-and-state-in-core-are-subscriptions) | [architecture.md](architecture.md) | decided (#5) |
