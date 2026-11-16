@@ -231,3 +231,13 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
 - **55.** Camera capture errors cannot affect photo status or audio, but errors rendering the current photo still silence its alarm; returning to capture restores camera error handling.
   - `packages/ui/test/alarm-lifecycle.test.tsx::alarm lifecycle::scopes capture errors to the camera across photo analysis and return to live capture`
   - `packages/ui/test/alarm-lifecycle.test.tsx::alarm lifecycle::still reports photo rendering errors and silences photo audio`
+
+
+- **56.** Captured overlay pixels and lossless thermal values are copied before asynchronous photo export can observe reused buffers.
+  - `packages/core/src/export/export.test.ts::photo export::preserves supplied overlay pixels and independent lossless temperatures`
+- **57.** Captured raw values and uncertainty follow the displayed mirrors and rotation.
+  - `packages/ui/test/photos.test.ts::photo geometry::transforms thermal pixels and uncertainty with displayed mirrors and rotation`
+- **58.** Gallery analysis starts with fresh editable measurements and leaves original photo bytes unchanged; deletion does not erase active analysis.
+  - `packages/ui/test/photo-workflow.test.tsx::photo workflow::captures into the gallery and opens fresh measurements while preserving original bytes`
+- **59.** Failed photo saves do not claim success, and failed deletions keep gallery entries visible.
+  - `packages/ui/test/photo-workflow.test.tsx::photo workflow::reports failed saves without claiming success and leaves failed deletions visible`

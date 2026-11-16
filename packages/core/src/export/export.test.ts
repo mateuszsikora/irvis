@@ -3,6 +3,7 @@ import { unzlibSync } from 'fflate';
 import {
   exportCsv,
   exportPng,
+  exportRenderedPng,
   exportSnapshot,
   IrvisReader,
   memoryByteSource,
@@ -39,6 +40,27 @@ function chunks(bytes: Uint8Array) {
   return result;
 }
 describe('photo export', () => {
+  it('preserves supplied overlay pixels and independent lossless temperatures', async () => {
+    const input = frame();
+    const raw = input.raw.slice();
+    const rgba = new Uint8ClampedArray(input.width * input.height * 4).fill(123);
+    const pending = exportRenderedPng(input, rgba, options);
+    rgba.fill(0);
+    input.raw.fill(0);
+    const bytes = await pending;
+    const pixels = unzlibSync(chunks(bytes).find((p) => p.type === 'IDAT')!.data);
+    expect([...pixels]).toEqual([
+      0,
+      ...new Array<number>(12).fill(123),
+      0,
+      ...new Array<number>(12).fill(123),
+    ]);
+    const reader = await IrvisReader.open(memoryByteSource(bytes));
+    expect((await reader.readFrame(0)).frame.raw).toEqual(raw);
+    await expect(exportRenderedPng(input, new Uint8ClampedArray(1), options)).rejects.toThrow(
+      'dimensions must match',
+    );
+  });
   it('round trips a lossless snapshot with metadata and captures reused buffers', async () => {
     const input = frame();
     const original = input.raw.slice();

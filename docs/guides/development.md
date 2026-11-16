@@ -154,3 +154,6 @@ Run `npm run test:desktop` after desktop or comparison changes. Expected output:
 ## Shared viewer packages
 
 `packages/ui` exports the React viewer and `packages/backend-replay` exports an in-memory camera backend. Both are source workspace dependencies of `apps/web`, with TypeScript build references in the root solution and web app. Their tests join the existing Vitest workspace discovery; UI tests use jsdom and Testing Library. The same Vite output detects the desktop preload at runtime.
+
+
+Photo library tests use the development-only `fake-indexeddb` dependency to exercise IndexedDB transactions without a browser. It is not bundled into the application; run the existing `npm test` command.

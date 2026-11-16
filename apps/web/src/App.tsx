@@ -1,6 +1,7 @@
+import { createPhotoLibrary } from './photo-library.ts';
 import { cameraProfiles, type CameraProfile } from '@irvis/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Viewer } from '@irvis/ui';
+import { Viewer, type PhotoLibrary } from '@irvis/ui';
 import { createReplayBackend } from '@irvis/backend-replay';
 import { liveBackend } from './viewer-backend.ts';
 import './viewer.css';
@@ -12,6 +13,10 @@ export interface AppProps {
   readonly profiles?: readonly CameraProfile[];
 }
 export function App({ profiles = cameraProfiles }: AppProps) {
+  const photoLibrary = useMemo(
+    () => (typeof indexedDB === 'undefined' ? undefined : createPhotoLibrary()),
+    [],
+  );
   const [source, setSource] = useState('demo');
   const [profileId, setProfileId] = useState(profiles[0]?.id ?? '');
   const profile = profiles.find((p) => p.id === profileId);
@@ -62,7 +67,12 @@ export function App({ profiles = cameraProfiles }: AppProps) {
       </header>
       {profiles.length === 0 && <p>No camera is supported yet.</p>}
       {profile?.videoModes && (
-        <SourceViewer key={`${source}-${profile.id}`} source={source} profile={profile} />
+        <SourceViewer
+          key={`${source}-${profile.id}`}
+          source={source}
+          profile={profile}
+          photoLibrary={photoLibrary}
+        />
       )}
       <details className="diagnostics">
         <summary>
@@ -75,7 +85,15 @@ export function App({ profiles = cameraProfiles }: AppProps) {
 }
 
 /** Error state belongs to one mounted source/profile, including pending opens. */
-function SourceViewer({ source, profile }: { source: string; profile: CameraProfile }) {
+function SourceViewer({
+  source,
+  profile,
+  photoLibrary,
+}: {
+  source: string;
+  profile: CameraProfile;
+  photoLibrary: PhotoLibrary | undefined;
+}) {
   const [error, setError] = useState('');
   const acceptsErrors = useRef(true);
   useEffect(() => {
@@ -93,5 +111,12 @@ function SourceViewer({ source, profile }: { source: string; profile: CameraProf
           }),
     [source],
   );
-  return <Viewer backend={backend} profile={profile} captureError={error} />;
+  return (
+    <Viewer
+      backend={backend}
+      profile={profile}
+      captureError={error}
+      {...(photoLibrary ? { photoLibrary } : {})}
+    />
+  );
 }
