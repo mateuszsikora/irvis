@@ -91,3 +91,20 @@ describe('App', () => {
 Run `node packages/media/test/browser.mjs` from the repository root after `npx playwright install chromium`. It needs ffprobe on PATH and an unused localhost port 4179. The script starts Vite, launches headless Chromium with a fake microphone, and drives recording → OPFS → playback/export → deletion plus capture → gallery → annotation/analysis. It inspects MP4 tracks with ffprobe and checks that the microphone tracks ended after Stop. Silent output has only video; microphone output includes AAC. The test uses a synthetic scene, not real hardware, and does not establish a crash-loss bound or Safari support.
 
 The media browser test also opens a two-frame file with a recorded correction change, adds measurements across forward/backward seeks, edits and deletes the selected point, and verifies distinct IDs and temperature readouts without duplicate React keys.
+
+## Cross-runtime acceptance (#21)
+
+```sh
+npx playwright install chromium webkit
+npm run test:parity
+```
+
+Use Node 26 or later. Electron comes from `npm ci`; Linux also needs the Playwright system libraries (`npx playwright install --with-deps chromium webkit`) and a display server for Electron (for example `xvfb-run -a npm run test:parity`). This is a separate Vitest Node suite, not part of `npm test`; missing browsers fail rather than skip it. Vite uses an ephemeral localhost port. The test allows 180 seconds for the whole matrix and 10 seconds per replay delivery.
+
+`packages/ui/test/parity/parity.integration.mjs` computes the Node reference during the same Vitest run, then drives Chromium (V8), WebKit (JavaScriptCore) and an isolated Electron renderer with Playwright. Each reads the committed `fixtures/infiray-p2pro/static-wall/lossless-v1.irvis` through `backend-replay.openRecording`: ten recorded frames followed by a backward seek and a seek to the end. Every raw value, frame metadata, converted/corrected pixel, whole-frame statistic, centre/edge point, diagonal line, area and histogram must match Node. Both identity correction and emissivity 0.73, reflected temperature 18 °C, offset 1.25 K are exercised.
+
+JSON numbers are encoded as big-endian IEEE-754 binary64 hexadecimal strings, preserving negative zero and non-finite values rather than rounding readings or converting NaN to null. There are no approved arithmetic exceptions in this scenario, so no tolerance is applied. A future exception must cite its decision and use an explicit tolerance only for the affected outputs; raw values and the existing exact path remain exact. Artifacts are written to `.context/parity/{node,chromium,webkit,electron}.json` before comparison.
+
+For each of the ten frames, the same React `Viewer` is mounted with `createReplayBackend([frame])`. Playwright starts it, enables min/max/centre tracking, selects °C, °F and K, compares visible measurement text with Node and stops it. Renderer exceptions fail the test. Electron uses a test-only shell with sandbox and context isolation enabled and Node integration disabled; it loads the same Vite-served UI as the browsers. Desktop packaging and the production preload are checked separately by `npm run test:desktop`.
+
+This is M4 acceptance for the recorded exact path, shared UI wiring and V8/JavaScriptCore arithmetic parity. It does not validate live camera capture, USB commands, planar reconstruction accuracy, Safari device APIs, MP4 export or physical temperature accuracy. Real camera backends remain covered by the spikes and the M5 hardware checklist described in the roadmap.
