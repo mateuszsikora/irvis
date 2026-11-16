@@ -11,11 +11,19 @@ import {
 
 describe('temperature units', () => {
   it('convert between °C and °F', () => {
-    expect(TEMPERATURE_UNITS).toEqual(['C', 'F']);
+    expect(TEMPERATURE_UNITS).toEqual(['C', 'F', 'K']);
     expect([-40, 0, 37, 100].map((c) => celsiusToUnit(c, 'F'))).toEqual([-40, 32, 98.6, 212]);
     expect([-40, 32, 98.6, 212].map((f) => unitToCelsius(f, 'F'))).toEqual([-40, 0, 37, 100]);
     expect(celsiusToUnit(21.3, 'C')).toBe(21.3);
     expect(unitToCelsius(21.3, 'C')).toBe(21.3);
+  });
+
+  it('converts kelvin readings and differences', () => {
+    expect(celsiusToUnit(0, 'K')).toBe(273.15);
+    expect(unitToCelsius(273.15, 'K')).toBe(0);
+    expect(celsiusDeltaToUnit(5, 'K')).toBe(5);
+    expect(unitDeltaToCelsius(5, 'K')).toBe(5);
+    expect(formatTemperature(0, 'K')).toBe('273.1 K');
   });
 
   it('convert differences without the 32° shift', () => {

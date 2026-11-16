@@ -1,5 +1,13 @@
+import { analyze, geometry, type AnalysisSettings } from './measurements.ts';
 import {
   autoRange,
+  correctFrame,
+  temperatureCorrection,
+  settingsFromCamera,
+  evaluateAlarms,
+  paintIsotherms,
+  formatTemperature,
+  type AlarmState,
   decodeYuyvRaw,
   reconstructPlanar,
   renderPalette,
@@ -21,11 +29,18 @@ export interface ViewSettings {
   smooth: boolean;
   uncertain: boolean;
   gain: string;
+  analysis?: AnalysisSettings;
+  /** Identity of the frame source; a new source starts without alarm hysteresis. */
+  alarmGeneration?: number;
 }
 
 /** Mutable frame state belongs to the canvas subscription, never React state. */
 export class FrameRenderer {
   range: TemperatureRange = { minCelsius: 20, maxCelsius: 40 };
+  private readouts: HTMLElement | undefined;
+  private onAlarm: ((active: boolean) => void) | undefined;
+  private alarmGeneration: number | undefined;
+  private alarmState: AlarmState | null = null;
   private source: HTMLCanvasElement;
   private canvas: HTMLCanvasElement;
   private scale: HTMLCanvasElement;
@@ -36,7 +51,11 @@ export class FrameRenderer {
     scale: HTMLCanvasElement,
     bounds: HTMLElement,
     warning: HTMLElement,
+    readouts?: HTMLElement,
+    onAlarm?: (active: boolean) => void,
   ) {
+    this.readouts = readouts;
+    this.onAlarm = onAlarm;
     this.canvas = canvas;
     this.scale = scale;
     this.bounds = bounds;
@@ -44,11 +63,18 @@ export class FrameRenderer {
     this.source = document.createElement('canvas');
   }
   draw(input: RawFrame, profile: CameraProfile, mode: VideoMode, settings: ViewSettings) {
+    if (settings.alarmGeneration !== this.alarmGeneration) {
+      this.alarmState = null;
+      this.alarmGeneration = settings.alarmGeneration;
+    }
     const conversion = profile.conversions.find((c) => c.gain === settings.gain)?.conversion;
     if (input.kind !== 'thermal' && (!conversion || !mode.layout)) {
       this.warning.textContent = 'No verified conversion for this mode. Readings unavailable.';
       this.canvas.getContext('2d')?.clearRect(0, 0, this.canvas.width, this.canvas.height);
       this.bounds.textContent = 'Readings unavailable';
+      if (this.readouts) this.readouts.textContent = '';
+      this.alarmState = null;
+      this.onAlarm?.(false);
       return;
     }
     const decoded =
@@ -62,11 +88,34 @@ export class FrameRenderer {
               uncertain: null,
             }
           : reconstructPlanar(input, { thermal: mode.layout!.thermal });
-    const celsius = toCelsiusArray(
+    let celsius = toCelsiusArray(
       decoded.raw,
       input.kind === 'thermal' ? input.frame.conversion : conversion!,
     );
+    const analysis = settings.analysis;
+    if (analysis) {
+      if (input.kind === 'thermal')
+        celsius = correctFrame(
+          input.frame,
+          analysis.correction ?? settingsFromCamera(input.frame.cameraState),
+        );
+      else if (analysis.correction)
+        celsius = celsius.map(temperatureCorrection(analysis.correction));
+    }
     const image = { ...decoded, celsius };
+    const result = analysis ? analyze(image, analysis) : null;
+    if (this.readouts) this.readouts.textContent = result?.text ?? '';
+    this.alarmState = evaluateAlarms(
+      celsius,
+      decoded.uncertain,
+      {
+        highCelsius: analysis?.alarm ? analysis.threshold : null,
+        lowCelsius: null,
+        hysteresis: 0.5,
+      },
+      this.alarmState,
+    );
+    this.onAlarm?.(this.alarmState.high.active);
     const automatic = autoRange(image);
     if (settings.range) this.range = settings.range;
     else if (!settings.locked && automatic) this.range = automatic;
@@ -78,6 +127,22 @@ export class FrameRenderer {
         ? 'Data look inconsistent with the declared camera mode. Check gain and factory settings.'
         : '';
     const rgba = renderPalette(celsius, this.range, settings.palette);
+    if (analysis?.isotherm)
+      paintIsotherms(rgba, celsius, decoded.uncertain, [
+        { kind: 'above', celsius: analysis.threshold, color: [255, 0, 0] },
+      ]);
+    const selected = analysis?.objects.find((o) => o.id === analysis.selected && o.kind === 'Area');
+    if (analysis?.highlight && selected) {
+      const { area } = geometry(selected, image);
+      const grey = renderPalette(celsius, this.range, 'white-hot');
+      for (let y = 0; y < image.height; y++)
+        for (let x = 0; x < image.width; x++) {
+          if (x < area.x || x >= area.x + area.width || y < area.y || y >= area.y + area.height) {
+            const i = (y * image.width + x) * 4;
+            rgba.set(grey.subarray(i, i + 4), i);
+          }
+        }
+    }
     if (settings.uncertain && decoded.uncertain)
       for (let i = 0; i < decoded.uncertain.length; i++) {
         if (decoded.uncertain[i]) rgba.set([255, 0, 255, 255], i * 4);
@@ -87,6 +152,38 @@ export class FrameRenderer {
     this.source
       .getContext('2d')
       ?.putImageData(new ImageData(rgba, decoded.width, decoded.height), 0, 0);
+    const overlay = this.source.getContext('2d');
+    if (overlay && analysis && result) {
+      overlay.strokeStyle = 'white';
+      overlay.fillStyle = 'white';
+      overlay.lineWidth = 1;
+      overlay.font = '8px sans-serif';
+      for (const object of analysis.objects) {
+        const { from, to, area } = geometry(object, image);
+        overlay.strokeStyle = object.id === analysis.selected ? '#00ff80' : 'white';
+        if (object.kind === 'Area') overlay.strokeRect(area.x, area.y, area.width, area.height);
+        if (object.kind === 'Line') {
+          overlay.beginPath();
+          overlay.moveTo(from.x, from.y);
+          overlay.lineTo(to.x, to.y);
+          overlay.stroke();
+        }
+      }
+      overlay.strokeStyle = 'white';
+      for (const marker of result.markers) {
+        overlay.beginPath();
+        overlay.moveTo(marker.x - 3, marker.y);
+        overlay.lineTo(marker.x + 3, marker.y);
+        overlay.moveTo(marker.x, marker.y - 3);
+        overlay.lineTo(marker.x, marker.y + 3);
+        overlay.stroke();
+        overlay.fillText(
+          marker.label,
+          Math.min(marker.x + 4, Math.max(0, image.width - 60)),
+          Math.max(8, marker.y),
+        );
+      }
+    }
     const quarter = settings.rotation % 180 !== 0;
     this.canvas.width = quarter ? decoded.height : decoded.width;
     this.canvas.height = quarter ? decoded.width : decoded.height;
@@ -112,6 +209,6 @@ export class FrameRenderer {
         0,
         0,
       );
-    this.bounds.textContent = `${this.range.minCelsius.toFixed(1)} °C — ${this.range.maxCelsius.toFixed(1)} °C`;
+    this.bounds.textContent = `${formatTemperature(this.range.minCelsius, analysis?.unit ?? 'C')} — ${formatTemperature(this.range.maxCelsius, analysis?.unit ?? 'C')}`;
   }
 }

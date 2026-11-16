@@ -1,17 +1,39 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cameraProfiles, type CameraBackend, type CameraSession, type RawFrame } from '@irvis/core';
+import {
+  cameraProfiles,
+  exportPng,
+  type CameraBackend,
+  type CameraSession,
+  type RawFrame,
+} from '@irvis/core';
 import { Viewer } from '../src/index.ts';
 const draw = vi.hoisted(() => vi.fn());
+const alarmCallback = vi.hoisted(() => ({
+  current: (_active: boolean) => {
+    void _active;
+  },
+}));
 vi.mock('../src/render.ts', () => ({
   FrameRenderer: class {
     draw = draw;
+    constructor(
+      _canvas: unknown,
+      _scale: unknown,
+      _bounds: unknown,
+      _warning: unknown,
+      _readouts: unknown,
+      onAlarm: (active: boolean) => void,
+    ) {
+      alarmCallback.current = onAlarm;
+    }
   },
 }));
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
   draw.mockClear();
+  vi.unstubAllGlobals();
 });
 const profile = cameraProfiles[0]!;
 function backend(): CameraBackend {
@@ -121,5 +143,123 @@ describe('Viewer', () => {
       profile.videoModes[0],
       expect.objectContaining({ palette: 'rainbow' }),
     );
+  });
+});
+
+describe('measurement controls', () => {
+  it('keeps three of each object, edits and deletes objects, and preserves tracking on clear', () => {
+    render(<Viewer profile={profile} backend={backend()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Track min' }));
+    for (const kind of ['point', 'line', 'area'])
+      for (let i = 0; i < 3; i++) fireEvent.click(screen.getByText(`Add ${kind}`));
+    const selector = screen.getByLabelText<HTMLSelectElement>('Selected object');
+    expect(selector.options).toHaveLength(10);
+    fireEvent.change(screen.getByLabelText('x (%)'), { target: { value: '10' } });
+    fireEvent.change(screen.getByLabelText('x2 (%)'), { target: { value: '90' } });
+    expect(screen.getByLabelText<HTMLInputElement>('x (%)').value).toBe('10');
+    expect(screen.getByLabelText<HTMLInputElement>('x2 (%)').value).toBe('90');
+    fireEvent.click(screen.getByText('Delete selected'));
+    expect(selector.options).toHaveLength(9);
+    fireEvent.click(screen.getByText('Clear measurements'));
+    expect(selector.options).toHaveLength(1);
+    expect(screen.getByText('Track min').getAttribute('aria-pressed')).toBe('true');
+  });
+  it('converts committed thresholds between units and validates correction edits', () => {
+    render(<Viewer profile={profile} backend={backend()} />);
+    fireEvent.change(screen.getByLabelText('High threshold (°C)'), { target: { value: '-10.5' } });
+    fireEvent.click(screen.getByText('Apply threshold'));
+    fireEvent.change(screen.getByLabelText('Temperature unit'), { target: { value: 'F' } });
+    expect(screen.getByLabelText<HTMLInputElement>('High threshold (°F)').value).toBe('13.1');
+    fireEvent.change(screen.getByLabelText('Temperature unit'), { target: { value: 'K' } });
+    expect(screen.getByLabelText<HTMLInputElement>('High threshold (K)').value).toBe('262.6');
+    fireEvent.change(screen.getByLabelText('Emissivity'), { target: { value: '0' } });
+    expect(screen.getByText<HTMLButtonElement>('Apply correction').disabled).toBe(true);
+    fireEvent.click(screen.getByText('Reset parameters'));
+    expect(screen.getByLabelText<HTMLInputElement>('Emissivity').value).toBe('1');
+    expect(screen.getByLabelText<HTMLInputElement>('Reflected temperature (°C)').value).toBe('25');
+    expect(screen.getByLabelText<HTMLInputElement>('Ambient temperature (°C)').disabled).toBe(true);
+  });
+  it('silences a triggered alarm immediately when disabled', async () => {
+    const start = vi.fn(),
+      stop = vi.fn();
+    vi.stubGlobal(
+      'AudioContext',
+      class {
+        destination = {};
+        resume = () => Promise.resolve();
+        close = () => Promise.resolve();
+        createOscillator = () => ({ connect: vi.fn(), disconnect: vi.fn(), start, stop });
+        createGain = () => ({ gain: { value: 0 }, connect: vi.fn(), disconnect: vi.fn() });
+      },
+    );
+    const source = backend();
+    source.open = () =>
+      Promise.resolve({
+        mode: profile.videoModes[0]!,
+        frames: {
+          subscribe: (listener: (frame: RawFrame) => void) => {
+            listener({
+              kind: 'thermal',
+              frame: {
+                width: 1,
+                height: 1,
+                timestamp: 0,
+                raw: new Uint16Array([50]),
+                conversion: { kind: 'linear', scale: 1, offset: 0 },
+                cameraState: { origin: 'assumed', values: {} },
+                uncertain: null,
+              },
+            });
+            return () => {};
+          },
+        },
+        close: async () => {},
+      } as unknown as CameraSession);
+    render(<Viewer profile={profile} backend={source} />);
+    await waitFor(() => expect(screen.getByText<HTMLButtonElement>('Start').disabled).toBe(false));
+    fireEvent.click(screen.getByText('Start'));
+    await waitFor(() => expect(screen.getByText<HTMLButtonElement>('Stop').disabled).toBe(false));
+    fireEvent.click(screen.getByLabelText('Enable alarm'));
+    expect(screen.getByText('Alarm enabled — below threshold')).toBeTruthy();
+    expect(start).not.toHaveBeenCalled();
+    act(() => alarmCallback.current(true));
+    expect(start).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByLabelText('Enable alarm'));
+    expect(stop).toHaveBeenCalledOnce();
+    expect(screen.getByText('Alarm disabled')).toBeTruthy();
+    act(() => alarmCallback.current(true));
+    expect(start).toHaveBeenCalledOnce();
+  });
+  it('opens a thermal PNG and adds fresh editable measurements', async () => {
+    const bytes = await exportPng(
+      {
+        width: 2,
+        height: 2,
+        timestamp: 0,
+        raw: new Uint16Array([20, 30, 40, 50]),
+        conversion: { kind: 'linear', scale: 1, offset: 0 },
+        cameraState: { origin: 'assumed', values: {} },
+        uncertain: null,
+      },
+      {
+        profile: { id: profile.id, version: profile.version, name: profile.name },
+        fps: 1,
+        path: 'exact',
+      },
+    );
+    render(<Viewer profile={profile} backend={backend()} />);
+    fireEvent.click(screen.getByText('Add point'));
+    fireEvent.change(screen.getByLabelText('Open thermal photo'), {
+      target: { files: [{ name: 'scene.png', arrayBuffer: () => Promise.resolve(bytes.buffer) }] },
+    });
+    await screen.findByText(/scene.png/);
+    expect(screen.getByLabelText<HTMLSelectElement>('Selected object').options).toHaveLength(1);
+    for (const kind of ['point', 'line', 'area']) fireEvent.click(screen.getByText(`Add ${kind}`));
+    expect(screen.getByLabelText<HTMLSelectElement>('Selected object').options).toHaveLength(4);
+    await waitFor(() => expect(draw).toHaveBeenCalled());
+    const received = draw.mock.calls.at(-1)?.[0] as RawFrame;
+    expect(received.kind).toBe('thermal');
+    if (received.kind === 'thermal')
+      expect(received.frame.raw).toEqual(new Uint16Array([20, 30, 40, 50]));
   });
 });

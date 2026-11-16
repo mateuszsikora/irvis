@@ -3,35 +3,35 @@
 // * and /, so every engine gives the same bits:
 // docs/decisions/architecture.md#measurement-code-uses-only-correctly-rounded-arithmetic
 
-/** `C`: degrees Celsius. `F`: degrees Fahrenheit. */
-export type TemperatureUnit = 'C' | 'F';
+/** `C`: degrees Celsius. `F`: degrees Fahrenheit. `K`: kelvin. */
+export type TemperatureUnit = 'C' | 'F' | 'K';
 
 /** Every unit, in the order a settings menu lists them. */
-export const TEMPERATURE_UNITS: readonly TemperatureUnit[] = ['C', 'F'];
+export const TEMPERATURE_UNITS: readonly TemperatureUnit[] = ['C', 'F', 'K'];
 
-/** The symbol shown after a value: `°C` or `°F`. */
+/** The symbol shown after a value: `°C`, `°F` or `K`. */
 export function unitSymbol(unit: TemperatureUnit): string {
-  return unit === 'C' ? '°C' : '°F';
+  return unit === 'K' ? 'K' : unit === 'C' ? '°C' : '°F';
 }
 
-/** A temperature in °C, in `unit`. °F = °C × 9 / 5 + 32. */
+/** A temperature in °C, in `unit`. °F = °C × 9 / 5 + 32; K = °C + 273.15. */
 export function celsiusToUnit(celsius: number, unit: TemperatureUnit): number {
-  return unit === 'C' ? celsius : (celsius * 9) / 5 + 32;
+  return unit === 'K' ? celsius + 273.15 : unit === 'C' ? celsius : (celsius * 9) / 5 + 32;
 }
 
-/** A temperature in `unit`, in °C. °C = (°F − 32) × 5 / 9. */
+/** A temperature in `unit`, in °C. °C = (°F − 32) × 5 / 9; °C = K − 273.15. */
 export function unitToCelsius(value: number, unit: TemperatureUnit): number {
-  return unit === 'C' ? value : ((value - 32) * 5) / 9;
+  return unit === 'K' ? value - 273.15 : unit === 'C' ? value : ((value - 32) * 5) / 9;
 }
 
 /** A temperature difference (an offset, a hysteresis) in kelvin, in `unit`: × 9 / 5 for °F. */
 export function celsiusDeltaToUnit(delta: number, unit: TemperatureUnit): number {
-  return unit === 'C' ? delta : (delta * 9) / 5;
+  return unit !== 'F' ? delta : (delta * 9) / 5;
 }
 
 /** A temperature difference in `unit`, in kelvin: × 5 / 9 for °F. */
 export function unitDeltaToCelsius(delta: number, unit: TemperatureUnit): number {
-  return unit === 'C' ? delta : (delta * 5) / 9;
+  return unit !== 'F' ? delta : (delta * 5) / 9;
 }
 
 /**
