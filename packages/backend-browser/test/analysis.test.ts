@@ -38,7 +38,8 @@ describe('browser analysis', () => {
     });
     expect(result.statistics.highByteHistogram[75]).toBe(4);
     expect(result.statistics.highByteHistogram.reduce((a, b) => a + b, 0)).toBe(4);
-    expect(result.frame).toBe(frame);
+    expect(result.frame.data).toBe(frame.data);
+    expect(result.frame.reconstructed?.raw).toEqual(new Uint16Array(4).fill(19201));
     expect(result.reconstructionMs).toBeGreaterThanOrEqual(0);
   });
 });

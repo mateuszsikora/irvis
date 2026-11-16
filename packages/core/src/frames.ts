@@ -6,6 +6,7 @@ import type { CameraStateSnapshot, Conversion } from './cameras/profile.ts';
  */
 export interface YuyvFrame {
   readonly kind: 'yuyv';
+  readonly cameraState?: CameraStateSnapshot;
   /** Pixels per row. */
   readonly width: number;
   /** Rows. */
@@ -29,6 +30,13 @@ export interface PlaneLayout {
  */
 export interface Yuv420Frame {
   readonly kind: 'yuv420';
+  /** Reconstruction computed by the capture Worker. */
+  readonly reconstructed?: {
+    width: number;
+    height: number;
+    raw: Uint16Array;
+    uncertain: Uint8Array;
+  };
   /** `i420`: planes Y, U, V. `nv12`: planes Y and interleaved UV. */
   readonly layout: 'i420' | 'nv12';
   readonly width: number;

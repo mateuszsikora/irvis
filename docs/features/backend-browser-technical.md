@@ -6,7 +6,7 @@
 
 `frame.ts` requests exact width and height, the profile fps, `resizeMode: { exact: 'none' }` and an exact device ID when supplied. The exact resize constraint requires no cropping or scaling in browsers that support `resizeMode`; an unsatisfiable combination must fail capture rather than fall back to resizing. Unsupported constraint names can be ignored by browsers, so this request alone is not proof of sample preservation. The separate coded-dimension check detects size mismatches, but cannot detect resizing that already produced the requested dimensions. It records metadata even for rejected frames. It rejects mismatched coded dimensions and formats other than I420/NV12 before copying. `allocationSize` and `copyTo` receive a full coded rectangle, with no format or colour-space option; the returned plane offsets and strides are preserved. VideoFrame timestamps are converted from microseconds to core milliseconds. Every consumed VideoFrame is closed in a finally block.
 
-`analysis.ts` calls core's `reconstructPlanar` in the Worker, with thermal rows from the selected mode. Brightness hints are disabled until the camera's upper image has been validated. The Worker returns the original buffer with statistics. Only the latest result is retained by `apps/web/src/Diagnostics.tsx`. Main-thread processing has one request in flight; the Safari worker processes sequentially. Stop cancels the reader and stops stream tracks. After a track transfer it sends `stop` to the Worker, which stops its own track, cancels its reader and acknowledges `stopped` after cleanup. The main thread terminates on acknowledgement or after a one-second fallback timeout; other paths terminate immediately. Cancelling startup clears the handshake timeout. Late permission results are stopped immediately. Worker failures and stream end stop capture.
+`analysis.ts` calls core's `reconstructPlanar` in the Worker, with thermal rows from the selected mode. Brightness hints are disabled until the camera's upper image has been validated. The Worker returns the original buffer, statistics and `frame.reconstructed` (raw values and uncertainty mask), which the live renderer consumes without repeating reconstruction. Only the latest result is retained by `apps/web/src/Diagnostics.tsx`. Main-thread processing has one request in flight; the Safari worker processes sequentially. Stop cancels the reader and stops stream tracks. After a track transfer it sends `stop` to the Worker, which stops its own track, cancels its reader and acknowledges `stopped` after cleanup. The main thread terminates on acknowledgement or after a one-second fallback timeout; other paths terminate immediately. Cancelling startup clears the handshake timeout. Late permission results are stopped immediately. Worker failures and stream end stop capture.
 
 ## Schema
 
@@ -18,7 +18,7 @@ The versioned download format is specified in [browser diagnostics format](../br
 - `constraints`, `metadata`, `rejection` and `copyFrame` are the capture helpers. `Analysis` and `FrameMetadata` describe callback data.
 - `deviceKey` is `irvis.browser.deviceId`. Storage failures do not block capture.
 
-This spike API does not yet implement the full core CameraBackend interface or hardware commands.
+The web app adapts this capture API to core CameraBackend, lists media devices and passes the selected device ID to capture. Browser capabilities are `exactRaw: false`, `deviceControl: false`, `concurrentWith: []`. Hardware commands are unavailable.
 
 ## Configuration
 

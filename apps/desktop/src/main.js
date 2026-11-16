@@ -1,14 +1,12 @@
+import { captureArgs, listDevices } from './capture.js';
+import { openControl } from './control.js';
 import { installRecordingStorage } from './recordings.js';
 import { app, BrowserWindow, ipcMain, protocol, net, session } from 'electron';
 import { spawn } from 'node:child_process';
 import { resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { cameraProfiles } from '@irvis/core';
-import {
-  findFfmpeg,
-  captureArgs,
-  parseInputPixelFormat,
-} from '../../../tools/capture-cli/src/ffmpeg.ts';
+import { findFfmpeg, parseInputPixelFormat } from '../../../tools/capture-cli/src/ffmpeg.ts';
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -26,8 +24,14 @@ const root = resolve(__dirname, '../../web/dist');
 let window;
 let child;
 let pending = false;
+let control;
+let controlCleanup = Promise.resolve();
+let generation = 0;
 const trusted = (url) => url.startsWith('app://irvis/');
 function stop() {
+  generation++;
+  if (control) controlCleanup = control.close().catch(() => {});
+  control = undefined;
   const previous = child;
   child = undefined;
   pending = false;
@@ -114,24 +118,47 @@ async function boot() {
   window.on('closed', () => {
     void closeRecordings();
   });
-  ipcMain.handle('capture:start', (event, options) => {
+  ipcMain.handle('capture:devices', (event) => {
+    authorize(event);
+    return listDevices();
+  });
+  ipcMain.handle('capture:command', async (event, id) => {
+    authorize(event);
+    if (!control) throw new Error('Camera control is unavailable');
+    await control.command(id);
+  });
+  ipcMain.handle('capture:start', async (event, options) => {
     authorize(event);
     stop();
-    if (process.platform !== 'darwin') throw new Error('M3 capture currently requires macOS.');
-    const mode = cameraProfiles
-      .find((p) => p.id === options?.profileId)
-      ?.videoModes?.find((m) => m.id === options?.modeId);
-    if (!mode?.layout || !Number.isSafeInteger(options.device) || options.device < 0)
-      throw new Error('Invalid capture selection');
-    const args = captureArgs({
-      deviceIndex: options.device,
-      width: mode.width,
-      height: mode.height,
-      fps: mode.fps,
-      seconds: 3600,
-      packetsPath: '/dev/null',
-    });
-    const proc = spawn(findFfmpeg(), ['-y', ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const token = generation;
+    const profile = cameraProfiles.find((p) => p.id === options?.profileId);
+    const mode = profile?.videoModes.find((m) => m.id === options?.modeId);
+    if (!mode?.layout) throw new Error('Invalid capture selection');
+    const args = captureArgs(process.platform, options.device, mode);
+    const ffmpeg = findFfmpeg();
+    await controlCleanup;
+    if (generation !== token) return;
+    // USB access can be unavailable while the OS owns UVC. Video remains usable.
+    try {
+      const opened = await openControl(
+        profile,
+        process.platform === 'darwin' ? resolve(__dirname, 'iokit-request') : undefined,
+      );
+      if (generation !== token) {
+        opened.close();
+        return;
+      }
+      control = opened;
+      await opened.read();
+      if (mode.enableCommand) await opened.command(mode.enableCommand);
+    } catch (error) {
+      if (generation !== token) return;
+      control?.close();
+      control = undefined;
+      if (mode.enableCommand) throw error;
+    }
+    if (generation !== token) return;
+    const proc = spawn(ffmpeg, ['-y', ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
     child = proc;
     let buffer = Buffer.alloc(0),
       log = '',
@@ -158,10 +185,11 @@ async function boot() {
       while (buffer.length >= size) {
         const data = buffer.subarray(0, size);
         buffer = buffer.subarray(size);
-        if (!pending && format === 'yuyv422') {
+        if (!pending && !control?.busy && format === 'yuyv422') {
           pending = true;
           window.webContents.send('capture:frame', {
             kind: 'yuyv',
+            cameraState: control?.snapshot,
             width: mode.width,
             height: mode.height,
             timestamp: performance.now(),

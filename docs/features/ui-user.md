@@ -4,7 +4,7 @@ The viewer shows live thermal images or a synthetic demo with simple English con
 
 ## Start a view
 
-Select Demo (the default) or Live camera, choose the camera profile, camera and thermal video mode, then Start. Stop releases the capture. Source or profile changes close the previous session. Live camera uses Electron when its preload API is present; otherwise it uses the browser. On macOS, Camera index is the AVFoundation video device index (default 0); use `ffmpeg -f avfoundation -list_devices true -i ""` to list devices. Open Capture diagnostics for the existing capture diagnostics (stop the viewer first).
+Select Demo (the default) or Live camera, choose the camera profile, camera and thermal video mode, then Start. Stop releases the capture. Source or profile changes close the previous session. Live camera uses Electron when its preload API is present; otherwise it uses the browser. The Camera menu lists native video devices in the desktop app and browser media devices on the web. Open Capture diagnostics for the existing capture diagnostics (stop the viewer first).
 
 ## Navigate the workspace
 
@@ -69,3 +69,7 @@ The Recordings section supports `.irvis` capture, playback, microphone audio and
 In Gallery, choose **Annotate** beside a photo. Pick an annotation colour and size. Enter text, then click its position; leave text empty to draw with the pointer. **Undo annotation** and **Redo annotation** change only the annotation draft. **Export flattened PNG** saves a separate image without temperature data. Keep the original photo for temperature analysis; annotations never overwrite it. Draft annotations are not retained after leaving the editor.
 
 Opening a recording restores its saved temperature correction. Playback and seeking follow saved correction changes. **Apply correction** or **Reset parameters** overrides that correction for the currently open recording; the override remains when seeking. Reopen the recording to follow its saved correction again. Files without saved correction use their recorded camera correction unchanged.
+
+Desktop Camera commands use the selected profile’s allow-list. They require USB access to exactly one matching camera. Unavailable USB access reports `Camera control is unavailable`; browser commands remain disabled. Camera state is read on connect and after commands. Selecting a gain without a verified conversion disables readings.
+
+After plugging in a camera, open Camera setup and select `Refresh cameras`. Stop capture first. The current camera stays selected if it is still connected; otherwise the first available camera is selected. If the camera's gain cannot be read, readings stay unavailable until a successful state read after reconnecting or sending another camera command.

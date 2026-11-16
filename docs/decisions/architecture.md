@@ -520,3 +520,11 @@ Mediabunny supplies the MP4 muxer and WebCodecs encoding with awaited submission
 Status: decided (#19)
 
 Opening a recording resets host correction from validated file metadata; seeking and playback follow its accumulated correction changes. An explicit Apply correction or Reset parameters action overrides correction until the file is reopened. Always reapplying metadata would undo intentional analysis edits, while inheriting correction from the previous source would change readings merely because another recording had been opened first. Only correction draft fields are synchronized when the applied recorded correction changes so the controls describe the measurement actually shown. The measurement controls remain mounted: resetting the whole panel would reset its ID counter while existing measurement objects remain, creating duplicate identifiers and coupling their edits/deletion.
+
+## Desktop state preserves unverified USB values
+
+Status: decided (#20)
+
+The desktop backend reuses the spike protocol and macOS IOKit helper. It preserves raw TPD fields and sensor bytes under `usb-` names instead of treating them as calibrated correction parameters. Only gain has an established enum mapping. Failed USB access leaves video usable; commands report unavailable. Ambiguous USB matches are rejected instead of selecting the first device.
+
+**Rejected:** decoding cur_vtemp or emissivity into physical units before their scaling and effect on thermal pixels are established.

@@ -68,3 +68,9 @@ Playback correction is scoped to each opened recording. `Viewer` initializes it 
 
 
 Live recording timestamps are captured with `performance.now()` at the camera subscription boundary and carried through renderer snapshots as `receivedAt`. Redrawing settings does not change that timestamp. Recording ignores snapshots preceding the recording request and stores receipt times instead of the camera's independent clock so version 2 audio packets share the thermal timeline. Export/download/deletion recognizes `.audio-v2.pcm` sidecars and retains legacy `.audio-v1.webm` support; PCM export uses the declared shared clock and crops/pads to video duration.
+
+## Live backend integration
+
+The Camera selector lists backend devices in both environments. Profile command buttons dispatch through the current session when no host command callback is provided. Rendering consumes Worker reconstruction when available and preserves desktop camera state in captured thermal frames. A camera-reported gain selects the conversion ahead of the host assumption; an unknown conversion disables readings. Raw USB state is not used as emissivity correction.
+
+`Refresh cameras` repeats enumeration while capture is stopped. It retains the selected ID when present, otherwise selects the first device or an empty value. Start and refresh are disabled during enumeration; stale enumeration results are ignored. Refresh does not retire a capture session. Missing gain in a camera-origin snapshot and explicit `unknown` gain disable readings, photos and recorded-frame output instead of falling back to the host assumption.

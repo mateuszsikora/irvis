@@ -168,3 +168,7 @@ Options: `--device <bus>:<address>` (required with multiple cameras), `--out <fi
 `src/usb-protocol.test.ts` tests ordered packets, endian boundaries, short replies, camera errors, invalid parameters, state error preservation and frame-half separation. `src/usb-video.test.ts` covers passthrough arguments and a live process that emits one frame then stalls. `src/usb-command.test.ts` covers both cancellation signals after detach, listener removal, exit codes and stopping video during startup. Hardware permissions, ffmpeg USB coexistence, IOKit request execution and setting effects remain owner tests.
 
 `src/usb-runtime.test.ts` imports the installed USB package without enumerating or opening hardware and checks both legacy enumeration and the WebUSB constructor. It replaces only `WebUSB.prototype.loadDevices` with synthetic devices to exercise the real authorization filter: requested IDs reach descriptor reads, unrelated devices stay unopened, an empty ID list includes all devices, and empty discovery reports no devices. Cancellation mocks use numeric OUT callback results, matching the native library.
+
+## Live backend integration
+
+Executable discovery searches for `ffmpeg.exe` on Windows PATH and `ffmpeg` elsewhere. `IRVIS_FFMPEG` still overrides discovery. The desktop app owns its platform-specific capture arguments; the CLI capture arguments remain AVFoundation-specific.

@@ -79,7 +79,14 @@ export class FrameRenderer {
       this.alarmState = null;
       this.alarmGeneration = settings.alarmGeneration;
     }
-    const conversion = profile.conversions.find((c) => c.gain === settings.gain)?.conversion;
+    const conversion = profile.conversions.find(
+      (c) =>
+        c.gain ===
+        (input.kind === 'yuyv'
+          ? (input.cameraState?.values['gain'] ??
+            (input.cameraState?.origin === 'camera' ? 'unknown' : settings.gain))
+          : settings.gain),
+    )?.conversion;
     if (input.kind !== 'thermal' && (!conversion || !mode.layout)) {
       this.warning.textContent = 'No verified conversion for this mode. Readings unavailable.';
       this.canvas.getContext('2d')?.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -99,7 +106,7 @@ export class FrameRenderer {
               raw: decodeYuyvRaw(input, mode.layout!.thermal),
               uncertain: null,
             }
-          : reconstructPlanar(input, { thermal: mode.layout!.thermal });
+          : (input.reconstructed ?? reconstructPlanar(input, { thermal: mode.layout!.thermal }));
     let celsius = toCelsiusArray(
       decoded.raw,
       input.kind === 'thermal' ? input.frame.conversion : conversion!,
@@ -228,7 +235,10 @@ export class FrameRenderer {
             ...decoded,
             timestamp: input.timestamp,
             conversion: conversion!,
-            cameraState: { origin: 'assumed', values: {} },
+            cameraState:
+              input.kind === 'yuyv' && input.cameraState
+                ? input.cameraState
+                : { origin: 'assumed', values: {} },
           };
     this.photo = {
       frame: structuredClone(

@@ -17,7 +17,7 @@ export function findFfmpeg(env: NodeJS.ProcessEnv = process.env): string {
   }
   for (const dir of (env['PATH'] ?? '').split(delimiter)) {
     if (dir === '') continue;
-    const candidate = join(dir, 'ffmpeg');
+    const candidate = join(dir, process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
     if (isExecutable(candidate)) return candidate;
   }
   throw new CliError(

@@ -45,6 +45,8 @@ export function Viewer({
 }: ViewerProps) {
   const [devices, setDevices] = useState<readonly { id: string; label: string }[]>([]);
   const [device, setDevice] = useState('');
+  const [deviceRefresh, setDeviceRefresh] = useState(0);
+  const [enumerating, setEnumerating] = useState(true);
   const [modeId, setModeId] = useState(profile.videoModes.find((m) => m.layout)?.id ?? '');
   const [session, setSession] = useState<CameraSession | null>(null);
   const [hasFrame, setHasFrame] = useState(false);
@@ -197,19 +199,29 @@ export function Viewer({
   }, [settings]);
   useEffect(() => {
     let alive = true;
+    setEnumerating(true);
     void backend
       .listDevices()
       .then((list) => {
         if (alive) {
           setDevices(list);
-          setDevice(list[0]?.id ?? '');
+          setDevice((selected) =>
+            list.some((entry) => entry.id === selected) ? selected : (list[0]?.id ?? ''),
+          );
         }
       })
       .catch((e) => {
         if (alive) setError(String(e));
+      })
+      .finally(() => {
+        if (alive) setEnumerating(false);
       });
     return () => {
       alive = false;
+    };
+  }, [backend, deviceRefresh]);
+  useEffect(() => {
+    return () => {
       generation.current++;
       void active.current?.close().catch(() => {});
       active.current = null;
@@ -354,7 +366,7 @@ export function Viewer({
           </span>
           <button
             className="primary-button"
-            disabled={busy || !!session || !device || !modeId}
+            disabled={busy || enumerating || !!session || !device || !modeId}
             onClick={() => void connect()}
           >
             <Icon name="play" />
@@ -812,35 +824,28 @@ export function Viewer({
           <details className="settings-disclosure">
             <summary>Camera setup</summary>
             <div className="connection">
-              {backend.id === 'electron' ? (
-                <label>
-                  Camera index
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={device}
-                    disabled={busy || !!session}
-                    onChange={(e) => setDevice(e.target.value)}
-                  />
-                </label>
-              ) : (
-                <label>
-                  Camera
-                  <select
-                    aria-label="Camera"
-                    value={device}
-                    disabled={busy || !!session}
-                    onChange={(e) => setDevice(e.target.value)}
-                  >
-                    {devices.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.label || d.id}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
+              <label>
+                Camera
+                <select
+                  aria-label="Camera"
+                  value={device}
+                  disabled={busy || !!session}
+                  onChange={(e) => setDevice(e.target.value)}
+                >
+                  {devices.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.label || d.id}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                disabled={busy || !!session || enumerating}
+                onClick={() => setDeviceRefresh((value) => value + 1)}
+              >
+                Refresh cameras
+              </button>
               <label>
                 Video mode
                 <select
@@ -895,9 +900,11 @@ export function Viewer({
               {profile.commands.map((c) => (
                 <button
                   key={c.id}
-                  disabled={!session || !backend.capabilities.deviceControl || !command}
+                  disabled={
+                    !session || !backend.capabilities.deviceControl || !(command ?? session.command)
+                  }
                   onClick={() => {
-                    void command?.(c.id).catch((e) => setError(String(e)));
+                    void (command ?? session?.command)?.(c.id).catch((e) => setError(String(e)));
                   }}
                 >
                   {c.label}
