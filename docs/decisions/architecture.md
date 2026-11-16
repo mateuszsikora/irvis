@@ -479,3 +479,11 @@ Status: decided (#17)
 The compact `ir` mark and full `irvis` wordmark share the amber `ir` silhouette and custom outlined letters. The header wordmark adds ivory `vis` directly on the dark app background, without a surrounding capsule, to distinguish infrared (`ir`) from visualization (`vis`) without losing contrast. An enclosed charcoal variant is retained for variable backgrounds. The transparent header version avoids making the brand resemble an interactive button. SVG preserves sharp edges at small UI sizes and avoids installed-font differences. The full mark replaces the separate icon and text in the header; the compact version serves narrow screens and the favicon.
 
 **Rejected:** raster logo assets and live text inside the SVG, because they respectively lose resolution independence and depend on font availability.
+
+## Viewer measurements use image-relative coordinates and explicit host edits
+
+Status: decided (#18)
+
+Objects use percentages of the unrotated thermal image and expose numeric coordinate edits. This supports keyboard movement and rectangle resizing, keeps objects bounded when frame sizes change, and does not assume unverified vendor gestures. Overlays are drawn before rotation and mirroring. Clear-all affects objects only.
+
+Host corrections are explicitly committed and use the existing core relative-camera model. The viewer follows reference limits and a reflected reset of 25 °C rather than changing core's general 20 °C default. Ambient correction stays disabled until a physical model is justified. A one-frame PNG/snapshot loader provides saved-photo analysis now; #19 owns gallery and capture integration. Captured presentation and editable objects remain distinct.

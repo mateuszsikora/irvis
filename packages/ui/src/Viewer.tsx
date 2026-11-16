@@ -1,6 +1,11 @@
+import { AnalysisControls } from './AnalysisControls.tsx';
+import { initialAnalysis } from './measurements.ts';
 import { useEffect, useRef, useState } from 'react';
 import {
   PALETTES,
+  IrvisReader,
+  memoryByteSource,
+  unitSymbol,
   rangeProblems,
   type CameraBackend,
   type CameraProfile,
@@ -42,13 +47,75 @@ export function Viewer({ backend, profile, command, captureError = '' }: ViewerP
     smooth: false,
     uncertain: false,
     gain: 'high',
+    analysis: initialAnalysis,
   });
+  const [triggered, setTriggered] = useState(false);
+  const [photoName, setPhotoName] = useState('');
+  const [photoError, setPhotoError] = useState('');
+  const photoGeneration = useRef(0);
+  const readouts = useRef<HTMLOutputElement>(null);
+  const audio = useRef<AudioContext | null>(null);
+  // Adapter capture errors belong to the camera, not a loaded photo.
+  // Local errors (including photo rendering failures) still apply to the current view.
+  const failure = error || (photoName ? '' : captureError);
+  const sounding = settings.analysis!.alarm && triggered && (!!session || !!photoName) && !failure;
+  useEffect(() => {
+    if (!sounding || !audio.current) return;
+    const context = audio.current;
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    gain.gain.value = 0.05;
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start();
+    return () => {
+      oscillator.stop();
+      oscillator.disconnect();
+      gain.disconnect();
+    };
+  }, [sounding]);
+  useEffect(
+    () => () => {
+      photoGeneration.current++;
+      void audio.current?.close();
+    },
+    [],
+  );
+  async function openPhoto(file: File) {
+    const token = ++photoGeneration.current;
+    setPhotoError('');
+    try {
+      const reader = await IrvisReader.open(
+        memoryByteSource(new Uint8Array(await file.arrayBuffer())),
+      );
+      if (reader.frames.length !== 1)
+        throw new Error('Choose a photo containing one thermal frame.');
+      const { frame } = await reader.readFrame(0);
+      if (token !== photoGeneration.current) return;
+      await stop();
+      if (token !== photoGeneration.current) return;
+      latest.current = {
+        frame: { kind: 'thermal', frame },
+        generation: generation.current,
+        mode: profile.videoModes.find((m) => m.layout)!,
+      };
+      setSettings((s) => ({
+        ...s,
+        analysis: { ...s.analysis!, objects: [], selected: null, correction: null, alarm: false },
+      }));
+      setPhotoName(file.name);
+      setHasFrame(true);
+      setError('');
+    } catch (e) {
+      if (token === photoGeneration.current) setPhotoError(String(e));
+    }
+  }
   const canvas = useRef<HTMLCanvasElement>(null),
     scale = useRef<HTMLCanvasElement>(null);
   const bounds = useRef<HTMLOutputElement>(null),
     warning = useRef<HTMLParagraphElement>(null);
   const current = useRef(settings);
-  const latest = useRef<{ frame: RawFrame; mode: VideoMode } | null>(null);
+  const latest = useRef<{ frame: RawFrame; mode: VideoMode; generation: number } | null>(null);
   const active = useRef<CameraSession | null>(null);
   const generation = useRef(0);
   useEffect(() => {
@@ -81,6 +148,8 @@ export function Viewer({ backend, profile, command, captureError = '' }: ViewerP
       scale.current,
       bounds.current,
       warning.current,
+      readouts.current ?? undefined,
+      (active) => setTriggered(active && latest.current?.generation === generation.current),
     );
     let previousFrame = latest.current;
     let previousSettings = current.current;
@@ -89,8 +158,13 @@ export function Viewer({ backend, profile, command, captureError = '' }: ViewerP
       const value = latest.current;
       if (value && (value !== previousFrame || previousSettings !== current.current)) {
         try {
-          renderer.draw(value.frame, profile, value.mode, current.current);
+          renderer.draw(value.frame, profile, value.mode, {
+            ...current.current,
+            alarmGeneration: value.generation,
+          });
         } catch (e) {
+          setTriggered(false);
+          if (readouts.current) readouts.current.textContent = 'Readings unavailable';
           setError(String(e));
         }
         previousFrame = value;
@@ -103,16 +177,22 @@ export function Viewer({ backend, profile, command, captureError = '' }: ViewerP
   }, [profile]);
   useEffect(() => {
     if (!session) return;
+    const token = generation.current;
     let received = false;
     return session.frames.subscribe((frame) => {
+      if (token !== generation.current) return;
       if (!received) {
         received = true;
         setHasFrame(true);
       }
-      latest.current = { frame, mode: session.mode };
+      latest.current = { frame, mode: session.mode, generation: token };
     });
   }, [session]);
   async function connect() {
+    photoGeneration.current++;
+    setPhotoName('');
+    setPhotoError('');
+    setTriggered(false);
     const token = ++generation.current;
     setBusy(true);
     setError('');
@@ -135,6 +215,11 @@ export function Viewer({ backend, profile, command, captureError = '' }: ViewerP
   }
   async function stop() {
     generation.current++;
+    setTriggered(false);
+    if (photoName) {
+      setSettings((s) => ({ ...s, analysis: { ...s.analysis!, alarm: false } }));
+      if (latest.current) latest.current = { ...latest.current, generation: generation.current };
+    }
     setBusy(false);
     const opened = active.current;
     active.current = null;
@@ -150,14 +235,13 @@ export function Viewer({ backend, profile, command, captureError = '' }: ViewerP
   const update = (patch: Partial<ViewSettings>) => setSettings((s) => ({ ...s, ...patch }));
   const gains = profile.state.find((f) => f.id === 'gain');
   const gainOptions = gains?.kind === 'enum' ? gains.values : ['high', 'low'];
-  const failure = error || captureError;
   return (
     <section aria-label="Thermal viewer" className="viewer">
       <div className="viewer-topbar">
         <div>
           <span className="eyebrow">WORKSPACE</span>
           <h2>
-            Live view{' '}
+            {photoName ? 'Photo analysis' : 'Live view'}{' '}
             <span className={`status-badge ${session && hasFrame && !failure ? 'is-live' : ''}`}>
               <i />
               {failure
@@ -188,7 +272,11 @@ export function Viewer({ backend, profile, command, captureError = '' }: ViewerP
             <Icon name="play" />
             Start
           </button>
-          <button className="stop-button" disabled={!busy && !session} onClick={() => void stop()}>
+          <button
+            className="stop-button"
+            disabled={!busy && !session && !photoName}
+            onClick={() => void stop()}
+          >
             <Icon name="stop" />
             Stop
           </button>
@@ -246,11 +334,16 @@ export function Viewer({ backend, profile, command, captureError = '' }: ViewerP
                     : rangeMode === 'manual'
                       ? 'Manual range'
                       : 'Auto range'}{' '}
-                  · °C
+                  · {unitSymbol(settings.analysis!.unit)}
                 </span>
               </div>
             </div>
           </div>
+          {photoError && (
+            <p className="notice error-notice" role="alert">
+              Photo import failed: {photoError}
+            </p>
+          )}
           {failure && (
             <p className="notice error-notice" role="alert">
               {failure}
@@ -286,10 +379,61 @@ export function Viewer({ backend, profile, command, captureError = '' }: ViewerP
               <span>Uncertain pixels</span>
             </label>
           </div>
+          <div className="preview-toolbar" aria-label="Tracking shortcuts">
+            {(['min', 'max', 'centre'] as const).map((key) => (
+              <button
+                key={key}
+                aria-pressed={settings.analysis!.tracking[key]}
+                onClick={() =>
+                  update({
+                    analysis: {
+                      ...settings.analysis!,
+                      tracking: {
+                        ...settings.analysis!.tracking,
+                        [key]: !settings.analysis!.tracking[key],
+                      },
+                    },
+                  })
+                }
+              >
+                Track {key}
+              </button>
+            ))}
+          </div>
+          <output
+            ref={readouts}
+            aria-label="Measurement readings"
+            style={{ whiteSpace: 'pre-line' }}
+          />
+          <p role="status">
+            {!settings.analysis!.alarm
+              ? 'Alarm disabled'
+              : triggered
+                ? 'Alarm triggered'
+                : 'Alarm enabled — below threshold'}
+          </p>
+          <label>
+            Open thermal photo
+            <input
+              type="file"
+              accept=".png,.irvis"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void openPhoto(file);
+                e.target.value = '';
+              }}
+            />
+          </label>
+          {photoName && (
+            <p>
+              {photoName} · New measurements use stored temperatures. Captured overlays are not
+              editable objects.
+            </p>
+          )}
           <nav className="tool-dock" aria-label="Tools">
-            {(['Measurement', 'Photo', 'Video', 'Gallery'] as const).map((name, i) => (
+            {(['Photo', 'Video', 'Gallery'] as const).map((name, i) => (
               <button key={name} disabled title="Coming in a later update">
-                <Icon name={(['measure', 'photo', 'video', 'gallery'] as const)[i]!} />
+                <Icon name={(['photo', 'video', 'gallery'] as const)[i]!} />
                 <span>{name}</span>
                 <small>Soon</small>
               </button>
@@ -297,6 +441,26 @@ export function Viewer({ backend, profile, command, captureError = '' }: ViewerP
           </nav>
         </div>
         <aside className="settings-panel" aria-label="View settings">
+          <AnalysisControls
+            value={settings.analysis!}
+            onChange={(analysis) => {
+              if (
+                analysis.alarm &&
+                !settings.analysis!.alarm &&
+                typeof AudioContext !== 'undefined'
+              ) {
+                audio.current ??= new AudioContext();
+                void audio.current.resume().catch(() => {});
+              }
+              if (
+                analysis.alarm !== settings.analysis!.alarm ||
+                analysis.threshold !== settings.analysis!.threshold
+              )
+                setTriggered(false);
+              update({ analysis });
+            }}
+          />
+
           <section className="settings-section">
             <div className="section-heading">
               <h3>Palette</h3>

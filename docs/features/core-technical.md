@@ -388,3 +388,7 @@ reuse, PNG framing/CRCs and inflated RGBA bytes, reopening through
 `IrvisReader`, malformed containers, CSV values and uncertainty, and range
 fallback/validation. It uses synthetic data; external image-editor behaviour
 is not covered.
+
+### Kelvin display units
+
+`corrections/units.ts` accepts `K` alongside `C` and `F`. Absolute kelvin values add/subtract 273.15 at the display/input boundary; temperature differences in kelvins are unchanged. `TEMPERATURE_UNITS` lists C, F, K. Internal measurements, alarms and corrections remain in Celsius. The viewer adds narrower validated correction input limits and a 25 °C reflected reset; `DEFAULT_CORRECTION` remains 20 °C. `corrections/units.test.ts` covers absolute and difference conversions.

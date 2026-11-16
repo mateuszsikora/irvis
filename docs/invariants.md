@@ -210,3 +210,24 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
 - **48.** Pending capture errors belong to the mounted source and profile; changing either isolates the new view from old errors without suppressing current errors.
   - `apps/web/src/viewer-session.test.tsx::viewer sessions::ignores pending capture errors after switching to Demo and back before starting again`
   - `apps/web/src/viewer-session.test.tsx::viewer sessions::isolates pending errors when the camera profile changes and still reports current errors`
+
+- **49.** Clearing measurement objects preserves independent global tracking; at least three points, lines and areas can coexist.
+  - `packages/ui/test/viewer.test.tsx::measurement controls::keeps three of each object, edits and deletes objects, and preserves tracking on clear`
+- **50.** An uncertain point or centre pixel has no measurement marker; local extrema skip uncertain pixels.
+  - `packages/ui/test/measurements.test.ts::viewer measurements::excludes uncertain markers and reports local extrema for multiple objects`
+- **51.** Disabling a triggered viewer alarm stops its oscillator immediately and prevents stale trigger updates from restarting sound.
+  - `packages/ui/test/viewer.test.tsx::measurement controls::silences a triggered alarm immediately when disabled`
+
+
+- **52.** A rejected photo import leaves the current live alarm operational.
+  - `packages/ui/test/alarm-lifecycle.test.tsx::alarm lifecycle::keeps live alarms working after a rejected photo import`
+- **53.** Alarm triggers and hysteresis belong to the frame source; retained or obsolete frames cannot trigger a new session before its first frame.
+  - `packages/ui/test/alarm-lifecycle.test.tsx::alarm lifecycle::waits for a new session frame and ignores retained frames and obsolete emissions`
+  - `packages/ui/test/render.test.ts::FrameRenderer::resets alarm hysteresis when the frame source changes`
+- **54.** Stop disables a photo alarm while retaining editable measurements; resuming it requires explicit re-enabling.
+  - `packages/ui/test/alarm-lifecycle.test.tsx::alarm lifecycle::stops photo audio and requires explicit re-enabling while keeping the photo editable`
+
+
+- **55.** Camera capture errors cannot affect photo status or audio, but errors rendering the current photo still silence its alarm; returning to capture restores camera error handling.
+  - `packages/ui/test/alarm-lifecycle.test.tsx::alarm lifecycle::scopes capture errors to the camera across photo analysis and return to live capture`
+  - `packages/ui/test/alarm-lifecycle.test.tsx::alarm lifecycle::still reports photo rendering errors and silences photo audio`

@@ -753,3 +753,28 @@ summary::-webkit-details-marker {
     display: none;
   }
 }
+
+.measurement-controls {
+  display: grid;
+  gap: 10px;
+}
+.measurement-controls label {
+  display: block;
+  color: var(--muted);
+}
+.measurement-controls fieldset {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+}
+.measurement-controls p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.preview-toolbar button[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
