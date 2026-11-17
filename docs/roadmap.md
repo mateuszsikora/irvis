@@ -15,7 +15,7 @@ irvis is an open-source viewer for USB-C thermal cameras:
 - one TypeScript core without DOM and Node APIs, and one UI build, shared by both;
 - feature parity with the vendor's Android app as the target. Hardware features (USB commands to the camera) exist only in the desktop app; the web version shows them greyed out with "available in the desktop app";
 - cameras supported through camera profiles, so that a new model (for example TOPDON TC001) is added without touching the UI, the backends or the recording format;
-- MIT licence; the repository is private now and public later.
+- MIT licence; the repository has been public since 17 November 2026 (#26).
 
 The first camera is the TOOLTOP T7, a rebrand of the InfiRay P2 Pro.
 
@@ -173,7 +173,7 @@ Targets for the reconstruction (from the specification): Y matches the low bytes
 | [#26](https://github.com/mateuszsikora/irvis/issues/26) | History audit for secrets and files that must not be public, licence review, then CI as a required check ([audit](findings/public-repository.md)) |
 | [#56](https://github.com/mateuszsikora/irvis/issues/56) | CI and "Promote to release" on GitHub-hosted runners, so that pull requests from forks do not run on the self-hosted runner |
 
-**Owner:** switch the repository to public with #26 and #56, in the order of the [owner steps](findings/public-repository.md#owner-steps-in-this-order).
+**Owner:** switch the repository to public with #26 and #56, in the order of the [owner steps](findings/public-repository.md#owner-steps-in-this-order) (done on 17 November 2026).
 
 ## Order of work
 
