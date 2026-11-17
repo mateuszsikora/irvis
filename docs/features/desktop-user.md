@@ -18,7 +18,7 @@ A missing recent browser frame shows `Waiting for a browser frame received withi
 
 ## Install a package
 
-Each version's packages are attached to its GitHub Release at https://github.com/mateuszsikora/irvis/releases; while the repository is private, only people with access to it can download them. Packages are unsigned: macOS and Windows warn that the developer cannot be verified. Each package carries its own ffmpeg, so no other software is needed; the ffmpeg source tarball and the `build.sh` that built it are attached to the same release.
+Each version's packages are attached to its GitHub Release at https://github.com/mateuszsikora/irvis/releases. Packages are unsigned: macOS and Windows warn that the developer cannot be verified. Each package carries its own ffmpeg, so no other software is needed; the ffmpeg source tarball and the `build.sh` that built it are attached to the same release.
 
 - **macOS 13 or later** (`irvis-<version>-mac-arm64.dmg` for Apple silicon, `-mac-x64.dmg` for Intel): open the dmg and drag irvis to Applications. The first start is blocked; open **System Settings → Privacy & Security** and choose **Open Anyway** for irvis. At the first capture macOS asks for camera access with `irvis uses the camera to display and record thermal images.`
 - **Windows 10 or later** (x64): run `irvis-<version>-win-x64.exe` and confirm **More info → Run anyway** in SmartScreen, or unpack `irvis-<version>-win-x64.zip` and run `irvis.exe`.
