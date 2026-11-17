@@ -20,4 +20,4 @@ body:
     id: camera
     attributes:
       label: Camera details
-      description: For a new camera, its model, USB ID (for example from `lsusb` or System Information) and any other software that works with it.
+      description: For a new camera, its model, USB ID (from `lsusb` on Linux, System Information on macOS, or Device Manager → Hardware Ids on Windows) and any other software that works with it.

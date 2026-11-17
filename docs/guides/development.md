@@ -218,9 +218,9 @@ Publishing starts the workflow again with the `release` event, from the tagged c
 | File | Name | Label | Required fields |
 | --- | --- | --- | --- |
 | `bug_report.yml` | Bug report | `bug` | What happened, Steps to reproduce, Where (desktop app on macOS, Windows or Linux; web version in Chrome or Edge, or Safari; run from source), irvis version, System and browser versions; Camera and Logs are optional |
-| `feature_request.yml` | Feature request, also for a new camera | `enhancement` | What irvis should do, Why; Camera details is optional |
+| `feature_request.yml` | Feature request | `enhancement` | What irvis should do (a feature or a camera to support), Why; Camera details is optional |
 
-`config.yml` keeps blank issues allowed, so that issues opened with `gh issue create --body` or without a form still work, and adds the link "Report a security vulnerability" to the private advisory form. [.github/SECURITY.md](../../.github/SECURITY.md) is the security policy that GitHub shows on the Security tab: reports go through private vulnerability reporting, never a public issue, and only `main` and the next release get fixes. The repository settings it depends on are listed in [CONTRIBUTING.md](../../CONTRIBUTING.md#repository-settings). The PR template is `.github/pull_request_template.md` ([CONTRIBUTING.md](../../CONTRIBUTING.md#pull-requests)).
+There is no `config.yml`, so the chooser keeps "Open a blank issue" for a report that fits neither form. [.github/SECURITY.md](../../.github/SECURITY.md) is the security policy that GitHub shows on the Security tab: reports go through private vulnerability reporting, never a public issue, and only `main` and the next release get fixes. With private vulnerability reporting on, GitHub adds the security policy and the advisory form to the issue chooser by itself. The repository settings it depends on are listed in [CONTRIBUTING.md](../../CONTRIBUTING.md#repository-settings). The PR template is `.github/pull_request_template.md` ([CONTRIBUTING.md](../../CONTRIBUTING.md#pull-requests)).
 
 ## Agent skills
 

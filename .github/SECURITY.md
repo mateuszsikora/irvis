@@ -8,4 +8,4 @@ Describe what is affected (the desktop app on which system, the web version in w
 
 ## Supported versions
 
-No release is published yet. Fixes land on `main` and ship in the next release; older releases get no fixes.
+Fixes land on `main` and ship in the next release; older releases get no fixes.

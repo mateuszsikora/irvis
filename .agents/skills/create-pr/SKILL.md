@@ -41,7 +41,7 @@ gh api repos/mateuszsikora/irvis --jq '{allow_squash_merge, allow_merge_commit, 
 gh api repos/mateuszsikora/irvis/actions/permissions/workflow --jq '{can_approve_pull_request_reviews}'
 gh api repos/mateuszsikora/irvis/actions/permissions/fork-pr-contributor-approval --jq .approval_policy
 gh api repos/mateuszsikora/irvis/rulesets --jq '.[] | {name, enforcement}'
-gh api repos/mateuszsikora/irvis --jq '.security_and_analysis | map_values(.status)'
+gh api repos/mateuszsikora/irvis --jq '.security_and_analysis // {} | map_values(.status)'
 gh api repos/mateuszsikora/irvis/private-vulnerability-reporting --jq .enabled
 gh api repos/mateuszsikora/irvis/vulnerability-alerts --silent && echo alerts on
 git status --short --branch
@@ -74,7 +74,7 @@ Then decide:
 - **Behind `main`, conflicts:** list the conflicted files and ask how to proceed. Never rebase or merge `main` on your own.
 - **Open PR for this branch:** update mode. Push new commits to it and rewrite its title and body (step 9); do not open a second PR. Keep the branch name.
 - **Only merged or closed PRs for this branch:** warn that the branch was probably already merged and is stale; ask before continuing.
-- **Repository settings differ from `CONTRIBUTING.md`** (merge commit or rebase allowed, branch deletion off, other squash title/message, `can_approve_pull_request_reviews` not `true`, fork approval policy not `all_external_contributors`, no active ruleset `main`, secret scanning or push protection not `enabled`, Dependabot security updates not `disabled`, private vulnerability reporting not `true`, no `alerts on` from the Dependabot alerts check): continue, and mention it once in the report. Changing them is the owner's decision; never change them yourself.
+- **Repository settings differ from `CONTRIBUTING.md`** (merge commit or rebase allowed, branch deletion off, other squash title/message, `can_approve_pull_request_reviews` not `true`, fork approval policy not `all_external_contributors`, no active ruleset `main`, secret scanning or push protection not `enabled`, Dependabot security updates not `disabled`, private vulnerability reporting not `true`, no `alerts on` from the Dependabot alerts check): continue, and mention it once in the report. Changing them is the owner's decision; never change them yourself. The security checks need admin access: if `security_and_analysis` prints `{}` and the other two fail with 403 or 404, report the security settings as not visible to this token, not as different.
 
 ## 2. Gather context
 
