@@ -53,7 +53,7 @@ Most tests need nothing beyond `npm ci`. The documentation check's tests need mo
 
 ## Shared runner load
 
-The self-hosted CI runner can be busy with other work. Functional tests must assert results, not elapsed wall-clock time. Core allows 60 seconds per test and hook, including the synthetic reconstruction sweep and exhaustive `.irvis` truncation recovery test. This is a hang guard, not a performance target. Keep deterministic coverage when a loaded runner exceeds Vitest's default five-second timeout; do not fix it by skipping cases, weakening assertions or adding retries.
+CI runs on shared GitHub-hosted runners, which can be slower than a development machine and vary from run to run (the former self-hosted runner was also busy with other work). Functional tests must assert results, not elapsed wall-clock time. Core allows 60 seconds per test and hook, including the synthetic reconstruction sweep and exhaustive `.irvis` truncation recovery test. This is a hang guard, not a performance target. Keep deterministic coverage when a loaded runner exceeds Vitest's default five-second timeout; do not fix it by skipping cases, weakening assertions or adding retries.
 
 Use fake timers or explicit synchronization for timer-driven behaviour instead of short real sleeps. Record algorithm timing in the separate non-gating benchmarks with the machine identity and workload. A runtime measured on an idle development machine is not a reliable CI timeout budget.
 

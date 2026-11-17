@@ -13,7 +13,7 @@ jobs:
   docs:
     name: Documentation contract
     if: github.event_name == 'pull_request'
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
@@ -32,7 +32,7 @@ jobs:
   integrity:
     name: Documentation integrity
     if: github.event_name == 'push'
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
@@ -44,8 +44,8 @@ jobs:
 
   typescript:
     name: TypeScript
-    runs-on: [self-hosted, Linux, X64]
-    # The steps take about 10 minutes on the self-hosted runner.
+    runs-on: ubuntu-24.04
+    # The steps took about 10 minutes on the former self-hosted runner.
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7

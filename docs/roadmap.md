@@ -173,7 +173,7 @@ Targets for the reconstruction (from the specification): Y matches the low bytes
 | [#26](https://github.com/mateuszsikora/irvis/issues/26) | History audit for secrets and files that must not be public, licence review, then CI as a required check ([audit](findings/public-repository.md)) |
 | [#56](https://github.com/mateuszsikora/irvis/issues/56) | CI and "Promote to release" on GitHub-hosted runners, so that pull requests from forks do not run on the self-hosted runner |
 
-**Owner:** switch the repository to public after #26 and #56, in the order of the [owner steps](findings/public-repository.md#owner-steps-in-this-order).
+**Owner:** switch the repository to public with #26 and #56, in the order of the [owner steps](findings/public-repository.md#owner-steps-in-this-order).
 
 ## Order of work
 

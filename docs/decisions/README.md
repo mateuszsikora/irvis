@@ -65,7 +65,8 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [Capture output packs pixels without automatic conversion](architecture.md#capture-output-packs-pixels-without-automatic-conversion) | [architecture.md](architecture.md) | decided (#6) |
 | [USB spike uses explicit transfer sequences without claiming UVC](architecture.md#usb-spike-uses-explicit-transfer-sequences-without-claiming-uvc) | [architecture.md](architecture.md) | decided (#7) |
 | [The USB spike uses node-usb 2.x for unclaimed EP0 transfers](architecture.md#the-usb-spike-uses-node-usb-2x-for-unclaimed-ep0-transfers) | [architecture.md](architecture.md) | decided (#7) |
-| [GitHub Actions use the self-hosted Linux X64 runner](architecture.md#github-actions-use-the-self-hosted-linux-x64-runner) | [architecture.md](architecture.md) | decided |
+| [GitHub Actions use the self-hosted Linux X64 runner](architecture.md#github-actions-use-the-self-hosted-linux-x64-runner) | [architecture.md](architecture.md) | superseded (#56) |
+| [GitHub Actions use GitHub-hosted runners](architecture.md#github-actions-use-github-hosted-runners) | [architecture.md](architecture.md) | decided (#56) |
 | [Planar reconstruction preserves the rounded chroma observation](architecture.md#planar-reconstruction-preserves-the-rounded-chroma-observation) | [architecture.md](architecture.md) | decided (#8) |
 | [Functional test timeouts allow shared runner contention](architecture.md#functional-test-timeouts-allow-shared-runner-contention) | [architecture.md](architecture.md) | decided (#8) |
 | [Browser diagnostics retain native planar bytes and disable brightness hints](architecture.md#browser-diagnostics-retain-native-planar-bytes-and-disable-brightness-hints) | [architecture.md](architecture.md) | decided (#9) |

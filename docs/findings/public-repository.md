@@ -46,13 +46,14 @@ What ships, and what was missing:
 
 ## Repository settings
 
-- **Self-hosted runner:** `ci.yml` runs on every `pull_request` on the self-hosted runner. In a public repository a pull request from a fork would run its code there. Moving to GitHub-hosted runners is [#56](https://github.com/mateuszsikora/irvis/issues/56), which must land before the visibility switch.
+- **Self-hosted runner:** `ci.yml` runs on every `pull_request` on the self-hosted runner. In a public repository a pull request from a fork would run its code there. Moving to GitHub-hosted runners is [#56](https://github.com/mateuszsikora/irvis/issues/56), done in the same pull request as #26; the owner removes the runner from the repository before the visibility switch.
 - **Required checks:** rulesets become available once the repository is public; the ruleset is in `.github/rulesets/main.json` ([decision](../decisions/docs.md#ci-checks-are-required-through-a-ruleset-once-the-repository-is-public), [how to apply it](../guides/development.md#required-checks)).
 
 ## Owner steps, in this order
 
-1. Merge #26 and #56.
+1. Remove the self-hosted runner: Settings → Actions → Runners. With the GitHub Actions minutes of the private repository used up, CI on GitHub-hosted runners runs only once the repository is public.
 2. Delete the unexpired `irvis-mac`, `irvis-win` and `irvis-linux` artifacts built before #26, which lack the licence files: `gh api repos/mateuszsikora/irvis/actions/artifacts --paginate --jq '.artifacts[] | select(.name | startswith("irvis-")) | .id' | xargs -I{} gh api -X DELETE repos/mateuszsikora/irvis/actions/artifacts/{}`.
 3. Decide about the e-mail address. It stays in the published history whatever is done to `main`. For new commits: GitHub → Settings → Emails → "Keep my email addresses private" and "Block command line pushes that expose my email", and `git config --global user.email <id>+<login>@users.noreply.github.com`.
 4. Switch the visibility: Settings → General → Danger Zone → "Change repository visibility".
-5. Apply the ruleset ([Required checks](../guides/development.md#required-checks)) and check it with a pull request and a release run.
+5. Settings → Actions → General → "Approval for running fork pull request workflows from contributors": "Require approval for all external contributors".
+6. Rerun CI on the pull request of #26 and #56, merge it, then apply the ruleset ([Required checks](../guides/development.md#required-checks)) and check it with a pull request and a release run.
