@@ -6,7 +6,8 @@ import { spawn } from 'node:child_process';
 import { resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { cameraProfiles } from '@irvis/core';
-import { findFfmpeg, parseInputPixelFormat } from '../../../tools/capture-cli/src/ffmpeg.ts';
+import { parseInputPixelFormat } from '../../../tools/capture-cli/src/ffmpeg.ts';
+import { bundledFfmpeg, locateFfmpeg } from './ffmpeg.js';
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -20,7 +21,11 @@ protocol.registerSchemesAsPrivileged([
     },
   },
 ]);
-const root = resolve(__dirname, '../../web/dist');
+// A package keeps the web build, ffmpeg and the IOKit helper in its resources
+// directory, outside app.asar, so that they can be fetched and spawned.
+const resources = app.isPackaged ? process.resourcesPath : undefined;
+const root = resources ? resolve(resources, 'web') : resolve(__dirname, '../../web/dist');
+const ffmpeg = () => locateFfmpeg({ bundled: resources && bundledFfmpeg(resources) });
 let window;
 let child;
 let pending = false;
@@ -120,7 +125,7 @@ async function boot() {
   });
   ipcMain.handle('capture:devices', (event) => {
     authorize(event);
-    return listDevices();
+    return listDevices(process.platform, ffmpeg);
   });
   ipcMain.handle('capture:command', async (event, id, value) => {
     authorize(event);
@@ -135,14 +140,16 @@ async function boot() {
     const mode = profile?.videoModes.find((m) => m.id === options?.modeId);
     if (!mode?.layout) throw new Error('Invalid capture selection');
     const args = captureArgs(process.platform, options.device, mode);
-    const ffmpeg = findFfmpeg();
+    const executable = ffmpeg();
     await controlCleanup;
     if (generation !== token) return;
     // USB access can be unavailable while the OS owns UVC. Video remains usable.
     try {
       const opened = await openControl(
         profile,
-        process.platform === 'darwin' ? resolve(__dirname, 'iokit-request') : undefined,
+        process.platform === 'darwin'
+          ? resolve(resources ?? __dirname, 'iokit-request')
+          : undefined,
       );
       if (generation !== token) {
         opened.close();
@@ -156,9 +163,11 @@ async function boot() {
       control?.close();
       control = undefined;
       if (mode.enableCommand) throw error;
+      // Video goes on without control; the reason is only logged.
+      console.warn('Camera control is unavailable: ' + error.message);
     }
     if (generation !== token) return;
-    const proc = spawn(ffmpeg, ['-y', ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const proc = spawn(executable, ['-y', ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
     child = proc;
     let buffer = Buffer.alloc(0),
       log = '',

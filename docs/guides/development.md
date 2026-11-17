@@ -37,6 +37,9 @@ Defined in the root [package.json](../../package.json). Run them from the reposi
 | `npm run format:check` | `prettier --check .` | Prettier, without changing files. |
 | `npm run format` | `prettier --write .` | Prettier, rewriting the files. |
 | `npm run typecheck` | `tsc --build` | Type-checks every TypeScript project. |
+| `npm run ffmpeg:build` | `bash apps/desktop/ffmpeg/build.sh` | Builds the minimal LGPL ffmpeg of a desktop package into `apps/desktop/ffmpeg/dist/<target>/`; pass `-- mac-arm64`, `mac-x64`, `linux-x64`, `win-x64` or `source` (default: the host). Needs a C compiler, make, curl and xz; takes about 1.5 minutes on an M-series Mac. See [Bundled ffmpeg](../features/desktop-technical.md#bundled-ffmpeg). |
+| `npm run ffmpeg:verify` | `node apps/desktop/ffmpeg/verify.mjs` | Checks that ffmpeg build; pass the same target. |
+| `npm run package:desktop` | `npm run build && npm run package --workspace @irvis/desktop --` | Builds everything and packages the desktop app with electron-builder into `apps/desktop/release/`; options after `--` go to electron-builder, as in `-- --mac --arm64 --x64`. Needs `npm run ffmpeg:build` for every packaged target first. See [Packages](../features/desktop-technical.md#packages). |
 | `npm run build` | `npm run build --workspaces --if-present` | The `build` script of every workspace that has one; today only `apps/web`, into `apps/web/dist/`. |
 
 npm prints `> <command>` before a script's output.
@@ -76,12 +79,12 @@ TypeScript 6.0 (`~6.0.3`), not 7: typescript-eslint 8.72 supports TypeScript bel
 ESLint 10 with a flat config, `eslint.config.js`:
 
 - `@eslint/js` recommended and typescript-eslint `recommendedTypeChecked` on every file, with type information from the TypeScript projects above (`projectService`). `.js`, `.mjs` and `.cjs` files are linted without types. Unused `eslint-disable` comments are errors.
-- ESLint does not read `.gitignore`; the config ignores `node_modules/`, `dist/` and `coverage/` at any depth, `.context/` and `.claude/worktrees/`.
+- ESLint does not read `.gitignore`; the config ignores `node_modules/`, `dist/` and `coverage/` at any depth, the desktop packages in `apps/desktop/release/`, `.context/` and `.claude/worktrees/`.
 - In `tools/docs-check/src/` outside the tests, only `node:` modules and relative paths may be imported, and `import()` is rejected: the check runs in CI without `npm ci` ([documentation contract](../features/docs-contract-technical.md#configuration)).
 - The rules for core from the architecture decisions (imports only of relative paths and `fflate`, the synchronous `fflate` API, the `Math` allow-list), and the test that makes every exception name a decision: [core: technical](../features/core-technical.md#configuration).
 - `npm run lint` fails on any warning (`--max-warnings 0`).
 
-Prettier 3 (`.prettierrc.json`: `printWidth` 100, `singleQuote`) checks every file it knows except those in `.prettierignore`: Markdown, which is formatted by hand ([style](documentation.md#style)), `package-lock.json`, and build output. `npm run format` rewrites the files.
+Prettier 3 (`.prettierrc.json`: `printWidth` 100, `singleQuote`) checks every file it knows except those in `.prettierignore`: Markdown, which is formatted by hand ([style](documentation.md#style)), `package-lock.json`, and build output, the desktop packages in `apps/desktop/release/` included. `npm run format` rewrites the files.
 
 ## Hooks
 
@@ -89,7 +92,7 @@ There are no git hooks. The documentation check looks at the whole branch, and a
 
 ## CI
 
-Both workflows use runners with all three labels `self-hosted`, `Linux`, and `X64`; the registered runner is `hp600g1`. Jobs wait in the queue when no matching runner is available. The runner needs git and Bash; CI installs the Node version from `.nvmrc` with `actions/setup-node`. See the [runner decision](../decisions/architecture.md#github-actions-use-the-self-hosted-linux-x64-runner).
+`ci.yml` and `promote.yml` use runners with all three labels `self-hosted`, `Linux`, and `X64`; the registered runner is `hp600g1`. `desktop.yml` uses GitHub-hosted runners ([Desktop packages](#desktop-packages)). Jobs wait in the queue when no matching runner is available. The runner needs git and Bash; CI installs the Node version from `.nvmrc` with `actions/setup-node`. See the [runner decision](../decisions/architecture.md#github-actions-use-the-self-hosted-linux-x64-runner).
 
 [.github/workflows/ci.yml](../../.github/workflows/ci.yml) runs on every pull request event (opened, synchronize, reopened) and on every push to `main`. It has read-only access to the repository contents.
 
@@ -102,6 +105,20 @@ Both workflows use runners with all three labels `self-hosted`, `Linux`, and `X6
 The two documentation jobs run no `npm ci`: the check imports only Node built-ins, so Node from `actions/setup-node` is all they need. The documentation check's tests run in the `typescript` job with every other test. On a pull request, `actions/checkout` checks out GitHub's merge commit of the branch into the base as it was when the run started. GitHub does not rerun the job when the base moves, so two pull requests that pass alone can break `main` together, for example one renames a heading and the other links to it. The `integrity` job reports that on the push that merges the second one, so the breakage shows up on `main` itself, not first in an unrelated pull request. It does not prevent it: open pull requests turn red on their next run until `main` is fixed.
 
 No job is a required check: branch protection and rulesets return HTTP 403 on this private repository on the free plan, so GitHub cannot block a merge on them. A red job is still a blocker by the rules in [CONTRIBUTING.md](../../CONTRIBUTING.md#verification); [the decision](../decisions/docs.md#the-documentation-check-is-not-a-required-status-check-yet).
+
+### Desktop packages
+
+[.github/workflows/desktop.yml](../../.github/workflows/desktop.yml), "Desktop packages", builds the bundled ffmpeg and the desktop packages on GitHub-hosted runners (macOS, Windows and Ubuntu; the self-hosted runner is Linux only, [decision](../decisions/architecture.md#desktop-packages-are-built-on-github-hosted-runners)). It has read-only access to the repository contents. It runs on pull requests that change what a package is built from or checked with: `apps/desktop/ffmpeg/`, `apps/desktop/src/`, `apps/desktop/electron-builder.config.mjs`, `apps/desktop/package.json`, `apps/desktop/test/package-smoke.mjs`, the root `package.json` and `package-lock.json` (Electron, electron-builder and node-usb versions), `tools/capture-cli/60-irvis.rules`, `tools/capture-cli/iokit-request.c`, `tools/capture-cli/src/ffmpeg.ts` or the workflow itself. Changes to the web UI and the shared packages bundled into `main.cjs` do not start it; by hand (Actions → "Desktop packages" → "Run workflow", or `gh workflow run desktop.yml --repo mateuszsikora/irvis --ref <branch>`); and as a reusable workflow (`workflow_call`). Both of the last two take the boolean input `allow-system-ffmpeg` (default `false`).
+
+| Job | Runner | Steps | Timeout |
+| --- | --- | --- | --- |
+| `ffmpeg`, shown as "ffmpeg <target>", one per target `mac-arm64`, `mac-x64` (both `macos-15`), `linux-x64` (`ubuntu-24.04`), `win-x64` (`windows-2025`) | per target | `git config --global core.autocrlf false` (so that `build.sh` keeps LF endings on Windows); `actions/checkout`; `actions/setup-node` with `.nvmrc`; restores `apps/desktop/ffmpeg/dist/<target>` from the cache key `ffmpeg-<target>-<hash of build.sh>`; on a miss, `apps/desktop/ffmpeg/build.sh <target>` (for `win-x64` in MSYS2 UCRT64 from `msys2/setup-msys2` with make, diffutils, curl, tar, xz and the UCRT64 gcc); `node apps/desktop/ffmpeg/verify.mjs <target>`; on a miss, saves the cache; uploads the artifact `ffmpeg-<target>` | 30 minutes |
+| `ffmpeg-source`, shown as "ffmpeg source" | `ubuntu-24.04` | `apps/desktop/ffmpeg/build.sh source`; uploads the artifact `ffmpeg-source` with `ffmpeg-9.0.2.tar.xz` and `build.sh`, for the GitHub Release | 5 minutes |
+| `package`, shown as "Package <os>", for `mac`, `linux`, `win`, after `ffmpeg` | `macos-15`, `ubuntu-24.04`, `windows-2025` | `actions/checkout`; `actions/setup-node` with `.nvmrc` and the npm cache; downloads the `ffmpeg-<target>` artifacts of the system by name into `apps/desktop/ffmpeg/dist/<target>` (a pattern matching a single artifact would extract it without its directory); `npm ci`; `npm run package:desktop -- <options>` (see [Packages](../features/desktop-technical.md#packages)); on Linux, checks with `dpkg-deb -c` that the deb holds `./usr/lib/udev/rules.d/60-irvis.rules` and runs the AppImage's `--appimage-extract resources/60-irvis.rules` from the [install instructions](../features/desktop-user.md#install-a-package), comparing the result with `tools/capture-cli/60-irvis.rules`; `node test/package-smoke.mjs` on every unpacked app (under `xvfb-run` on Linux, which it installs if missing), and on Linux once more with `--launch` on the AppImage and `APPIMAGE_EXTRACT_AND_RUN=1`; uploads the artifact `irvis-<os>` with the dmg, exe, zip, AppImage and deb files, named `irvis-<os>-without-ffmpeg` when a target was packaged without ffmpeg | 30 minutes |
+
+Artifacts are kept for 14 days. A cache hit skips the ffmpeg build but not its check. With `allow-system-ffmpeg`, a failing `ffmpeg` job does not stop packaging: the package of that target is built with `IRVIS_PACKAGE_WITHOUT_FFMPEG=1`, and the smoke test runs with `--ffmpeg-optional` ([fallback](../features/desktop-user.md#use-your-own-ffmpeg)). Such a target gets a warning annotation, a line in the job summary and the `-without-ffmpeg` artifact suffix. Without it, a failing `ffmpeg` job skips every package. GitHub bills the minutes of these runners to the repository owner while the repository is private, macOS at a multiple of Linux; the path filter keeps the workflow off pull requests that do not touch packaging.
+
+The packages name `https://github.com/mateuszsikora/irvis/releases` as the place of the ffmpeg source (in `resources/ffmpeg/README.txt` and `NOTICE`), but no release exists yet (#24) and the repository is private, so that address does not reach anyone outside it. Until releases publish the source next to the packages, do not give packages from these artifacts to anyone outside the repository. The cache key depends only on `build.sh`, so a new compiler in a runner image does not rebuild a cached ffmpeg; `verify.mjs` still checks it on every run.
 
 ## Netlify
 
@@ -147,7 +164,7 @@ Shared agent skills live in `.agents/skills/`, with symlinks in `.claude/skills/
 
 ## Desktop spike
 
-`npm run spike:m3:desktop` builds the shared web UI and the Electron main/preload bundles, then opens the desktop window. Node 26+ and system ffmpeg are required for the macOS capture spike. Electron, esbuild and Playwright are desktop workspace development dependencies. The browser-safe `@irvis/backend-electron` package is a TypeScript project reference of the web app; ESLint rejects Electron/Node imports and dynamic imports there. The sandboxed preload alone uses CommonJS require.
+`npm run spike:m3:desktop` builds the shared web UI and the Electron main/preload bundles, then opens the desktop window. Node 26+ and system ffmpeg are required for the macOS capture spike. Electron, electron-builder, esbuild and Playwright are desktop workspace development dependencies, and so is `@irvis/core`, which esbuild bundles. The browser-safe `@irvis/backend-electron` package is a TypeScript project reference of the web app; ESLint rejects Electron/Node imports and dynamic imports there. The sandboxed preload alone uses CommonJS require.
 
 Run `npm run test:desktop` after desktop or comparison changes. Expected output: `desktop smoke: build, bridge isolation, module Worker, fetch, localStorage, video and CSP passed` and exit code 0. It generates a temporary video in the built web directory using ffmpeg. Run the usual lint, formatting, typecheck, unit tests, build and docs-check too. Hardware verification follows [M3](../findings/m3.md).
 

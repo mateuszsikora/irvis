@@ -2,19 +2,27 @@
   "name": "@irvis/desktop",
   "version": "0.0.0",
   "private": true,
+  "description": "irvis desktop app: a viewer for USB-C thermal cameras",
+  "author": {
+    "name": "Mateusz Sikora"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/mateuszsikora/irvis",
   "type": "module",
   "main": "dist/main.cjs",
   "scripts": {
     "build": "esbuild src/main.js --bundle --platform=node --external:electron --outfile=dist/main.cjs && esbuild src/preload.cjs --bundle --platform=node --external:electron --outfile=dist/preload.cjs && node src/permissions.js",
     "start": "electron .",
-    "test:smoke": "node test/smoke.mjs"
+    "test:smoke": "node test/smoke.mjs",
+    "package": "electron-builder --config electron-builder.config.mjs --publish never"
   },
   "dependencies": {
-    "@irvis/core": "*",
     "usb": "^2.19.1"
   },
   "devDependencies": {
+    "@irvis/core": "*",
     "electron": "^45.3.2",
+    "electron-builder": "^26.18.0",
     "esbuild": "^0.28.2",
     "playwright": "^1.65.1"
   }

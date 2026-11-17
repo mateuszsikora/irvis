@@ -1,9 +1,15 @@
-// The development launcher uses Electron.app; packaged apps must carry the same key.
+// The development launcher uses Electron.app; packages set the same key through
+// electron-builder.config.mjs (mac.extendInfo).
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { resolve, dirname } from 'node:path';
 if (process.platform === 'darwin') {
+  // Universal, so that the x64 package built on an arm64 Mac carries it too.
   execFileSync('cc', [
+    '-arch',
+    'arm64',
+    '-arch',
+    'x86_64',
     '../../tools/capture-cli/iokit-request.c',
     '-framework',
     'IOKit',

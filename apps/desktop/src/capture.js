@@ -11,11 +11,9 @@ export function inputArgs(platform, device, mode) {
     return ['-f', 'dshow', ...size, '-pixel_format', 'yuyv422', '-i', `video=${device}`];
   throw new Error('Invalid capture selection');
 }
-export function captureArgs(platform, device, mode) {
+/** Native bytes packed to stdout; the bundled ffmpeg is verified with exactly these. */
+export function outputArgs() {
   return [
-    '-hide_banner',
-    '-nostdin',
-    ...inputArgs(platform, device, mode),
     '-map',
     '0:v',
     '-c:v',
@@ -31,7 +29,10 @@ export function captureArgs(platform, device, mode) {
     'pipe:1',
   ];
 }
-export async function listDevices(platform = process.platform) {
+export function captureArgs(platform, device, mode) {
+  return ['-hide_banner', '-nostdin', ...inputArgs(platform, device, mode), ...outputArgs()];
+}
+export async function listDevices(platform = process.platform, ffmpeg = findFfmpeg) {
   if (platform === 'linux')
     return (await readdir('/dev'))
       .filter((n) => /^video\d+$/.test(n))
@@ -40,7 +41,7 @@ export async function listDevices(platform = process.platform) {
   const format = platform === 'darwin' ? 'avfoundation' : platform === 'win32' ? 'dshow' : null;
   if (!format) throw new Error('Unsupported capture platform');
   const result = await run(
-    findFfmpeg(),
+    ffmpeg(),
     ['-hide_banner', '-f', format, '-list_devices', 'true', '-i', ''],
     10000,
   );

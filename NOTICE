@@ -37,3 +37,12 @@ Licence: none stated in the repository; only facts were taken, no code
 Used in: packages/core/src/cameras/infiray-p2pro/
 What: the raw value in 1/64 K (raw / 64 in kelvin), the 256x192 mode
   without temperature data, and the USB IDs.
+
+FFmpeg (https://ffmpeg.org)
+Copyright (c) 2000-2026 the FFmpeg developers
+Licence: LGPL-2.1-or-later
+Used in: the desktop packages (resources/ffmpeg/), built by
+  apps/desktop/ffmpeg/build.sh
+What: an unmodified FFmpeg 9.0.2 binary, built without GPL or nonfree
+  parts; its licence text and source details ship next to it, and the
+  source tarball is published with each release.

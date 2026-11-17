@@ -572,3 +572,35 @@ Android Tiny1C applies raw / 64 − 273.15 in both gains. Its Low/High selection
 Auto is a host policy with 100 settling frames and 100 consecutive crossings at 160/150 °C. It uses camera-converted maxima before host edits, waits for each gain readback and exits on errors or session changes. Numeric corrections reset settling. Explicit gain selection preserves the chosen transmittance rather than copying Android's model-specific constants.
 
 **Rejected:** inferring a different low-gain divisor from a room scene below the vendor's valid range, adjusting coefficients to make a cooling kettle read 100 °C, treating display limits as calibrated accuracy, or inventing an Auto USB opcode. Physical switching above 160 °C remains untested; both policy thresholds are tested with controlled frame values and both gain commands are tested on hardware.
+
+## Desktop packages are built on GitHub-hosted runners
+
+Status: decided (#23)
+
+`.github/workflows/desktop.yml` builds the bundled ffmpeg and the packages on `macos-15`, `windows-2025` and `ubuntu-24.04`. A dmg and an ffmpeg with AVFoundation can only be built on macOS, and the self-hosted runner is Linux; the owner chose GitHub-hosted runners for all three systems, so that the workflow does not depend on what is installed on `hp600g1`. The workflow runs only on pull requests that touch packaging, by hand, or when called, because macOS minutes are billed at a multiple while the repository is private. `ci.yml` and `promote.yml` keep the [self-hosted runner](#github-actions-use-the-self-hosted-linux-x64-runner).
+
+**Rejected:** macOS on GitHub-hosted and Linux and Windows (cross-compiled with mingw-w64) on the self-hosted runner, because the runner would need gcc, mingw-w64 and the Electron system libraries installed and kept by hand, and electron-builder would need Wine there to edit the Windows executable.
+
+## The bundled ffmpeg is a static build of a pinned release with nothing but the camera path
+
+Status: decided (#23)
+
+`apps/desktop/ffmpeg/build.sh` builds FFmpeg 9.0.2 from the release tarball, pinned by SHA-256, with `--disable-everything --disable-autodetect` and only the pipe protocol, rawvideo and the input of the system ([details](../features/desktop-technical.md#bundled-ffmpeg)). Disabling autodetection keeps libraries such as libxcb, zlib or SDL from being linked because a build machine happens to have them. Linux and Windows binaries are static, so they run on any glibc and need no MinGW DLLs; macOS links only system frameworks. swscale and swresample are left out: capture packs native YUYV with `-pix_fmt +` and never converts. `verify.mjs` checks the result by what it does (licence, codec and device lists, a byte-exact passthrough of `outputArgs()`), not by the flags.
+
+**Rejected:** building from a git revision, because a release tarball is the source users can download and verify by its signature. **Rejected:** dynamic linking against the build machine's libraries, because the binary would then depend on the distribution it was built on. **Rejected:** keeping swscale "just in case", because a conversion it allowed would silently break the exact reference that [`-pix_fmt +` protects](#capture-output-packs-pixels-without-automatic-conversion).
+
+## Unsigned macOS packages carry an ad-hoc signature without the hardened runtime
+
+Status: decided (#23)
+
+Until signing and notarisation are done, electron-builder signs the macOS app with `identity: '-'` (ad-hoc) and `hardenedRuntime: false`. Setting `NSCameraUsageDescription` changes Info.plist after Electron was signed, and an arm64 executable with an invalid signature does not start; an ad-hoc signature is valid. The hardened runtime is only needed for notarisation and, without the camera and audio-input entitlements, would block both.
+
+**Rejected:** `identity: null` (no signing), because the modified bundle would have a broken signature. **Rejected:** the hardened runtime now, because it needs entitlements that only matter once the app is notarised.
+
+## Windows packages are an NSIS installer and a zip
+
+Status: decided (#23)
+
+Windows gets an assisted per-user NSIS installer, whose installation directory can be changed, and a zip of the same files for running without installing. The owner chose both. Neither is signed, so SmartScreen warns about both.
+
+**Rejected:** only one of the two, because the installer gives a Start menu entry and an uninstaller, and the zip runs where installing is not allowed.
