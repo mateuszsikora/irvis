@@ -125,12 +125,20 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+      # By name, so that each artifact lands in dist/<target>; a pattern
+      # matching one artifact would extract it without its directory.
+      # With allow-system-ffmpeg, a target may have no artifact.
       - uses: actions/download-artifact@v8
-        # With allow-system-ffmpeg, a system may have no ffmpeg artifact.
+        if: matrix.os == 'mac'
         continue-on-error: ${{ inputs.allow-system-ffmpeg == true }}
         with:
-          pattern: ffmpeg-${{ matrix.os }}-*
-          path: apps/desktop/ffmpeg/artifacts
+          name: ffmpeg-mac-arm64
+          path: apps/desktop/ffmpeg/dist/mac-arm64
+      - uses: actions/download-artifact@v8
+        continue-on-error: ${{ inputs.allow-system-ffmpeg == true }}
+        with:
+          name: ffmpeg-${{ matrix.os }}-x64
+          path: apps/desktop/ffmpeg/dist/${{ matrix.os }}-x64
       - name: Install
         run: npm ci
       - name: Package
@@ -138,15 +146,8 @@ jobs:
         env:
           IRVIS_PACKAGE_WITHOUT_FFMPEG: ${{ inputs.allow-system-ffmpeg == true && '1' || '' }}
         run: |
-          cd apps/desktop/ffmpeg
-          mkdir -p dist
-          # artifacts/ffmpeg-<target> -> dist/<target>; artifacts lose the executable bit.
-          for dir in artifacts/ffmpeg-*; do
-            [ -d "$dir" ] || continue
-            mv "$dir" "dist/${dir#artifacts/ffmpeg-}"
-            chmod +x dist/"${dir#artifacts/ffmpeg-}"/ffmpeg*
-          done
-          cd ../../..
+          # Artifacts lose the executable bit.
+          chmod +x apps/desktop/ffmpeg/dist/*/ffmpeg* 2> /dev/null || true
           npm run package:desktop -- ${{ matrix.args }}
       - name: Check the udev rule in the deb
         if: matrix.os == 'linux'

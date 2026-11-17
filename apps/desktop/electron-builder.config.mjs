@@ -13,13 +13,14 @@ const systems = { darwin: 'mac', linux: 'linux', win32: 'win' };
 /** Stops a package without ffmpeg unless IRVIS_PACKAGE_WITHOUT_FFMPEG=1. */
 function requireFfmpeg({ electronPlatformName, arch }) {
   const target = `${systems[electronPlatformName]}-${Arch[arch]}`;
-  if (existsSync(resolve(import.meta.dirname, 'ffmpeg/dist', target))) return;
+  const exe = electronPlatformName === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+  if (existsSync(resolve(import.meta.dirname, 'ffmpeg/dist', target, exe))) return;
   if (process.env.IRVIS_PACKAGE_WITHOUT_FFMPEG === '1') {
     console.warn(`packaging ${target} without ffmpeg; users must set IRVIS_FFMPEG`);
     return;
   }
   throw new Error(
-    `apps/desktop/ffmpeg/dist/${target} is missing: run npm run ffmpeg:build -- ${target}, ` +
+    `apps/desktop/ffmpeg/dist/${target}/${exe} is missing: run npm run ffmpeg:build -- ${target}, ` +
       'or set IRVIS_PACKAGE_WITHOUT_FFMPEG=1 to package without ffmpeg',
   );
 }
