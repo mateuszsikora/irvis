@@ -124,11 +124,11 @@ The packages name `https://github.com/mateuszsikora/irvis/releases` as the place
 
 ## Netlify
 
-Netlify builds `apps/web` from the private repository: a deploy preview for every pull request, and production only from the branch `release` ([decision](../decisions/architecture.md#the-web-version-is-hosted-on-netlify-and-goes-to-production-from-release)). The build settings are in `netlify.toml`, and the settings that only the Netlify UI has are listed in [web app: technical](../features/web-app-technical.md#netlify). Connecting the repository is the owner's step. TODO(owner): record the site name and URL here once it is connected.
+`netlify.toml` configures a Netlify build of `apps/web`: a deploy preview for every pull request, and production only from the branch `release` ([decision](../decisions/architecture.md#the-web-version-is-hosted-on-netlify-and-goes-to-production-from-release)). The build settings are in `netlify.toml`, and the settings that only the Netlify UI has are listed in [web app: technical](../features/web-app-technical.md#netlify). The repository is not connected to Netlify and will not be: the web version is to be published on GitHub Pages instead ([#54](https://github.com/mateuszsikora/irvis/issues/54)), and until then nothing deploys it.
 
 ## Promote to release
 
-[.github/workflows/promote.yml](../../.github/workflows/promote.yml), "Promote to release", moves `release` to a commit on `main`, which makes Netlify publish it to production. [Release](#release) calls it (`workflow_call`, input `sha`) with the commit of a published release's tag; otherwise it runs only by hand: Actions → "Promote to release" → "Run workflow", or
+[.github/workflows/promote.yml](../../.github/workflows/promote.yml), "Promote to release", moves `release` to a commit on `main`. A Netlify site with the production branch `release` would publish that commit, but no site is connected ([Netlify](#netlify)), so moving `release` publishes nothing. [Release](#release) calls it (`workflow_call`, input `sha`) with the commit of a published release's tag; otherwise it runs only by hand: Actions → "Promote to release" → "Run workflow", or
 
 ```sh
 gh workflow run promote.yml --repo mateuszsikora/irvis            # the tip of main
@@ -141,18 +141,18 @@ The job "Promote to release" (5 minutes) is the only one with `contents: write`;
 2. fails with `the sha input must be 7 to 40 lowercase hexadecimal digits` unless `sha` is empty or such a string;
 3. `git fetch origin main`, then resolves `sha` (empty means `origin/main`), and fails with `<sha> is not a commit in this repository` if it cannot;
 4. fails with `<sha> is not on main; only commits on main are published` unless `git merge-base --is-ancestor <sha> origin/main` holds;
-5. `git push origin <sha>:refs/heads/release`, without `--force`. The first run creates `release`. Later runs succeed only if `release` fast-forwards to the commit, so the workflow never moves production to a commit off `main` or back to an older one. A rejected push fails the step with git's `! [rejected] ... (non-fast-forward)`.
+5. `git push origin <sha>:refs/heads/release`, without `--force`. The first run creates `release`. Later runs succeed only if `release` fast-forwards to the commit, so the workflow never moves `release` to a commit off `main` or back to an older one. A rejected push fails the step with git's `! [rejected] ... (non-fast-forward)`.
 
-These checks bind the workflow, not the people who can write to the repository. `release` is not protected (branch protection and rulesets return HTTP 403 on this plan, see [CI](#ci)), so anyone with write access can still `git push origin <commit>:release` and Netlify publishes it. A run started from another branch uses that branch's copy of `promote.yml`, with `contents: write`, and a changed copy can drop every check above. That only commits on `main` reach production is therefore a rule for contributors, like the other rules in [CONTRIBUTING.md](../../CONTRIBUTING.md#repository-settings), until the plan allows protecting `release`: then restrict pushes to it to the workflow.
+These checks bind the workflow, not the people who can write to the repository. `release` is not protected (branch protection and rulesets return HTTP 403 on this plan, see [CI](#ci)), so anyone with write access can still `git push origin <commit>:release`. A run started from another branch uses that branch's copy of `promote.yml`, with `contents: write`, and a changed copy can drop every check above. That only commits on `main` reach `release` is therefore a rule for contributors, like the other rules in [CONTRIBUTING.md](../../CONTRIBUTING.md#repository-settings), until the plan allows protecting `release`: then restrict pushes to it to the workflow.
 
-To roll production back, publish an older deploy in the Netlify UI ("Publish deploy"); the next promotion moves forward from `release` as before. A push made with the workflow's `GITHUB_TOKEN` starts no other workflow; Netlify learns about it through its GitHub App, whose webhooks such pushes still trigger. TODO(owner): confirm on the first promotion that Netlify starts a production deploy, and that it honours the `ignore` command in `[context.production]` of `netlify.toml` (a production build of another branch shows as "Canceled").
+A push made with the workflow's `GITHUB_TOKEN` starts no other workflow, so a workflow triggered by a push to `release` would not run after a promotion.
 
 ## Release
 
 [.github/workflows/release.yml](../../.github/workflows/release.yml), "Release", makes a release in two steps ([decision](../decisions/architecture.md#a-release-is-a-draft-github-release-built-from-a-version-commit-on-main)):
 
 1. **Run it** from `main`: Actions → "Release" → "Run workflow", optionally with a version, or `gh workflow run release.yml --repo mateuszsikora/irvis [-f version=0.2.0]`. It merges a pull request that sets the version, builds the desktop packages from that commit and leaves a draft GitHub Release with the packages and the ffmpeg source. The run's summary links the draft.
-2. **Publish the draft**: Releases → the draft → edit → "Publish release". Publishing creates the tag `v<version>` on the version commit and, unless it is a prerelease, moves `release` for Netlify.
+2. **Publish the draft**: Releases → the draft → edit → "Publish release". Publishing creates the tag `v<version>` on the version commit and, unless it is a prerelease, moves `release` ([Promote to release](#promote-to-release)).
 
 To discard a release before it is published, delete the draft. `main` keeps the version; run the workflow again with the same version to rebuild the draft without another pull request. A run with an empty version always takes the next patch version, so a second such run (or a rerun of one that merged its pull request) makes a new version, not a new draft of the same one.
 

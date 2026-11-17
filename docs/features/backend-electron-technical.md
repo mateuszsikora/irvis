@@ -2,7 +2,7 @@
 
 ## Data flow
 
-`packages/backend-electron/src/index.ts` reads the optional preload bridge from `window.irvisDesktop`; it imports no Electron or Node module. ESLint forbids these imports and dynamic imports. It is bundled into the same web build served by Netlify.
+`packages/backend-electron/src/index.ts` reads the optional preload bridge from `window.irvisDesktop`; it imports no Electron or Node module. ESLint forbids these imports and dynamic imports. It is bundled into the same web build that the desktop app loads and that the web version is to publish ([#54](https://github.com/mateuszsikora/irvis/issues/54)).
 
 `compare(reference, mode, kelvinsPerRaw, live?)` validates packed reference dimensions, extracts little-endian thermal values using the mode's thermal rows, and calls core's `simulateYUYVtoI420` when no live frame is supplied. It reconstructs the planar frame without brightness hints and uses `compareFrames` for error metrics.
 

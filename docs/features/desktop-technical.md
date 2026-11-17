@@ -61,7 +61,7 @@ See [M5 hardware observations](../findings/m5-hardware.md) for measured thermal 
 | System | Options used in CI | Targets | Architectures |
 | --- | --- | --- | --- |
 | macOS 13 or later (Electron 45's `LSMinimumSystemVersion`) | `--mac --arm64 --x64` | dmg | arm64, x64 |
-| Windows | `--win --x64` | NSIS installer (assisted, per user, installation directory can be changed) and zip | x64 |
+| Windows 10 or later (Electron 45's minimum; the installer does not check it) | `--win --x64` | NSIS installer (assisted, per user, installation directory can be changed) and zip | x64 |
 | Linux | `--linux --x64` | AppImage and deb | x64 |
 
 What a package holds:

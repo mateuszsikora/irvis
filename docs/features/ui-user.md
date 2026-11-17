@@ -20,11 +20,11 @@ Clear (default) uses nearest-neighbour scaling; Smooth uses browser interpolatio
 
 ## Declare the browser camera mode
 
-The browser displays `camera mode unknown, readings assume high gain`. It assumes factory settings. Confirm camera mode and factory settings, or choose Declared gain. This is a software declaration, not a USB command. Low gain currently has no verified conversion in the shipped profile: `No verified conversion for this mode. Readings unavailable.` replaces the image/readings. Out-of-range readings show `Data look inconsistent with the declared camera mode. Check gain and factory settings.` This heuristic cannot prove camera state or detect every mismatch.
+The browser displays `camera mode unknown, readings assume high gain`. It assumes factory settings. Confirm camera mode and factory settings, or choose Declared gain. This is a software declaration, not a USB command. Declaring a gain that has no conversion in the profile replaces the image and readings with `No verified conversion for this mode. Readings unavailable.`; the P2 Pro profile has conversions for both gains ([limits](cameras-user.md#supported-cameras)). Out-of-range readings show `Data look inconsistent with the declared camera mode. Check gain and factory settings.` This heuristic cannot prove camera state or detect every mismatch.
 
 ## Find camera and capture tools
 
-Expand Camera commands in View settings. Commands come from the profile and require backend support and an active session. The browser shows them disabled with `available in the desktop app` and Download desktop app. The current Electron capture bridge also lacks command dispatch, so its commands stay disabled. `Capture photo` saves the rendered thermal image, and `Gallery` opens saved photos. Video remains unavailable until #19.
+Expand Camera commands in View settings. Commands come from the profile and require backend support and an active session. The browser shows them disabled with `available in the desktop app` and Download desktop app. In the desktop app they send USB commands to the camera ([camera correction](#change-camera-correction)). `Capture photo` saves the rendered thermal image, and `Gallery` opens saved photos. Recording is described in [Record, play and export video](#record-play-and-export-video).
 
 ## See also
 
