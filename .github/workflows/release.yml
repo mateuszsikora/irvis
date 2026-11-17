@@ -167,8 +167,8 @@ jobs:
           fi
           # A pull request opened with GITHUB_TOKEN starts no workflow, but
           # workflow_dispatch does: CI on the branch reports the checks that
-          # .github/rulesets/main.json requires ("Documentation contract" is
-          # skipped outside pull requests, which counts as passing).
+          # .github/rulesets/main.json requires ("Documentation contract"
+          # checks that the branch changes nothing but the version).
           head=$(git rev-parse HEAD)
           gh workflow run ci.yml --ref "$branch"
           run=''
