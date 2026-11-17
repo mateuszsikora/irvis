@@ -140,6 +140,14 @@ The ruleset has no bypass actor. The Release workflow opens its version pull req
 - Requiring an approving review, for the reason above.
 - Protecting `release` in the same change, because publishing on GitHub Pages ([#54](https://github.com/mateuszsikora/irvis/issues/54)) may remove the branch and "Promote to release".
 
+## Dependabot alerts are on and its security updates are off
+
+Status: decided (#59)
+
+With the repository public, Dependabot alerts report known vulnerabilities in the npm dependencies (`package-lock.json`) and in the Actions used in `.github/workflows/`. Dependabot security updates, which open a pull request for each alert, stay off. Their branches always start with `dependabot` (`dependabot.yml` sets only the separator), so they cannot follow the branch pattern in [CONTRIBUTING.md](../../CONTRIBUTING.md#branches); their titles are "Bump <package> from <a> to <b>" unless `dependabot.yml` sets a prefix; and their bodies, which hold release notes and commit lists, would land in `main` with squash merge. An alert is fixed by hand instead, with a normal pull request that bumps the dependency or the Action; such a bump needs no documentation ([decision](#version-only-bumps-need-no-documentation)).
+
+**Rejected:** turning security updates on with an exemption from the branch and commit rules, as the Release workflow's version pull request has, because that exemption covers a pull request whose whole content the owner chose when starting the run, while a Dependabot pull request brings a new version of third-party code and a message written by someone else.
+
 ## Tests use unittest from the standard library
 
 Status: superseded (#30)
