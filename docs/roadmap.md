@@ -15,7 +15,8 @@ irvis is an open-source viewer for USB-C thermal cameras:
 - one TypeScript core without DOM and Node APIs, and one UI build, shared by both;
 - feature parity with the vendor's Android app as the target. Hardware features (USB commands to the camera) exist only in the desktop app; the web version shows them greyed out with "available in the desktop app";
 - cameras supported through camera profiles, so that a new model (for example TOPDON TC001) is added without touching the UI, the backends or the recording format;
-- MIT licence; the repository has been public since 17 November 2026 (#26).
+- MIT licence; the repository has been public since 17 November 2026 (#26);
+- the web version published on GitHub Pages, from the same release as the desktop packages ([#54](https://github.com/mateuszsikora/irvis/issues/54)).
 
 The first camera is the TOOLTOP T7, a rebrand of the InfiRay P2 Pro.
 
@@ -93,7 +94,7 @@ The three pull requests go in this order, because #3 and #4 change the same file
 
 **Acceptance:** `npm test` and `npm run build` pass in CI.
 
-**Owner:** connect the repository in Netlify with the production branch `release` (after #5).
+**Owner:** none any more. The Netlify site planned here was never connected, and #54 replaced it with GitHub Pages.
 
 ### M1. Spike: exact data via ffmpeg
 
@@ -172,12 +173,13 @@ Targets for the reconstruction (from the specification): Y matches the low bytes
 | [#25](https://github.com/mateuszsikora/irvis/issues/25) | README with supported cameras, browser limits, minimum versions and links |
 | [#26](https://github.com/mateuszsikora/irvis/issues/26) | History audit for secrets and files that must not be public, licence review, then CI as a required check ([audit](findings/public-repository.md)) |
 | [#56](https://github.com/mateuszsikora/irvis/issues/56) | CI and "Promote to release" on GitHub-hosted runners, so that pull requests from forks do not run on the self-hosted runner |
+| [#54](https://github.com/mateuszsikora/irvis/issues/54) | The web version on GitHub Pages, built from the tag of each published release and checked on the published site; `netlify.toml` and "Promote to release" removed |
 
-**Owner:** switch the repository to public with #26 and #56, in the order of the [owner steps](findings/public-repository.md#owner-steps-in-this-order) (done on 17 November 2026).
+**Owner:** switch the repository to public with #26 and #56, in the order of the [owner steps](findings/public-repository.md#owner-steps-in-this-order) (done on 17 November 2026). After #54: set the Pages source to GitHub Actions and allow the tag rule `v*` in the environment `github-pages` ([development guide](guides/development.md#pages)).
 
 ## Order of work
 
-1. #3, then #4, then #5. The owner connects Netlify.
+1. #3, then #4, then #5.
 2. #6 as early as possible, then #7, so that the owner can run them on the camera.
 3. In parallel, without hardware: #8, #14, #12, #13 and, after #14, #15 in core, tested on synthetic frames; #17, which creates the minimal `backend-replay` and builds the viewer on synthetic frames.
 4. After the results of #6 and with #14 in place: #16. After #7: #22. After #10: the decision on the browser path.
@@ -199,7 +201,8 @@ Targets for the reconstruction (from the specification): Y matches the low bytes
 | The NUC command is unknown | #7 | Other sources; at worst only the camera's automatic shutter |
 | The browser does not know the camera state (gain, TPD, palette) and readings are silently wrong | #7 | Assume high gain with a visible warning, let the user declare the mode, warn on inconsistent data |
 | The camera applies emissivity to the raw data and the app applies it again | #7 | Software correction relative to the camera state stored in the `.irvis` chunk |
-| Netlify's free-plan credits run out, or deploys block (forum reports from July–August 2026, not verified) | after #5 | Production only from `release`; Cloudflare Pages |
+| The web version shares the origin `no-plan.dev` with the owner's other Pages sites, which can read its stored recordings and photos and use its camera permission | #54 | A domain or subdomain of irvis's own |
+| Pages cannot set headers, so a later need for cross-origin isolation (`SharedArrayBuffer`) or a CSP header has no place there | #54 | A CSP in a `<meta>` element; another host such as Cloudflare Pages |
 
 ## Deviations from the specification
 
@@ -207,7 +210,7 @@ Targets for the reconstruction (from the specification): Y matches the low bytes
 2. The camera profile is generalised: no hard-coded `width: 256; height: 384; thermalRow0: 192`, and the conversion is data instead of a `toCelsius` function ([decision](decisions/architecture.md#a-camera-is-a-profile-and-its-conversion-is-data)).
 3. "Video recording" is a `.irvis` recording with MP4 export ([decision](decisions/architecture.md#recordings-are-irvis-files-and-mp4-is-an-export)).
 4. The "own raw format (header + Uint16Array)" is merged into `.irvis`: a snapshot is a one-frame recording, and the PNG photo embeds that one-frame `.irvis`, so there is one temperature format.
-5. Netlify instead of GitHub Pages ([decision](decisions/architecture.md#the-web-version-is-hosted-on-netlify-and-goes-to-production-from-release)).
+5. Withdrawn in #54: the web version is on GitHub Pages, as the specification asks ([decision](decisions/architecture.md#the-web-version-is-published-on-github-pages-from-published-releases)); from #5 to #54 the plan was Netlify ([superseded decision](decisions/architecture.md#the-web-version-is-hosted-on-netlify-and-goes-to-production-from-release)).
 6. An own LGPL ffmpeg build instead of `ffmpeg-static` ([decision](decisions/architecture.md#the-desktop-app-ships-its-own-lgpl-ffmpeg-build)).
 7. New packages `backend-replay` and `media`, which the proposed repository layout does not have.
 8. `CameraBackend.id` gains `'replay'`, `RawFrame` gains a `thermal` variant, and there is a new `Player` interface ([decision](decisions/architecture.md#interfaces-live-in-core-as-types-and-apps-inject-the-backends)).

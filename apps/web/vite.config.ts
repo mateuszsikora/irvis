@@ -1,10 +1,11 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
-// base '/' because Netlify and Electron (app://irvis/) both serve the build
-// from the root: docs/features/web-app-technical.md#build
+// A relative base, so that the same files load from GitHub Pages under
+// /irvis/ (or a custom domain's root) and from app://irvis/ in the desktop
+// app: docs/features/web-app-technical.md#build
 export default defineConfig({
-  base: '/',
+  base: './',
   plugins: [react()],
   build: {
     outDir: 'dist',

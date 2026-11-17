@@ -1,6 +1,6 @@
 # Web app: technical
 
-How `apps/web` and its Netlify configuration work, for whoever changes them. Why there is one build for the web and the desktop app: [decision](../decisions/architecture.md#one-ui-build-serves-the-web-and-the-desktop-app). Why production publishes from `release`: [decision](../decisions/architecture.md#the-web-version-is-hosted-on-netlify-and-goes-to-production-from-release).
+How `apps/web` and its publishing on GitHub Pages work, for whoever changes them. Why there is one build for the web and the desktop app: [decision](../decisions/architecture.md#one-ui-build-serves-the-web-and-the-desktop-app). Why Pages publishes from releases: [decision](../decisions/architecture.md#the-web-version-is-published-on-github-pages-from-published-releases).
 
 ## Data flow
 
@@ -28,41 +28,49 @@ Scripts in `apps/web/package.json`: `dev` (`vite`), `build` (`vite build`), `pre
 
 | Setting | Value | Why |
 | --- | --- | --- |
-| `base` | `'/'` | Electron serves the files from `app://irvis/`, and a site built from `netlify.toml` would serve them from its root |
+| `base` | `'./'` | Pages serves the files under `/irvis/` and Electron from the root of `app://irvis/`. With a relative base, `index.html` loads `./assets/…`, and the bundle finds its Workers, the AudioWorklet and the other assets with `new URL(<file>, import.meta.url)`, so the same files work under any path, a custom domain's root included. The app has no client-side routes, so no page other than `index.html` would need another base |
 | `plugins` | `@vitejs/plugin-react` | JSX and React Fast Refresh in `dev` |
-| `build.outDir` | `dist` (emptied first) | What the desktop app copies to `web/` and what `netlify.toml` names as `build.publish` |
+| `build.outDir` | `dist` (emptied first) | What the desktop app copies to `web/` and what the Pages workflow uploads |
 | `build.license` | `{ fileName: 'THIRD-PARTY-LICENSES.md' }` | The minified bundle drops the licence comments of the npm packages it contains (React, React DOM, scheduler, fflate and the MPL-2.0 Mediabunny). Vite writes `dist/THIRD-PARTY-LICENSES.md` with the name, version, SPDX identifier and licence text of each, so the file is served next to `index.html` and copied into the desktop packages |
 | `test` | project `web`, environment `jsdom`, files `src/**/*.test.{ts,tsx}` | Read by Vitest ([testing guide](../guides/testing.md#react-component-tests)) |
 
 TypeScript: `apps/web/tsconfig.json` is a solution file for `tsconfig.app.json` (`src/`, `lib` ES2022 + DOM + DOM.Iterable, `types: ["vite/client"]`, `jsx: "react-jsx"`, `noEmit`, references core's library project, so `src/` type-checks against core's declarations) and `tsconfig.node.json` (`vite.config.ts`, `types: ["node"]`). Both extend the root `tsconfig.base.json`.
 
-### Netlify
+### Pages
 
-No Netlify site is connected to the repository, and none will be: this configuration publishes nothing, and publishing on GitHub Pages ([#54](https://github.com/mateuszsikora/irvis/issues/54)) replaces it.
+The web version is the build of `apps/web/dist` from the tag of the latest published release, served by GitHub Pages at `https://no-plan.dev/irvis/` (`https://mateuszsikora.github.io/irvis/` redirects there, because the account's user site has the custom domain `no-plan.dev`). The workflow that builds and publishes it, and the repository settings it needs, are in [the development guide](../guides/development.md#pages).
 
-`netlify.toml` at the repository root:
+Pages serves static files over HTTPS and sets no headers of the repository's choosing: no `Content-Security-Policy`, no `Cross-Origin-Opener-Policy` or `Cross-Origin-Embedder-Policy`, and `Cache-Control: max-age=600` on every file. The app needs none of the three security headers: nothing in it uses `SharedArrayBuffer`, so it does not need to be cross-origin isolated, and `netlify.toml` set no headers either. What it needs from the origin is a secure context, for camera access, module Workers (the diagnostics worker of `@irvis/backend-browser` and the storage worker of `@irvis/media`), the AudioWorklet of the microphone and OPFS. HTTPS gives all of them; the [Pages smoke check](#pages-smoke-check) tries the camera, both Workers and OPFS on every publish, not the AudioWorklet. The CSP that the desktop app sets on `app://irvis/` applies only there.
 
-| Setting | Value |
-| --- | --- |
-| `build.command` | `npm run build --workspace @irvis/web` |
-| `build.publish` | `apps/web/dist` |
-| `context.production.ignore` | `test "$BRANCH" != "release"` |
+The site shares its origin, `https://no-plan.dev`, with the user site and the account's other project sites (such as `/slate/`). The browser keeps storage and permissions per origin, so their pages can read and delete the recordings in OPFS (`irvis-recordings`), the photos in IndexedDB (`irvis-photos`) and the saved camera in localStorage, and they use the camera permission given to irvis. A domain or subdomain of irvis's own would give it a separate origin ([decision](../decisions/architecture.md#the-web-version-is-published-on-github-pages-from-published-releases)).
 
-Netlify installs the dependencies itself (it finds `package-lock.json`) with the Node version from `.nvmrc`. The production branch is chosen in the Netlify UI, not in the file; the `ignore` command is a second guard: a production build of any branch other than `release` is cancelled, because an `ignore` command that exits 0 cancels the build. That command replaces Netlify's default check, so a production build of `release` runs even when nothing changed since the last deploy. Deploy previews and branch deploys use the default.
+### Pages smoke check
 
-Settings a connected site would need in the Netlify UI:
+`apps/web/test/pages-smoke.mjs` opens the web build in headless Chromium (Playwright) and checks what the app needs from a static HTTPS host:
 
-- Production branch: `release`.
-- Deploy previews: on, for pull requests against `main`.
-- Branch deploys: none (each deploy costs credits).
+```sh
+npm run build --workspace @irvis/web
+node apps/web/test/pages-smoke.mjs                              # the build, served under /irvis/
+node apps/web/test/pages-smoke.mjs https://no-plan.dev/irvis/   # the published site
+```
+
+Without a URL it serves `apps/web/dist` under `/irvis/` on a free port of `localhost` with no header but `Content-Type`, the way Pages serves a project site; `localhost` is a secure context as HTTPS is. Chromium's fake camera plays grey frames of the first video mode of the first camera profile (256 × 384 at 25 fps for the InfiRay P2 Pro), written to a temporary `.y4m` file, because browser diagnostics ask for that exact size. In that order, it checks:
+
+1. the heading `irvis` and `window.isSecureContext`;
+2. Demo → Start, "Check recording storage" answering with the OPFS message (`Estimated uncompressed capacity: <n> seconds`, not the memory fallback), Record .irvis for a second and Stop recording; the recording is listed, and a non-empty `.irvis` file is in the OPFS directory `irvis-recordings`, written through the storage module Worker. It then deletes the recording and stops the demo;
+3. Capture diagnostics → Start diagnostics with the fake camera, until the panel counts a frame read in the diagnostics module Worker;
+4. that no request failed, no response had a status of 400 or more, and the page threw no error. A wrong `base` shows up here as missing files under the site's path.
+
+It prints `pages smoke (<url>): files, secure context, OPFS recording, module Workers and camera passed` and exits 0; on a failure it prints the failed requests and responses it saw before Playwright's error. It needs `npx playwright install chromium` (with `--with-deps` on Linux). The recording it makes on the published site is deleted again, and the rest stays in the temporary browser profile of that run.
+
 
 ## Failure modes
 
 | Symptom | Cause |
 | --- | --- |
 | The page stays empty and the console shows `Uncaught Error: irvis: no #root element in index.html` | `index.html` lost its `<div id="root">` |
-| Netlify shows a production deploy as "Canceled" | A production build ran for a branch other than `release` (the `ignore` guard) |
-| `npm ci` fails on Netlify with `EBADENGINE` | The Node version Netlify uses is older than `engines.node` in the root `package.json`; `.npmrc` sets `engine-strict=true` |
+| The published page stays empty and the console lists 404s for `/assets/…` at the root of the domain | `base` is absolute (`'/'`) again; the Pages smoke check fails on the build before it is published |
+| "Publish on Pages" fails with `Tag "v<version>" is not allowed to deploy to github-pages due to environment protection rules.` | The environment `github-pages` lacks the tag rule `v*` ([development guide](../guides/development.md#pages)) |
 
 ## Tests
 
@@ -70,12 +78,12 @@ Settings a connected site would need in the Netlify UI:
 
 Backend tests live in `packages/backend-browser/test/`; see [backend tests](backend-browser-technical.md#tests). `Diagnostics.test.tsx` covers empty profiles, session reset, fps, device storage and downloads.
 
-Not covered: `main.tsx`, the production build (CI runs `npm run build` but checks only that it succeeds), and anything Netlify does.
+Not covered: `main.tsx`; how the desktop app loads this build from `app://irvis/`, which CI does not check (`npm run test:desktop` runs only by hand; the [Pages smoke check](#pages-smoke-check) runs on the web build in CI and in the Pages workflow); Safari, the other supported browser, and real cameras on the Pages origin.
 
 ## See also
 
 - [Web app](web-app-user.md)
-- [Development guide: Promote to release](../guides/development.md#promote-to-release)
+- [Development guide: Pages](../guides/development.md#pages)
 
 ## Desktop comparison panel
 

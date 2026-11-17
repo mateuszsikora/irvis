@@ -26,7 +26,7 @@ Every commit and pull request that changes behaviour lands its documentation in 
 | --- | --- | --- |
 | `tools/docs-check/` except its tests | `docs/features/docs-contract-technical.md` (or `-user.md`, or `docs/guides/documentation.md`); this table and `docs/features/README.md` if `RULES` changed | F1 |
 | `packages/core/` except `src/cameras/` | `docs/features/core-technical.md` (or `-user.md`) | F2 |
-| `apps/web/` or `netlify.toml` | `docs/features/web-app-technical.md` (or `-user.md`) | F3 |
+| `apps/web/` | `docs/features/web-app-technical.md` (or `-user.md`) | F3 |
 | `packages/core/src/cameras/` | `docs/features/cameras-technical.md` (or `-user.md`) | F4 |
 | `tools/capture-cli/` except its tests | `docs/features/capture-cli-technical.md` (or `-user.md`) | F5 |
 | `packages/backend-browser/` | `docs/features/backend-browser-technical.md` (or `-user.md`) | F6 |

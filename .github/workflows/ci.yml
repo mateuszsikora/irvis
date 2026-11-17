@@ -99,3 +99,24 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
+
+  pages:
+    name: Web build under /irvis/
+    # Not a required check: it catches an absolute path or base before a
+    # release publishes it, see docs/guides/development.md#ci.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Build
+        run: npm run build --workspace @irvis/web
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Check the build under /irvis/
+        run: node apps/web/test/pages-smoke.mjs

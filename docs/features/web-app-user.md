@@ -1,10 +1,12 @@
 # Web app
 
-`apps/web` is the one UI build of irvis: the desktop app loads it, and it is to be published as the web version ([#54](https://github.com/mateuszsikora/irvis/issues/54)). It provides a thermal viewer with synthetic demo and live capture, supported camera profiles, and experimental browser diagnostics.
+`apps/web` is the one UI build of irvis: the desktop app loads it, and GitHub Pages publishes it as the web version. It provides a thermal viewer with synthetic demo and live capture, supported camera profiles, and experimental browser diagnostics.
 
 ## Open the web version
 
-The web version is not published. `netlify.toml` and "Promote to release" ([development guide](../guides/development.md#promote-to-release)) were written for a Netlify site, but the repository is not connected to Netlify and will not be, so pull requests get no deploy preview either. Publishing on GitHub Pages is [#54](https://github.com/mateuszsikora/irvis/issues/54). Until then, [run it locally](#run-it-locally).
+Open [https://no-plan.dev/irvis/](https://no-plan.dev/irvis/) in a [supported browser](#supported-browsers); `https://mateuszsikora.github.io/irvis/` leads there too. The site serves the latest release, unless the owner has published an earlier one again, and it is the same version as the [desktop packages](desktop-user.md#install-a-package) of that release; changes merged since then appear with the next release, and pull requests get no preview. Before the first release is published, the site does not exist yet: [run it locally](#run-it-locally).
+
+The page keeps what it stores in the browser, per site: recordings, photos and the chosen camera. `no-plan.dev` also serves other sites of the same owner, and the browser treats them as the same site, so their pages can read and delete what irvis stores, and they get the camera permission you give irvis. Download recordings and photos you want to keep.
 
 ## Supported browsers
 

@@ -1,7 +1,7 @@
 # Run by hand from main: sets the version through a pull request, builds the
 # desktop packages and leaves a draft GitHub Release with them and the source
 # of the LGPL parts they carry (ffmpeg, and libusb inside node-usb).
-# Publishing that release moves the release branch for Netlify.
+# Publishing that release publishes the web version of its tag on GitHub Pages.
 # Why and how: docs/guides/development.md#release
 name: Release
 
@@ -298,20 +298,22 @@ jobs:
             --title "irvis $VERSION" --generate-notes \
             --notes "Unsigned desktop packages for macOS, Windows and Linux; how to install them: $GITHUB_SERVER_URL/$GH_REPO/blob/$tag/docs/features/desktop-user.md#install-a-package. Each package carries an LGPL ffmpeg and node-usb with the LGPL libusb built in; the ffmpeg source tarball, its build.sh and the node-usb source package with libusb are attached.")
           if [ "$PRERELEASE" = true ]; then
-            next="Publish it to tag $SHA; as a prerelease it does not move release."
+            next="Publish it to tag $SHA; as a prerelease it does not go to Pages."
           else
-            next="Publish it to tag $SHA and move release."
+            next="Publish it to tag $SHA and publish the web version on Pages."
           fi
           echo "Draft release $tag: $url. $next" >> "$GITHUB_STEP_SUMMARY"
 
-  promote:
-    name: Promote to release
-    # A prerelease does not reach production.
+  pages:
+    name: Pages
+    # A prerelease does not reach the web version.
     if: >-
       github.event_name == 'release' && !github.event.release.prerelease &&
       startsWith(github.ref, 'refs/tags/v')
-    uses: ./.github/workflows/promote.yml
+    uses: ./.github/workflows/pages.yml
     permissions:
-      contents: write
+      contents: read
+      pages: write
+      id-token: write
     with:
-      sha: ${{ github.sha }}
+      tag: ${{ github.event.release.tag_name }}

@@ -1,0 +1,173 @@
+# Builds apps/web from the tag of a published release and publishes it on
+# GitHub Pages, then checks the published site. Release calls it when a
+# release that is not a prerelease is published; by hand from main it
+# publishes a release's tag again.
+# Why and how: docs/guides/development.md#pages
+name: Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag of a published release, such as v0.2.0 (empty for the latest release)
+        required: false
+        default: ''
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build the web version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      sha: ${{ steps.tag.outputs.sha }}
+      tag: ${{ steps.tag.outputs.tag }}
+      index: ${{ steps.index.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # merge-base --is-ancestor needs the history of main.
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Choose the tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -eu
+          # Catches a run started from another branch by mistake. It is not a
+          # security boundary: that branch's copy of this file can drop it.
+          # Release calls this workflow when a release of a tag v* is published.
+          case "$GITHUB_EVENT_NAME:$GITHUB_REF" in
+            workflow_dispatch:refs/heads/main | release:refs/tags/v*) ;;
+            *)
+              echo "::error::run this workflow from main, not from $GITHUB_REF"
+              exit 1
+              ;;
+          esac
+          if [ -z "$TAG" ]; then
+            # gh release view without a tag shows the latest release, which
+            # is never a draft or a prerelease.
+            TAG=$(gh release view --json tagName --jq .tagName) || {
+              echo "::error::there is no published release to publish"
+              exit 1
+            }
+          fi
+          if ! printf '%s' "$TAG" | grep -Eqx 'v[0-9A-Za-z.+-]+'; then
+            echo "::error::$TAG is not a release tag: use v<version>, such as v0.2.0"
+            exit 1
+          fi
+          # A token with contents: read does not see drafts, so a draft fails
+          # here like a missing release; the isDraft test is a second guard.
+          state=$(gh release view "$TAG" --json isDraft,isPrerelease \
+            --jq 'if .isDraft then "draft" elif .isPrerelease then "prerelease" else "release" end') || state=missing
+          if [ "$state" = missing ] || [ "$state" = draft ]; then
+            echo "::error::$TAG is not a published release of this repository"
+            exit 1
+          fi
+          if [ "$state" = prerelease ]; then
+            echo "::error::$TAG is a prerelease; only releases that are not prereleases go to Pages"
+            exit 1
+          fi
+          # The checkout with fetch-depth 0 holds every tag and origin/main.
+          sha=$(git rev-parse --verify --quiet "refs/tags/$TAG^{commit}") || {
+            echo "::error::the tag $TAG is not in this repository"
+            exit 1
+          }
+          if ! git merge-base --is-ancestor "$sha" origin/main; then
+            echo "::error::$TAG ($sha) is not on main; only commits on main are published"
+            exit 1
+          fi
+          git switch --quiet --detach "$sha"
+          {
+            echo "tag=$TAG"
+            echo "sha=$sha"
+          } >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build --workspace @irvis/web
+      # index.html names the hashed bundle, so its hash identifies the build.
+      - id: index
+        run: echo "sha256=$(sha256sum apps/web/dist/index.html | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+      # The files as Pages will serve them, under /irvis/, before they are published.
+      - run: npx playwright install --with-deps chromium
+      - name: Check the build under /irvis/
+        run: node apps/web/test/pages-smoke.mjs
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: apps/web/dist
+
+  deploy:
+    name: Publish on Pages
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    # On the job, so that runs by hand and from Release share one queue.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    outputs:
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
+      - name: Summary
+        env:
+          TAG: ${{ needs.build.outputs.tag }}
+          SHA: ${{ needs.build.outputs.sha }}
+          URL: ${{ steps.deployment.outputs.page_url }}
+        run: echo "Published $TAG ($SHA) at $URL" >> "$GITHUB_STEP_SUMMARY"
+
+  check:
+    name: Check the published site
+    needs: [build, deploy]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Wait for this build
+        env:
+          URL: ${{ needs.deploy.outputs.url }}
+          INDEX: ${{ needs.build.outputs.index }}
+        run: |
+          # pipefail: a failed curl leaves served empty, not the hash of nothing.
+          set -euo pipefail
+          # Pages' CDN may still answer with the previous index.html.
+          for _ in $(seq 1 20); do
+            served=$(curl -fsSL "$URL" | sha256sum | cut -d ' ' -f 1) || served=''
+            if [ "$served" = "$INDEX" ]; then exit 0; fi
+            sleep 30
+          done
+          echo "::error::$URL does not serve the index.html of this build after 10 minutes"
+          exit 1
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.build.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Check the published site
+        env:
+          URL: ${{ needs.deploy.outputs.url }}
+        run: node apps/web/test/pages-smoke.mjs "$URL"

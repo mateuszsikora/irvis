@@ -8,7 +8,7 @@ Run from the repository root:
 
 ```sh
 npm run docs-check                               # compare with origin/main, else main
-npm run docs-check -- --base origin/release      # compare with another base branch
+npm run docs-check -- --base upstream/main       # compare with another base branch
 npm run docs-check -- -v                         # also list the changed files
 ```
 

@@ -213,13 +213,9 @@ describe('TypeScript rules', () => {
     repo.passes();
   });
 
-  it('web app and netlify need web app doc', () => {
-    for (const path of ['apps/web/src/App.tsx', 'netlify.toml']) {
-      repo.write(path, 'x\n');
-      repo.fails('F3');
-      repo.git('checkout', '-q', '--', path);
-    }
-    repo.write('netlify.toml', 'x\n');
+  it('web app needs web app doc', () => {
+    repo.write('apps/web/src/App.tsx', 'x\n');
+    repo.fails('F3');
     repo.append('docs/features/web-app-technical.md', '\nTouched.\n');
     repo.passes();
   });

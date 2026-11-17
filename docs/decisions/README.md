@@ -59,7 +59,8 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [The .irvis threshold is in raw units](architecture.md#the-irvis-threshold-is-in-raw-units) | [architecture.md](architecture.md) | decided (#14) |
 | [Camera profiles carry a version](architecture.md#camera-profiles-carry-a-version) | [architecture.md](architecture.md) | decided (#14) |
 | [Motion compensation in .irvis is postponed](architecture.md#motion-compensation-in-irvis-is-postponed) | [architecture.md](architecture.md) | superseded (#16) |
-| [The web version is hosted on Netlify and goes to production from release](architecture.md#the-web-version-is-hosted-on-netlify-and-goes-to-production-from-release) | [architecture.md](architecture.md) | decided (#3) |
+| [The web version is hosted on Netlify and goes to production from release](architecture.md#the-web-version-is-hosted-on-netlify-and-goes-to-production-from-release) | [architecture.md](architecture.md) | superseded (#54) |
+| [The web version is published on GitHub Pages from published releases](architecture.md#the-web-version-is-published-on-github-pages-from-published-releases) | [architecture.md](architecture.md) | decided (#54) |
 | [The desktop app ships its own LGPL ffmpeg build](architecture.md#the-desktop-app-ships-its-own-lgpl-ffmpeg-build) | [architecture.md](architecture.md) | decided (#3) |
 | [The capture tool runs on Node type stripping, without tsx](architecture.md#the-capture-tool-runs-on-node-type-stripping-without-tsx) | [architecture.md](architecture.md) | decided (#6) |
 | [Captures keep the camera's bytes with an ffmpeg stream copy](architecture.md#captures-keep-the-cameras-bytes-with-an-ffmpeg-stream-copy) | [architecture.md](architecture.md) | superseded (#6) |
