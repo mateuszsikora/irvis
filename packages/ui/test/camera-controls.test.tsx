@@ -27,10 +27,10 @@ describe('CameraControls', () => {
   it('waits for automatic gain confirmation and exits Auto on failure', async () => {
     let receive: (frame: RawFrame) => void = () => {};
     const frames = {
-      subscribe: (listener: typeof receive) => {
+      subscribe: vi.fn((listener: typeof receive) => {
         receive = listener;
         return () => {};
-      },
+      }),
     };
     let reject!: (error: Error) => void;
     const command = vi
@@ -63,6 +63,9 @@ describe('CameraControls', () => {
         screen.getByRole('button', { name: 'Auto sensor range' }).getAttribute('aria-pressed'),
       ).toBe('true'),
     );
+    // Auto subscribes in an effect that runs after the render above; frames
+    // sent before it would go nowhere.
+    await waitFor(() => expect(frames.subscribe).toHaveBeenCalledTimes(1));
     const data = new Uint8Array(8);
     new DataView(data.buffer).setUint16(4, 30000, true);
     const frame: RawFrame = {

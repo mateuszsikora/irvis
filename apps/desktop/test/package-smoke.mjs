@@ -53,6 +53,9 @@ if (withoutFfmpeg) for (const file of bundled) assert.ok(!existsSync(file), `${f
 for (const file of [
   ...(withoutFfmpeg ? [] : bundled),
   join(resources, 'web/index.html'),
+  join(resources, 'web/THIRD-PARTY-LICENSES.md'),
+  join(resources, 'libusb/COPYING'),
+  join(resources, 'libusb/AUTHORS'),
   join(resources, 'LICENSE.irvis.txt'),
   join(resources, 'NOTICE.irvis.txt'),
   ...(platform === 'darwin' ? [join(resources, 'iokit-request')] : []),

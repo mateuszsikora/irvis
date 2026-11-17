@@ -116,13 +116,15 @@ Edit the file under `.agents/skills/` only. The symlink must be relative (exactl
 
 ## Repository settings
 
-The rules above assume these GitHub settings, which live outside the repository and are changed by the owner: squash merge only (merge commits and rebase merges disabled), squash commit title `COMMIT_OR_PR_TITLE`, squash commit message `COMMIT_MESSAGES`, delete head branches after merge, and, for the [Release workflow](docs/guides/development.md#release), "Allow GitHub Actions to create and approve pull requests" (Settings → Actions → General). Check the current state with:
+The rules above assume these GitHub settings, which live outside the repository and are changed by the owner: squash merge only (merge commits and rebase merges disabled), squash commit title `COMMIT_OR_PR_TITLE`, squash commit message `COMMIT_MESSAGES`, delete head branches after merge; for the [Release workflow](docs/guides/development.md#release), "Allow GitHub Actions to create and approve pull requests" (Settings → Actions → General); workflows of pull requests from forks wait for approval for every outside contributor ("Require approval for all external contributors", same page), so that nobody's code runs in CI unseen; and the ruleset `main` from `.github/rulesets/main.json` ([Required checks](docs/guides/development.md#required-checks)). Check the current state with:
 
 ```sh
 gh api repos/mateuszsikora/irvis --jq '{allow_squash_merge, allow_merge_commit, allow_rebase_merge, delete_branch_on_merge, squash_merge_commit_title, squash_merge_commit_message}'
 gh api repos/mateuszsikora/irvis/actions/permissions/workflow --jq '{can_approve_pull_request_reviews}'
+gh api repos/mateuszsikora/irvis/actions/permissions/fork-pr-contributor-approval --jq .approval_policy
+gh api repos/mateuszsikora/irvis/rulesets --jq '.[] | {name, enforcement}'
 ```
 
-`can_approve_pull_request_reviews` must be `true`.
+`can_approve_pull_request_reviews` must be `true`, the approval policy `all_external_contributors`, and the ruleset `main` must be listed with `enforcement` `active`.
 
-If GitHub still allows merge commits or rebase merges, the rule still holds: use "Squash and merge". The `create-pr` skill reports any difference. Branch protection and rulesets are not available on the current plan, so GitHub cannot require the CI checks to pass or enforce the rules in this file; contributors and agents do.
+If GitHub still allows merge commits or rebase merges, the rule still holds: use "Squash and merge". The `create-pr` skill reports any difference. The ruleset makes GitHub require the checks "Documentation contract" and "TypeScript", a pull request and squash merges on `main`, and it blocks force pushes to `main` and its deletion. The other rules in this file are enforced by contributors and agents, not by GitHub.

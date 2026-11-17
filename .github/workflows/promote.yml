@@ -23,7 +23,7 @@ permissions:
 jobs:
   promote:
     name: Promote to release
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: write

@@ -31,6 +31,7 @@ Scripts in `apps/web/package.json`: `dev` (`vite`), `build` (`vite build`), `pre
 | `base` | `'/'` | Electron serves the files from `app://irvis/`, and a site built from `netlify.toml` would serve them from its root |
 | `plugins` | `@vitejs/plugin-react` | JSX and React Fast Refresh in `dev` |
 | `build.outDir` | `dist` (emptied first) | What the desktop app copies to `web/` and what `netlify.toml` names as `build.publish` |
+| `build.license` | `{ fileName: 'THIRD-PARTY-LICENSES.md' }` | The minified bundle drops the licence comments of the npm packages it contains (React, React DOM, scheduler, fflate and the MPL-2.0 Mediabunny). Vite writes `dist/THIRD-PARTY-LICENSES.md` with the name, version, SPDX identifier and licence text of each, so the file is served next to `index.html` and copied into the desktop packages |
 | `test` | project `web`, environment `jsdom`, files `src/**/*.test.{ts,tsx}` | Read by Vitest ([testing guide](../guides/testing.md#react-component-tests)) |
 
 TypeScript: `apps/web/tsconfig.json` is a solution file for `tsconfig.app.json` (`src/`, `lib` ES2022 + DOM + DOM.Iterable, `types: ["vite/client"]`, `jsx: "react-jsx"`, `noEmit`, references core's library project, so `src/` type-checks against core's declarations) and `tsconfig.node.json` (`vite.config.ts`, `types: ["node"]`). Both extend the root `tsconfig.base.json`.

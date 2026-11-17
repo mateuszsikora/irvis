@@ -363,11 +363,21 @@ Rejected: treating TypeScript structural casts and transport mocks as proof of c
 
 ## GitHub Actions use the self-hosted Linux X64 runner
 
-Status: decided
+Status: superseded (#56)
+
+Before the repository went public, CI moved to GitHub-hosted runners; see [the replacement decision](#github-actions-use-github-hosted-runners).
 
 Run every job in `ci.yml` and `promote.yml` on `[self-hosted, Linux, X64]`, using the existing runner registered for this repository. Match its platform labels rather than its machine name so a replacement runner can take over without workflow edits. Keep the existing triggers, permissions, timeouts, and verification steps.
 
 **Rejected:** keeping `ubuntu-latest`, because the repository owner wants these workflows to use the already registered self-hosted runner.
+
+## GitHub Actions use GitHub-hosted runners
+
+Status: decided (#56)
+
+Every job in `ci.yml` and `promote.yml` runs on `ubuntu-24.04`, like the jobs of `release.yml` and `desktop.yml`, and the self-hosted runner is removed from the repository. In a public repository a pull request from a fork runs its own copy of the workflow, so a self-hosted runner would execute anyone's code on the owner's machine; it is not ephemeral, so such a job could also leave something behind that later reads the `contents: write` token of "Promote to release". GitHub recommends self-hosted runners only for private repositories, and standard GitHub-hosted runners cost nothing for a public one. The GitHub Actions minutes of the private repository had also run out.
+
+**Rejected:** keeping the self-hosted runner for pushes to `main` and "Promote to release" only, because a fork's pull request can change `runs-on` back to its labels while the runner is registered; requiring approval for fork workflows instead, because one missed review would expose the machine.
 
 ## Planar reconstruction preserves the rounded chroma observation
 
@@ -577,7 +587,7 @@ Auto is a host policy with 100 settling frames and 100 consecutive crossings at 
 
 Status: decided (#23)
 
-`.github/workflows/desktop.yml` builds the bundled ffmpeg and the packages on `macos-15`, `windows-2025` and `ubuntu-24.04`. A dmg and an ffmpeg with AVFoundation can only be built on macOS, and the self-hosted runner is Linux; the owner chose GitHub-hosted runners for all three systems, so that the workflow does not depend on what is installed on `hp600g1`. The workflow runs only on pull requests that touch packaging, by hand, or when called, because macOS minutes are billed at a multiple while the repository is private. `ci.yml` and `promote.yml` keep the [self-hosted runner](#github-actions-use-the-self-hosted-linux-x64-runner).
+`.github/workflows/desktop.yml` builds the bundled ffmpeg and the packages on `macos-15`, `windows-2025` and `ubuntu-24.04`. A dmg and an ffmpeg with AVFoundation can only be built on macOS, and the self-hosted runner is Linux; the owner chose GitHub-hosted runners for all three systems, so that the workflow does not depend on what is installed on `hp600g1`. The workflow runs only on pull requests that touch packaging, by hand, or when called, because macOS minutes are billed at a multiple while the repository is private. `ci.yml` and `promote.yml` moved to GitHub-hosted runners later ([decision](#github-actions-use-github-hosted-runners)).
 
 **Rejected:** macOS on GitHub-hosted and Linux and Windows (cross-compiled with mingw-w64) on the self-hosted runner, because the runner would need gcc, mingw-w64 and the Electron system libraries installed and kept by hand, and electron-builder would need Wine there to edit the Windows executable.
 
@@ -611,6 +621,6 @@ Status: decided (#24)
 
 A release takes two actions of the owner: running "Release" by hand, optionally with a version, and publishing the draft it leaves ([details](../guides/development.md#release)). The run sets `version` in `apps/desktop/package.json` through a pull request that it opens and squash-merges itself, builds the packages from that merge commit by calling "Desktop packages" without `allow-system-ffmpeg`, and creates a draft GitHub Release with the packages, the ffmpeg source tarball and `build.sh`, targeting that commit. Publishing creates the tag on it and calls "Promote to release" with it, so the tag is on `main`, the repository's version at the tag is the packages' version, and the web version in production comes from the same commit. The pull request keeps the rule that nothing is pushed to `main` directly; it is merged without review because it changes only the version that the owner chose when starting the run, and the draft is where the owner looks before anything is public. A version with a prerelease part gives a GitHub prerelease, which leaves `release` alone and is the way to try the workflow without touching production.
 
-The jobs that set the version and create the draft run on `ubuntu-24.04`, not on the [self-hosted runner](#github-actions-use-the-self-hosted-linux-x64-runner): the release needs [GitHub-hosted runners](#desktop-packages-are-built-on-github-hosted-runners) for the packages anyway, and these jobs use the `gh` CLI, which those images carry and the self-hosted runner is not known to have. Moving `release` stays on the self-hosted runner, because it reuses `promote.yml`.
+The jobs that set the version and create the draft run on `ubuntu-24.04`, not on the [self-hosted runner](#github-actions-use-the-self-hosted-linux-x64-runner): the release needs [GitHub-hosted runners](#desktop-packages-are-built-on-github-hosted-runners) for the packages anyway, and these jobs use the `gh` CLI, which those images carry and the self-hosted runner is not known to have. Moving `release` reuses `promote.yml`, which also runs on `ubuntu-24.04` since [#56](#github-actions-use-github-hosted-runners).
 
 **Rejected:** a tag pushed by hand as the trigger, because the owner wants a release from the Actions page in a few clicks, and the version bump would be a separate pull request before it. **Rejected:** leaving the version pull request for the owner to merge, because the draft must be built from the merged commit; waiting for the merge would add a step, and building before it would tag a commit that squash merging leaves off `main`. **Rejected:** setting the package version from the input at packaging time (electron-builder's `extraMetadata`) without a commit, because the repository would then never say which version it is, and the tag would point to a commit whose `package.json` holds another version. **Rejected:** a second copy of the fast-forward step in `release.yml`, because two copies of the rule that only commits on `main` reach production would drift; `promote.yml` became a reusable workflow instead. **Rejected:** releasing packages packaged without ffmpeg, because users of a release would then need their own ffmpeg without being told; a failed ffmpeg build stops the release.

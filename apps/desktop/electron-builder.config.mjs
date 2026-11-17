@@ -4,9 +4,12 @@
 import { Arch } from 'electron-builder';
 import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 
+const require = createRequire(import.meta.url);
 const repository = resolve(import.meta.dirname, '../..');
+// The node-usb prebuilds link libusb (LGPL-2.1-or-later) statically.
+const libusb = resolve(dirname(require.resolve('usb/package.json')), 'libusb');
 const camera = 'irvis uses the camera to display and record thermal images.';
 const systems = { darwin: 'mac', linux: 'linux', win32: 'win' };
 
@@ -29,7 +32,7 @@ function requireFfmpeg({ electronPlatformName, arch }) {
 export default {
   // npm hoists electron to the workspace root, where electron-builder does
   // not look; package the version that npm installed.
-  electronVersion: createRequire(import.meta.url)('electron/package.json').version,
+  electronVersion: require('electron/package.json').version,
   appId: 'io.github.mateuszsikora.irvis',
   productName: 'irvis',
   executableName: 'irvis',
@@ -59,6 +62,7 @@ export default {
     },
     { from: resolve(repository, 'LICENSE'), to: 'LICENSE.irvis.txt' },
     { from: resolve(repository, 'NOTICE'), to: 'NOTICE.irvis.txt' },
+    { from: libusb, to: 'libusb', filter: ['COPYING', 'AUTHORS'] },
   ],
   mac: {
     target: ['dmg'],

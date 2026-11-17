@@ -12,8 +12,12 @@ the material, in this form:
   Used in: <paths in this repository>
   What: <what was taken: code, constants, a protocol description>
 
-Third-party npm packages are not listed here; their licences ship with them
-in node_modules and in the release packages.
+Third-party npm packages are not listed here, except the two below whose
+licences ask for more than their notice. The web build carries the licence
+texts of the npm packages bundled into it in THIRD-PARTY-LICENSES.md, next to
+index.html (resources/web/ in the desktop packages); node-usb and its runtime
+dependencies keep theirs in app.asar; Electron and Chromium ship theirs as
+LICENSE.electron.txt and LICENSES.chromium.html in the desktop packages.
 
 LeoDJ/P2Pro-Viewer (https://github.com/LeoDJ/P2Pro-Viewer)
 Copyright (c) 2023 LeoDJ
@@ -46,3 +50,21 @@ Used in: the desktop packages (resources/ffmpeg/), built by
 What: an unmodified FFmpeg 9.0.2 binary, built without GPL or nonfree
   parts; its licence text and source details ship next to it, and the
   source tarball is published with each release.
+
+Mediabunny (https://github.com/Vanilagy/mediabunny)
+Licence: MPL-2.0
+Used in: the web build and the desktop packages, bundled from the npm
+  package mediabunny
+What: unmodified code for MP4 export. Its source is the npm package
+  mediabunny of the version that THIRD-PARTY-LICENSES.md names, and the
+  tag of that version in the repository above.
+
+libusb (https://libusb.info)
+Copyright: the libusb authors, listed in AUTHORS
+Licence: LGPL-2.1-or-later
+Used in: the desktop packages, linked statically into the node-usb
+  (https://github.com/node-usb/node-usb, MIT) prebuilds
+What: unmodified libusb, the version that node-usb ships. Its licence and
+  authors are in resources/libusb/ of each package, and the node-usb
+  source package (usb-<version>.tgz), which holds the libusb source and
+  rebuilds the prebuild, is published with each release.

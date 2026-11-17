@@ -5,6 +5,10 @@ on:
   pull_request:
   push:
     branches: [main]
+  # The Release workflow starts CI on its version branch this way, because
+  # its pull request, opened with GITHUB_TOKEN, starts no workflow. The docs
+  # job then checks that the branch changes only the version.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -12,8 +16,10 @@ permissions:
 jobs:
   docs:
     name: Documentation contract
-    if: github.event_name == 'pull_request'
-    runs-on: [self-hosted, Linux, X64]
+    # On workflow_dispatch the job passes only a release version branch, so
+    # that starting CI by hand cannot stand in for the contract on a branch.
+    if: github.event_name != 'push'
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
@@ -25,14 +31,41 @@ jobs:
         with:
           node-version-file: .nvmrc
       - name: Documentation contract
+        if: github.event_name == 'pull_request'
         env:
           BASE_REF: ${{ github.base_ref }}
         run: npm run docs-check -- --base "origin/$BASE_REF"
+      - name: Only the release version changed
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -eu
+          base=$(git merge-base origin/main HEAD)
+          node -e '
+            const { execFileSync } = require("node:child_process");
+            const base = process.argv[1];
+            const git = (...args) => execFileSync("git", args, { encoding: "utf8" });
+            const files = git("diff", "--name-only", base, "HEAD").split("\n").filter(Boolean).sort();
+            const expected = ["apps/desktop/package.json", "package-lock.json"];
+            const read = (rev, file) => JSON.parse(git("show", rev + ":" + file));
+            const strip = (file, json) => {
+              if (file === expected[0]) delete json.version;
+              else delete json.packages["apps/desktop"].version;
+              return JSON.stringify(json);
+            };
+            const same =
+              JSON.stringify(files) === JSON.stringify(expected) &&
+              expected.every((file) => strip(file, read(base, file)) === strip(file, read("HEAD", file)));
+            if (!same) {
+              console.log("::error::run by hand, CI passes the documentation contract only on a branch that changes nothing but the version in apps/desktop/package.json and package-lock.json; open a pull request instead");
+              process.exit(1);
+            }
+            console.log("only the release version changed since " + base);
+          ' "$base"
 
   integrity:
     name: Documentation integrity
     if: github.event_name == 'push'
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
@@ -44,8 +77,9 @@ jobs:
 
   typescript:
     name: TypeScript
-    runs-on: [self-hosted, Linux, X64]
-    # The steps take about 10 minutes on the self-hosted runner.
+    runs-on: ubuntu-24.04
+    # The steps take about 2 minutes on ubuntu-24.04; the limit dates from
+    # the former self-hosted runner, where they took about 10.
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7

@@ -20,7 +20,8 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [Test files are left out of the source side](docs.md#test-files-are-left-out-of-the-source-side) | [docs.md](docs.md) | decided |
 | [The decisions index is generated](docs.md#the-decisions-index-is-generated) | [docs.md](docs.md) | decided |
 | [Integrity checks run on the whole tree every time](docs.md#integrity-checks-run-on-the-whole-tree-every-time) | [docs.md](docs.md) | decided |
-| [The documentation check is not a required status check yet](docs.md#the-documentation-check-is-not-a-required-status-check-yet) | [docs.md](docs.md) | postponed |
+| [The documentation check is not a required status check yet](docs.md#the-documentation-check-is-not-a-required-status-check-yet) | [docs.md](docs.md) | superseded (#26) |
+| [CI checks are required through a ruleset once the repository is public](docs.md#ci-checks-are-required-through-a-ruleset-once-the-repository-is-public) | [docs.md](docs.md) | decided (#26) |
 | [Tests use unittest from the standard library](docs.md#tests-use-unittest-from-the-standard-library) | [docs.md](docs.md) | superseded (#30) |
 | [CLAUDE.md is a symlink to AGENTS.md](docs.md#claudemd-is-a-symlink-to-agentsmd) | [docs.md](docs.md) | decided |
 | [No path-scoped rule file for agents](docs.md#no-path-scoped-rule-file-for-agents) | [docs.md](docs.md) | decided |
@@ -64,7 +65,8 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [Capture output packs pixels without automatic conversion](architecture.md#capture-output-packs-pixels-without-automatic-conversion) | [architecture.md](architecture.md) | decided (#6) |
 | [USB spike uses explicit transfer sequences without claiming UVC](architecture.md#usb-spike-uses-explicit-transfer-sequences-without-claiming-uvc) | [architecture.md](architecture.md) | decided (#7) |
 | [The USB spike uses node-usb 2.x for unclaimed EP0 transfers](architecture.md#the-usb-spike-uses-node-usb-2x-for-unclaimed-ep0-transfers) | [architecture.md](architecture.md) | decided (#7) |
-| [GitHub Actions use the self-hosted Linux X64 runner](architecture.md#github-actions-use-the-self-hosted-linux-x64-runner) | [architecture.md](architecture.md) | decided |
+| [GitHub Actions use the self-hosted Linux X64 runner](architecture.md#github-actions-use-the-self-hosted-linux-x64-runner) | [architecture.md](architecture.md) | superseded (#56) |
+| [GitHub Actions use GitHub-hosted runners](architecture.md#github-actions-use-github-hosted-runners) | [architecture.md](architecture.md) | decided (#56) |
 | [Planar reconstruction preserves the rounded chroma observation](architecture.md#planar-reconstruction-preserves-the-rounded-chroma-observation) | [architecture.md](architecture.md) | decided (#8) |
 | [Functional test timeouts allow shared runner contention](architecture.md#functional-test-timeouts-allow-shared-runner-contention) | [architecture.md](architecture.md) | decided (#8) |
 | [Browser diagnostics retain native planar bytes and disable brightness hints](architecture.md#browser-diagnostics-retain-native-planar-bytes-and-disable-brightness-hints) | [architecture.md](architecture.md) | decided (#9) |
