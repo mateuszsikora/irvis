@@ -1,0 +1,59 @@
+name: Bug report
+description: Something in irvis does not work as described.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead. Quote error messages exactly.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Connect the camera
+        2. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - Desktop app on macOS
+        - Desktop app on Windows
+        - Desktop app on Linux
+        - Web version in Chrome or Edge
+        - Web version in Safari
+        - Run from source
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: irvis version
+      description: The version of the package (from its file name), or the commit when run from source.
+      placeholder: 0.1.0, or a1b2c3d
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: System and browser versions
+      placeholder: macOS 15.5, Chrome 157
+    validations:
+      required: true
+  - type: input
+    id: camera
+    attributes:
+      label: Camera
+      description: Model, and the USB ID if you know it.
+      placeholder: TOOLTOP T7, 0x0bda:0x5840
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, screenshots or recordings
+      description: Anything that shows the problem. A `.irvis` recording that reproduces it, zipped, helps most.

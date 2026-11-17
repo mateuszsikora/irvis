@@ -211,6 +211,17 @@ The step "Create the draft release":
 
 Publishing starts the workflow again with the `release` event, from the tagged commit's copy of the file. A prerelease (marked as such on the draft, which the workflow does for a version with `-`; the box can also be changed before publishing) does not move `release`. If "Promote to release" fails, for example because `release` already holds a newer commit of `main` and the fast-forward is rejected, the GitHub Release stays published and production stays where it was; promote by hand if needed.
 
+## Issue templates and security policy
+
+[.github/ISSUE_TEMPLATE/](../../.github/ISSUE_TEMPLATE) holds two issue forms, which GitHub offers on "New issue":
+
+| File | Name | Label | Required fields |
+| --- | --- | --- | --- |
+| `bug_report.yml` | Bug report | `bug` | What happened, Steps to reproduce, Where (desktop app on macOS, Windows or Linux; web version in Chrome or Edge, or Safari; run from source), irvis version, System and browser versions; Camera and Logs are optional |
+| `feature_request.yml` | Feature request, also for a new camera | `enhancement` | What irvis should do, Why; Camera details is optional |
+
+`config.yml` keeps blank issues allowed, so that issues opened with `gh issue create --body` or without a form still work, and adds the link "Report a security vulnerability" to the private advisory form. [.github/SECURITY.md](../../.github/SECURITY.md) is the security policy that GitHub shows on the Security tab: reports go through private vulnerability reporting, never a public issue, and only `main` and the next release get fixes. The repository settings it depends on are listed in [CONTRIBUTING.md](../../CONTRIBUTING.md#repository-settings). The PR template is `.github/pull_request_template.md` ([CONTRIBUTING.md](../../CONTRIBUTING.md#pull-requests)).
+
 ## Agent skills
 
 Shared agent skills live in `.agents/skills/`, with symlinks in `.claude/skills/`. The layout and the check for it are in [CONTRIBUTING.md](../../CONTRIBUTING.md#agent-skills).

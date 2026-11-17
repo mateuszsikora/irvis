@@ -41,6 +41,9 @@ gh api repos/mateuszsikora/irvis --jq '{allow_squash_merge, allow_merge_commit, 
 gh api repos/mateuszsikora/irvis/actions/permissions/workflow --jq '{can_approve_pull_request_reviews}'
 gh api repos/mateuszsikora/irvis/actions/permissions/fork-pr-contributor-approval --jq .approval_policy
 gh api repos/mateuszsikora/irvis/rulesets --jq '.[] | {name, enforcement}'
+gh api repos/mateuszsikora/irvis --jq '.security_and_analysis | map_values(.status)'
+gh api repos/mateuszsikora/irvis/private-vulnerability-reporting --jq .enabled
+gh api repos/mateuszsikora/irvis/vulnerability-alerts --silent && echo alerts on
 git status --short --branch
 git rev-parse --abbrev-ref HEAD
 git log --oneline origin/main..HEAD
@@ -71,7 +74,7 @@ Then decide:
 - **Behind `main`, conflicts:** list the conflicted files and ask how to proceed. Never rebase or merge `main` on your own.
 - **Open PR for this branch:** update mode. Push new commits to it and rewrite its title and body (step 9); do not open a second PR. Keep the branch name.
 - **Only merged or closed PRs for this branch:** warn that the branch was probably already merged and is stale; ask before continuing.
-- **Repository settings differ from `CONTRIBUTING.md`** (merge commit or rebase allowed, branch deletion off, other squash title/message, `can_approve_pull_request_reviews` not `true`, fork approval policy not `all_external_contributors`, no active ruleset `main`): continue, and mention it once in the report. Changing them is the owner's decision; never change them yourself.
+- **Repository settings differ from `CONTRIBUTING.md`** (merge commit or rebase allowed, branch deletion off, other squash title/message, `can_approve_pull_request_reviews` not `true`, fork approval policy not `all_external_contributors`, no active ruleset `main`, secret scanning or push protection not `enabled`, Dependabot security updates not `disabled`, private vulnerability reporting not `true`, no `alerts on` from the Dependabot alerts check): continue, and mention it once in the report. Changing them is the owner's decision; never change them yourself.
 
 ## 2. Gather context
 
@@ -303,6 +306,6 @@ In the user's language:
 - linked issue with `Closes`/`Refs`, or that none fit;
 - labels;
 - what was verified (commands and results) and what was not;
-- anything the user should act on: repository settings that differ from `CONTRIBUTING.md` (with the command that would fix them, for the owner to run or approve: `gh api -X PATCH repos/mateuszsikora/irvis ...` for the merge settings, `gh api -X PUT repos/mateuszsikora/irvis/actions/permissions/workflow -f default_workflow_permissions=read -F can_approve_pull_request_reviews=true` for the Actions setting, `gh api -X PUT repos/mateuszsikora/irvis/actions/permissions/fork-pr-contributor-approval -f approval_policy=all_external_contributors` for fork approval, the commands in `docs/guides/development.md#required-checks` for the ruleset), commits that need fixing at merge time, local `main` ahead of `origin/main`.
+- anything the user should act on: repository settings that differ from `CONTRIBUTING.md` (with the command that would fix them, for the owner to run or approve: `gh api -X PATCH repos/mateuszsikora/irvis ...` for the merge settings, `gh api -X PUT repos/mateuszsikora/irvis/actions/permissions/workflow -f default_workflow_permissions=read -F can_approve_pull_request_reviews=true` for the Actions setting, `gh api -X PUT repos/mateuszsikora/irvis/actions/permissions/fork-pr-contributor-approval -f approval_policy=all_external_contributors` for fork approval, the commands in `docs/guides/development.md#required-checks` for the ruleset, `gh api -X PATCH repos/mateuszsikora/irvis --input <file>` with `{"security_and_analysis": {"secret_scanning": {"status": "enabled"}, "secret_scanning_push_protection": {"status": "enabled"}, "dependabot_security_updates": {"status": "disabled"}}}` for scanning, `gh api -X PUT repos/mateuszsikora/irvis/private-vulnerability-reporting` and `gh api -X PUT repos/mateuszsikora/irvis/vulnerability-alerts` for the other two), commits that need fixing at merge time, local `main` ahead of `origin/main`.
 
 If the PR's branch is not the one checked out, check it out (`git switch <branch>`) so the IDE or Conductor shows it.

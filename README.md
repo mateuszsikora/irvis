@@ -10,7 +10,7 @@ The TOPDON TC001 reports the same USB ID (`0x0bda:0x5830`) but has no profile of
 
 ## Desktop app
 
-Each version's packages are attached to its release on [GitHub Releases](https://github.com/mateuszsikora/irvis/releases), together with the source of the LGPL ffmpeg that each package carries. No release is published yet. The packages are unsigned:
+Each version's packages are attached to its release on [GitHub Releases](https://github.com/mateuszsikora/irvis/releases), together with the sources of the LGPL ffmpeg and libusb that each package carries. No release is published yet. The packages are unsigned:
 
 | System | Packages |
 | --- | --- |
@@ -50,5 +50,6 @@ The web version is not published yet ([#54](https://github.com/mateuszsikora/irv
 - Every document and where it lives: [docs/README.md](docs/README.md)
 - Setup, build targets and CI: [development guide](docs/guides/development.md)
 - How changes reach `main`: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Bugs and feature requests: [issues](https://github.com/mateuszsikora/irvis/issues/new/choose); vulnerabilities: [security policy](.github/SECURITY.md), never a public issue
 
 Licence: [MIT](LICENSE). Third-party material: [NOTICE](NOTICE).

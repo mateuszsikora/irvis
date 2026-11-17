@@ -1,0 +1,23 @@
+name: Feature request
+description: Something irvis should do, or a camera it should support.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What irvis should do
+      description: The feature, or the camera model it should support.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What you are trying to do and what stops you now.
+    validations:
+      required: true
+  - type: textarea
+    id: camera
+    attributes:
+      label: Camera details
+      description: For a new camera, its model, USB ID (for example from `lsusb` or System Information) and any other software that works with it.
