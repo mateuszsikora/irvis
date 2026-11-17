@@ -56,7 +56,7 @@ See [M5 hardware observations](../findings/m5-hardware.md) for measured thermal 
 
 ## Packages
 
-`apps/desktop/electron-builder.config.mjs` configures electron-builder 26. `npm run package:desktop -- <electron-builder options>` runs `npm run build` (web build, main and preload bundles, on macOS the IOKit helper) and then `electron-builder --config electron-builder.config.mjs --publish never` in `apps/desktop`. Without options it packages the host system and architecture. Packages go to `apps/desktop/release/` (ignored by git), named `irvis-<version>-<os>-<arch>.<ext>` with the version of `apps/desktop/package.json` (now `0.0.0`); electron-builder writes `x86_64` (AppImage) and `amd64` (deb) for x64 on Linux.
+`apps/desktop/electron-builder.config.mjs` configures electron-builder 26. `npm run package:desktop -- <electron-builder options>` runs `npm run build` (web build, main and preload bundles, on macOS the IOKit helper) and then `electron-builder --config electron-builder.config.mjs --publish never` in `apps/desktop`. Without options it packages the host system and architecture. Packages go to `apps/desktop/release/` (ignored by git), named `irvis-<version>-<os>-<arch>.<ext>` with the version of `apps/desktop/package.json`, which the [Release workflow](../guides/development.md#release) sets; electron-builder writes `x86_64` (AppImage) and `amd64` (deb) for x64 on Linux.
 
 | System | Options used in CI | Targets | Architectures |
 | --- | --- | --- | --- |

@@ -78,6 +78,7 @@ describe('App', () => {
 
 - Call `cleanup` after each test yourself: without Vitest globals, Testing Library cannot register it.
 - Query by role and visible text (`getByRole`, `getByText`), as a user finds things, not by class names.
+- In a wait (`findBy…`, `waitFor`) on a large tree such as the `Viewer`, query by text and pin the element with `selector` (`findByText(/^Analyze /, { selector: 'button' })`). A first `ByRole` query computes accessible names for the whole tree and can take a large part of the wait's timeout on the CI runner ([UI tests](../features/ui-technical.md#tests)).
 - `@testing-library/jest-dom` is not installed; assert on properties such as `textContent`.
 - The package needs `environment: 'jsdom'` in its Vitest project, and `jsdom`, `@testing-library/react` and `@testing-library/dom` in its `devDependencies`.
 

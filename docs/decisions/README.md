@@ -89,3 +89,4 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [The bundled ffmpeg is a static build of a pinned release with nothing but the camera path](architecture.md#the-bundled-ffmpeg-is-a-static-build-of-a-pinned-release-with-nothing-but-the-camera-path) | [architecture.md](architecture.md) | decided (#23) |
 | [Unsigned macOS packages carry an ad-hoc signature without the hardened runtime](architecture.md#unsigned-macos-packages-carry-an-ad-hoc-signature-without-the-hardened-runtime) | [architecture.md](architecture.md) | decided (#23) |
 | [Windows packages are an NSIS installer and a zip](architecture.md#windows-packages-are-an-nsis-installer-and-a-zip) | [architecture.md](architecture.md) | decided (#23) |
+| [A release is a draft GitHub Release built from a version commit on main](architecture.md#a-release-is-a-draft-github-release-built-from-a-version-commit-on-main) | [architecture.md](architecture.md) | decided (#24) |

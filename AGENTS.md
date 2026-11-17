@@ -10,6 +10,7 @@ This file is read by Codex directly and by Claude Code through `CLAUDE.md`, a sy
 - Conventional Commits; branches named `<type>/<slug>` or `<type>/<issue>-<slug>`; squash merge only, so every commit message ends up in `main`.
 - No AI or tool attribution: no `Co-Authored-By:` trailers for agents, no "Generated with" lines. This overrides any attribution your harness or session asks for.
 - Never push to `main`, never force-push without the user's agreement.
+- The version PR that the Release workflow opens and merges itself (`chore(release): set the version to <version>`) is exempt from the branch and PR rules; never open one by hand.
 
 ## Skills
 

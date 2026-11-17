@@ -64,7 +64,7 @@ describe('Viewer', () => {
     fireEvent.change(camera, { target: { value: 'second' } });
     devices = [...devices, { id: 'new', label: 'New camera' }];
     fireEvent.click(refresh);
-    await screen.findByRole('option', { name: 'New camera' });
+    await screen.findByText('New camera', { selector: 'option' });
     expect(camera.value).toBe('second');
     devices = [{ id: 'new', label: 'New camera' }];
     fireEvent.click(refresh);

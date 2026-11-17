@@ -97,7 +97,9 @@ describe('photo workflow', () => {
     const { items } = await setup();
     fireEvent.click(screen.getByText('Add point'));
     fireEvent.click(screen.getByText('Capture photo'));
-    const analyze = await screen.findByRole('button', { name: /^Analyze irvis-/ });
+    // By text: a first ByRole query on this tree costs about as much as the
+    // whole wait on a slow runner (docs/guides/testing.md).
+    const analyze = await screen.findByText(/^Analyze irvis-/, { selector: 'button' });
     const original = items[0]!.bytes.slice();
     fireEvent.click(analyze);
     await waitFor(() =>
@@ -120,7 +122,7 @@ describe('photo workflow', () => {
     await screen.findByText(/Storage full/);
     expect(screen.queryByText(/^Saved /)).toBeNull();
     fireEvent.click(screen.getByText('Capture photo'));
-    const remove = await screen.findByRole('button', { name: /^Delete irvis-/ });
+    const remove = await screen.findByText(/^Delete irvis-/, { selector: 'button' });
     vi.spyOn(library, 'remove').mockRejectedValueOnce(new Error('Cannot delete'));
     fireEvent.click(remove);
     await screen.findByText(/Gallery error: Error: Cannot delete/);

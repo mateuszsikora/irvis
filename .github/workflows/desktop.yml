@@ -28,6 +28,11 @@ on:
       allow-system-ffmpeg:
         type: boolean
         default: false
+      # The commit to package (empty for the caller's commit); Release passes
+      # the commit that sets the version.
+      ref:
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -50,6 +55,8 @@ jobs:
       # build.sh must keep LF line endings for the MSYS2 bash.
       - run: git config --global core.autocrlf false
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
@@ -92,6 +99,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
       - name: Download and check the tarball
         run: |
           apps/desktop/ffmpeg/build.sh source
@@ -132,6 +141,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
