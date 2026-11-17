@@ -1,6 +1,6 @@
 # Development guide
 
-For anyone who works on this repository, person or agent: what to install, which npm scripts exist, how the TypeScript toolchain is set up, what CI runs, how the web version reaches production, and how a release is made. Branch, commit and pull request rules are in [CONTRIBUTING.md](../../CONTRIBUTING.md).
+For anyone who works on this repository, person or agent: what to install, which npm scripts exist, how the TypeScript toolchain is set up, what CI runs, how the web version is published, and how a release is made. Branch, commit and pull request rules are in [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 ## Setup
 
@@ -23,7 +23,7 @@ npm run docs-check
 
 ## npm scripts
 
-Defined in the root [package.json](../../package.json). Run them from the repository root; pass options to the script after `--`, as in `npm run docs-check -- --base origin/release -v`.
+Defined in the root [package.json](../../package.json). Run them from the repository root; pass options to the script after `--`, as in `npm run docs-check -- --base origin/<branch> -v`.
 
 | Script | Command | What it does |
 | --- | --- | --- |
@@ -92,15 +92,16 @@ There are no git hooks. The documentation check looks at the whole branch, and a
 
 ## CI
 
-Every workflow runs on GitHub-hosted runners: `ci.yml`, `promote.yml` and the jobs of `release.yml` on `ubuntu-24.04`, `desktop.yml` on the systems in [Desktop packages](#desktop-packages). The repository has no self-hosted runner, so a pull request from a fork never runs on a machine of the owner's. CI installs the Node version from `.nvmrc` with `actions/setup-node`. See the [runner decision](../decisions/architecture.md#github-actions-use-github-hosted-runners).
+Every workflow runs on GitHub-hosted runners: `ci.yml`, `pages.yml` and the jobs of `release.yml` on `ubuntu-24.04`, `desktop.yml` on the systems in [Desktop packages](#desktop-packages). The repository has no self-hosted runner, so a pull request from a fork never runs on a machine of the owner's. CI installs the Node version from `.nvmrc` with `actions/setup-node`. See the [runner decision](../decisions/architecture.md#github-actions-use-github-hosted-runners).
 
-[.github/workflows/ci.yml](../../.github/workflows/ci.yml) runs on every pull request event (opened, synchronize, reopened), on every push to `main`, and by hand (`workflow_dispatch`), which the [Release workflow](#release) uses on its version branch: then `typescript` runs as always, `integrity` is skipped, and `docs` runs the step "Only the release version changed" instead of the contract. It has read-only access to the repository contents.
+[.github/workflows/ci.yml](../../.github/workflows/ci.yml) runs on every pull request event (opened, synchronize, reopened), on every push to `main`, and by hand (`workflow_dispatch`), which the [Release workflow](#release) uses on its version branch: then `typescript` and `pages` run as always, `integrity` is skipped, and `docs` runs the step "Only the release version changed" instead of the contract. It has read-only access to the repository contents.
 
 | Job | Runs on | Steps | Timeout |
 | --- | --- | --- | --- |
 | `docs`, shown as "Documentation contract" | pull requests and runs by hand | `actions/checkout` with `fetch-depth: 0` (a shallow clone has no merge base); `actions/setup-node` with `node-version-file: .nvmrc`; then, on a pull request, the step "Documentation contract": `npm run docs-check -- --base "origin/$BASE_REF"`, with `BASE_REF` set from `github.base_ref` through `env`; on a run by hand, the step "Only the release version changed", which compares the branch with its merge base with `origin/main` and fails with `run by hand, CI passes the documentation contract only on a branch that changes nothing but the version in apps/desktop/package.json and package-lock.json; open a pull request instead` unless exactly those two files changed and they are equal once `version` (and the `apps/desktop` entry's `version` in the lockfile) is removed | 5 minutes |
 | `integrity`, shown as "Documentation integrity" | pushes to `main` | `actions/checkout`; `actions/setup-node` with `node-version-file: .nvmrc`; then `npm run docs-check -- --integrity-only` | 5 minutes |
 | `typescript`, shown as "TypeScript" | both | `actions/checkout`; `actions/setup-node` with `node-version-file: .nvmrc` and `cache: npm`; then the steps Install (`npm ci`), Lint (`npm run lint`), Format (`npm run format:check`), Typecheck (`npm run typecheck`), Test (`npm test`, which includes the documentation check's tests), Build (`npm run build`) | 20 minutes |
+| `pages`, shown as "Web build under /irvis/" | all three | `actions/checkout`; `actions/setup-node` with `node-version-file: .nvmrc` and `cache: npm`; then the steps Install (`npm ci`), Build (`npm run build --workspace @irvis/web`), Install Chromium (`npx playwright install --with-deps chromium`) and "Check the build under /irvis/" (`node apps/web/test/pages-smoke.mjs`, the [Pages smoke check](../features/web-app-technical.md#pages-smoke-check) that [Pages](#pages) runs before it publishes) | 15 minutes |
 
 On `ubuntu-24.04` the `typescript` job took 2 minutes in its first run (17 November 2026). The 20-minute limit dates from the former self-hosted runner, where the job took about 10 minutes (Install about 2, Typecheck about 2, Test about 4) and a 10-minute limit cancelled runs in the middle of Test; it stays as a guard against a hung run.
 
@@ -136,37 +137,49 @@ Artifacts are kept for 14 days. In the public repository anyone signed in to Git
 
 `resources/ffmpeg/README.txt` in the packages names `https://github.com/mateuszsikora/irvis/releases` as the place of the ffmpeg source, and `NOTICE` says that the ffmpeg and node-usb sources are published with each release. [Release](#release) publishes the ffmpeg tarball, `build.sh` and `usb-<version>.tgz` there next to the packages. Give packages to others only from a published GitHub Release, not from these artifacts; a draft is not public. The cache key depends only on `build.sh`, so a new compiler in a runner image does not rebuild a cached ffmpeg; `verify.mjs` still checks it on every run.
 
-## Netlify
+## Pages
 
-`netlify.toml` configures a Netlify build of `apps/web`: a deploy preview for every pull request, and production only from the branch `release` ([decision](../decisions/architecture.md#the-web-version-is-hosted-on-netlify-and-goes-to-production-from-release)). The build settings are in `netlify.toml`, and the settings that only the Netlify UI has are listed in [web app: technical](../features/web-app-technical.md#netlify). The repository is not connected to Netlify and will not be: the web version is to be published on GitHub Pages instead ([#54](https://github.com/mateuszsikora/irvis/issues/54)), and until then nothing deploys it.
-
-## Promote to release
-
-[.github/workflows/promote.yml](../../.github/workflows/promote.yml), "Promote to release", moves `release` to a commit on `main`. A Netlify site with the production branch `release` would publish that commit, but no site is connected ([Netlify](#netlify)), so moving `release` publishes nothing. [Release](#release) calls it (`workflow_call`, input `sha`) with the commit of a published release's tag; otherwise it runs only by hand: Actions → "Promote to release" → "Run workflow", or
+[.github/workflows/pages.yml](../../.github/workflows/pages.yml), "Pages", builds `apps/web` from the tag of a published release, publishes it on GitHub Pages and then checks the published site ([decision](../decisions/architecture.md#the-web-version-is-published-on-github-pages-from-published-releases)). The site's address is `https://mateuszsikora.github.io/irvis/`, which GitHub redirects to `https://no-plan.dev/irvis/`: the account's user site (the repository `mateuszsikora.github.io`) has the custom domain `no-plan.dev`, and project sites are served under it. [Release](#release) calls the workflow (`workflow_call`, input `tag`) when a release that is not a prerelease is published. By hand it publishes the tag of a published release again, for example to go back to an earlier release after a bad one: Actions → "Pages" → "Run workflow", or
 
 ```sh
-gh workflow run promote.yml --repo mateuszsikora/irvis            # the tip of main
-gh workflow run promote.yml --repo mateuszsikora/irvis -f sha=<sha>
+gh workflow run pages.yml --repo mateuszsikora/irvis                # the latest release
+gh workflow run pages.yml --repo mateuszsikora/irvis -f tag=v0.2.0
 ```
 
-The job "Promote to release" (5 minutes) is the only one with `contents: write`; the workflow default is `contents: read`. Its runs, by hand or from Release, share the concurrency group `promote-to-release` without cancelling the running one: at most one waits, and a newer run cancels the waiting one. The group is set on the job, so that it also holds in a called workflow. Its step "Fast-forward release":
+Nothing else publishes the site: pull requests and pushes to `main` get no preview and no deploy, only the same check of the build under `/irvis/` in [CI](#ci). A tag published before this workflow existed has no `apps/web/test/pages-smoke.mjs` and an absolute `base`, so a run by hand fails on it; there was no release before it. Every job runs on `ubuntu-24.04`. The workflow default is `contents: read`; only the job "Publish on Pages" gets `pages: write` and `id-token: write`, which `actions/deploy-pages` needs.
 
-1. fails with `run this workflow from main, not from <ref>` unless it was started by hand from `main` or called by Release for a published release of a tag `v*` (whose commit steps 3 and 4 still check); a run by hand from another branch (`gh workflow run --ref` or the branch menu in "Run workflow") stops here;
-2. fails with `the sha input must be 7 to 40 lowercase hexadecimal digits` unless `sha` is empty or such a string;
-3. `git fetch origin main`, then resolves `sha` (empty means `origin/main`), and fails with `<sha> is not a commit in this repository` if it cannot;
-4. fails with `<sha> is not on main; only commits on main are published` unless `git merge-base --is-ancestor <sha> origin/main` holds;
-5. `git push origin <sha>:refs/heads/release`, without `--force`. The first run creates `release`. Later runs succeed only if `release` fast-forwards to the commit, so the workflow never moves `release` to a commit off `main` or back to an older one. A rejected push fails the step with git's `! [rejected] ... (non-fast-forward)`.
+| Job | Steps | Timeout |
+| --- | --- | --- |
+| `build`, shown as "Build the web version" | `actions/checkout` with `fetch-depth: 0` (for `git merge-base`) and without keeping the token in its git configuration; the step "Choose the tag", below, which switches to the tag's commit; `actions/setup-node` with that commit's `.nvmrc` and the npm cache; `npm ci`; `npm run build --workspace @irvis/web`; `npx playwright install --with-deps chromium`; the step "Check the build under /irvis/", `node apps/web/test/pages-smoke.mjs`, which serves the build under `/irvis/` as Pages would ([Pages smoke check](../features/web-app-technical.md#pages-smoke-check)); `actions/upload-pages-artifact` with `apps/web/dist` | 15 minutes |
+| `deploy`, shown as "Publish on Pages", after `build`, in the environment `github-pages` | `actions/deploy-pages`; then writes `Published <tag> (<sha>) at <url>` to the run's summary | 10 minutes |
+| `check`, shown as "Check the published site", after both | the step "Wait for this build", below; `actions/checkout` of the tag's commit; Node, `npm ci` and Chromium as in `build`; the step "Check the published site", `node apps/web/test/pages-smoke.mjs <url>` with the URL that `actions/deploy-pages` reports | 25 minutes |
 
-These checks bind the workflow, not the people who can write to the repository. `release` is not protected (branch protection and rulesets return HTTP 403 on this plan, and the ruleset for the public repository covers only `main`, see [Required checks](#required-checks)), so anyone with write access can still `git push origin <commit>:release`. A run started from another branch uses that branch's copy of `promote.yml`, with `contents: write`, and a changed copy can drop every check above. That only commits on `main` reach `release` is therefore a rule for contributors, like the other rules in [CONTRIBUTING.md](../../CONTRIBUTING.md#repository-settings). Protecting `release` waits for [#54](https://github.com/mateuszsikora/irvis/issues/54), which may remove the branch ([decision](../decisions/docs.md#ci-checks-are-required-through-a-ruleset-once-the-repository-is-public)).
+"Publish on Pages" runs in the concurrency group `pages` without cancelling the running one: at most one run waits, and a newer run cancels the waiting one. The group is set on the job, so that it also holds when Release calls the workflow. A failing "Check the build under /irvis/" stops the run before anything is published; a failing "Check the published site" comes after the deploy, so the site already serves the new files: publish the previous release by hand if they do not work.
 
-A push made with the workflow's `GITHUB_TOKEN` starts no other workflow, so a workflow triggered by a push to `release` would not run after a promotion.
+The step "Choose the tag":
+
+1. fails with `run this workflow from main, not from <ref>` unless it was started by hand from `main` or called by Release for a published release of a tag `v*`;
+2. takes the latest release when `tag` is empty (`gh release view` without a tag, which never shows a draft or a prerelease), and fails with `there is no published release to publish` when there is none;
+3. fails with `<tag> is not a release tag: use v<version>, such as v0.2.0` unless the tag is `v` followed by letters, digits, `.`, `+` and `-`;
+4. fails with `<tag> is not a published release of this repository` when `gh release view <tag>` finds no release or a draft (a token with `contents: read` does not see drafts at all), and with `<tag> is a prerelease; only releases that are not prereleases go to Pages`;
+5. fails with `the tag <tag> is not in this repository` when the checkout has no such tag, and with `<tag> (<sha>) is not on main; only commits on main are published` unless `git merge-base --is-ancestor <sha> origin/main` holds;
+6. switches to the tag's commit, so that the rest of the job builds and checks the commit of the release, the one its desktop packages were built from.
+
+The build job also records the SHA-256 of the built `index.html`, which names the hashed bundle. The step "Wait for this build" fetches the published URL (following the redirect) every 30 seconds until it serves an `index.html` with that hash, because Pages' CDN may still answer with the previous one, and fails with `<url> does not serve the index.html of this build after 10 minutes` after 20 tries.
+
+These checks bind the workflow, not the people who can write to the repository: a run started from another branch or tag uses that copy of `pages.yml`, which can drop them. What GitHub enforces is the environment `github-pages`, whose deployment rules say which branches and tags may publish, and those rules are only as strong as the refs they name. `main` takes changes only through the [ruleset](#required-checks), but no ruleset covers tags: anyone with write access can push a tag `v<anything>` on a commit whose `pages.yml` skips the checks, run it with `gh workflow run pages.yml --ref <that tag>`, and publish whatever that commit builds, or move an existing tag so that publishing it again by hand publishes something else. That only published releases reach the site is therefore a rule for contributors, as it was for the `release` branch before.
+
+The workflow needs two repository settings, which the owner changes outside the repository:
+
+- Settings → Pages → Build and deployment → Source: "GitHub Actions". `gh api repos/mateuszsikora/irvis/pages --jq .build_type` must print `workflow`. Setting it creates the environment `github-pages`.
+- Settings → Environments → `github-pages` → Deployment branches and tags: `main`, for runs by hand, and the tag rule `v*`, because Release's call runs on the tag of the published release. Add the tag rule with `gh api -X POST repos/mateuszsikora/irvis/environments/github-pages/deployment-branch-policies -f name='v*' -f type=tag`, and list the rules with `gh api repos/mateuszsikora/irvis/environments/github-pages/deployment-branch-policies --jq '.branch_policies[] | {name, type}'`. Without the tag rule, "Publish on Pages" fails on every release with `Tag "v<version>" is not allowed to deploy to github-pages due to environment protection rules.`; the release stays published, and a run by hand from `main` publishes it.
 
 ## Release
 
 [.github/workflows/release.yml](../../.github/workflows/release.yml), "Release", makes a release in two steps ([decision](../decisions/architecture.md#a-release-is-a-draft-github-release-built-from-a-version-commit-on-main)):
 
 1. **Run it** from `main`: Actions → "Release" → "Run workflow", optionally with a version, or `gh workflow run release.yml --repo mateuszsikora/irvis [-f version=0.2.0]`. It merges a pull request that sets the version, builds the desktop packages from that commit and leaves a draft GitHub Release with the packages, the ffmpeg source and the node-usb source with libusb. The run's summary links the draft.
-2. **Publish the draft**: Releases → the draft → edit → "Publish release". Publishing creates the tag `v<version>` on the version commit and, unless it is a prerelease, moves `release` ([Promote to release](#promote-to-release)).
+2. **Publish the draft**: Releases → the draft → edit → "Publish release". Publishing creates the tag `v<version>` on the version commit and, unless it is a prerelease, publishes the web version of that commit on GitHub Pages ([Pages](#pages)).
 
 To discard a release before it is published, delete the draft. `main` keeps the version; run the workflow again with the same version to rebuild the draft without another pull request. A run with an empty version always takes the next patch version, so a second such run (or a rerun of one that merged its pull request) makes a new version, not a new draft of the same one.
 
@@ -179,7 +192,7 @@ The workflow default is `contents: read`. Runs of the same event share the concu
 | `version`, shown as "Set the version", with `actions: write`, `contents: write` and `pull-requests: write` | a run by hand | `ubuntu-24.04` | `actions/checkout` of `refs/heads/main`, the tip of `main` when the job starts, not the commit the run was started on, so that a waiting run or a rerun sees the version an earlier run merged; the steps "Choose the version" and "Merge the version pull request", below | 30 minutes, which includes the CI run on the version branch |
 | `packages`, shown as "Packages", after `version` | a run by hand | as in [Desktop packages](#desktop-packages) | calls `desktop.yml` with `allow-system-ffmpeg: false` (a failing ffmpeg build skips every package, and so the draft) and `ref` set to the version commit | as there |
 | `draft`, shown as "Draft release", after both, with `contents: write` | a run by hand | `ubuntu-24.04` | downloads the artifacts `irvis-mac`, `irvis-win`, `irvis-linux` and `ffmpeg-source` by name (a package without ffmpeg is named `-without-ffmpeg` and is never picked up); checks out `.nvmrc` and `package-lock.json` of the version commit into `source/` (without keeping the token in its git configuration) and sets up that Node; the step "Fetch the node-usb source", below; then the step "Create the draft release", below | 15 minutes |
-| `promote`, shown as "Promote to release", with `contents: write` | a published release of a tag `v*` that is not a prerelease | `ubuntu-24.04` | calls `promote.yml` with `sha` set to the tag's commit ([Promote to release](#promote-to-release)) | 5 minutes |
+| `pages`, shown as "Pages", with `contents: read`, `pages: write` and `id-token: write` | a published release of a tag `v*` that is not a prerelease | `ubuntu-24.04` | calls `pages.yml` with `tag` set to the release's tag ([Pages](#pages)) | as there |
 
 The step "Choose the version":
 
@@ -199,7 +212,7 @@ The step "Merge the version pull request":
 5. squash-merges it with `gh pr merge --squash`, retrying up to five times five seconds apart while GitHub computes whether it can be merged, then fails with `could not merge <url>`; GitHub deletes the branch after the merge;
 6. hands the merge commit to the later jobs.
 
-The pull request is opened and merged with the workflow's `GITHUB_TOKEN`, and events made with that token start no workflow apart from `workflow_dispatch`. So nothing runs on the pull request by itself, and the push to `main` starts no workflow either. Step 4 starts CI so that the [required checks](#required-checks) report on the version commit: "TypeScript" runs, and "Documentation contract" checks that the branch changes nothing but the two versions. The pull request is exempt from the pull request rules ([CONTRIBUTING.md](../../CONTRIBUTING.md#what-reaches-main)). The documentation contract itself would fail on it: the version-bump filter accepts only the dependency fields of a `package.json` ([documentation contract](../features/docs-contract-technical.md#version-bump-filter)), so `version` in `apps/desktop/package.json` needs a desktop document under rule F7. [Documentation integrity](#ci) runs on `main` again with the next merged pull request. A left-over pull request and branch of a failed step 4 or 5 make the next run stop at step 2.
+The pull request is opened and merged with the workflow's `GITHUB_TOKEN`, and events made with that token start no workflow apart from `workflow_dispatch`. So nothing runs on the pull request by itself, and the push to `main` starts no workflow either. Step 4 starts CI so that the [required checks](#required-checks) report on the version commit, and it waits for the whole run, so a failing "Web build under /irvis/", which is not required on pull requests, stops the release too: "TypeScript" runs, and "Documentation contract" checks that the branch changes nothing but the two versions. The pull request is exempt from the pull request rules ([CONTRIBUTING.md](../../CONTRIBUTING.md#what-reaches-main)). The documentation contract itself would fail on it: the version-bump filter accepts only the dependency fields of a `package.json` ([documentation contract](../features/docs-contract-technical.md#version-bump-filter)), so `version` in `apps/desktop/package.json` needs a desktop document under rule F7. [Documentation integrity](#ci) runs on `main` again with the next merged pull request. A left-over pull request and branch of a failed step 4 or 5 make the next run stop at step 2.
 
 The step "Fetch the node-usb source" exists because the node-usb prebuilds in the packages link libusb (LGPL-2.1-or-later) statically ([Packages](../features/desktop-technical.md#packages)). It reads the version and `integrity` of `node_modules/usb` from the version commit's `package-lock.json`, runs `npm pack usb@<version>`, which downloads the published package `usb-<version>.tgz` (node-usb's source with libusb's, and what rebuilds the prebuild) into the assets, and fails with `usb-<version>.tgz from the registry is not the package in package-lock.json` when the integrity of the download differs.
 
@@ -207,9 +220,9 @@ The step "Create the draft release":
 
 1. fails with `the packages hold <n> files matching <pattern> instead of one` unless the downloaded files include exactly one of each: `irvis-<version>-mac-arm64.dmg`, `irvis-<version>-mac-x64.dmg`, `irvis-<version>-win-x64.exe`, `irvis-<version>-win-x64.zip`, `irvis-<version>-linux-x86_64.AppImage`, `irvis-<version>-linux-amd64.deb`, `ffmpeg-*.tar.xz`, `build.sh` and `usb-*.tgz`. Only these nine files are released; anything else in the artifacts is left out;
 2. deletes every draft release of the tag `v<version>`, which an earlier run of the same version leaves behind;
-3. `gh release create v<version> <the nine files> --draft --target <version commit> --title "irvis <version>" --generate-notes`, with `--prerelease` for a prerelease, and with a first paragraph that the packages are unsigned, links to [Install a package](../features/desktop-user.md#install-a-package) at the tag, and says that the packages carry an LGPL ffmpeg and node-usb with the LGPL libusb, and that the ffmpeg source tarball, its `build.sh` and the node-usb source package are attached. GitHub writes the rest of the notes from the pull requests merged since the previous release. The draft has no tag until it is published. The run's summary gives its URL and says whether publishing it moves `release`.
+3. `gh release create v<version> <the nine files> --draft --target <version commit> --title "irvis <version>" --generate-notes`, with `--prerelease` for a prerelease, and with a first paragraph that the packages are unsigned, links to [Install a package](../features/desktop-user.md#install-a-package) at the tag, and says that the packages carry an LGPL ffmpeg and node-usb with the LGPL libusb, and that the ffmpeg source tarball, its `build.sh` and the node-usb source package are attached. GitHub writes the rest of the notes from the pull requests merged since the previous release. The draft has no tag until it is published. The run's summary gives its URL and says whether publishing it publishes the web version on Pages.
 
-Publishing starts the workflow again with the `release` event, from the tagged commit's copy of the file. A prerelease (marked as such on the draft, which the workflow does for a version with `-`; the box can also be changed before publishing) does not move `release`. If "Promote to release" fails, for example because `release` already holds a newer commit of `main` and the fast-forward is rejected, the GitHub Release stays published and production stays where it was; promote by hand if needed.
+Publishing starts the workflow again with the `release` event, from the tagged commit's copy of the file. A prerelease (marked as such on the draft, which the workflow does for a version with `-`; the box can also be changed before publishing) does not go to Pages. If "Pages" fails, the GitHub Release stays published and the site keeps the release it had; once the cause is fixed, run "Pages" by hand with the tag ([Pages](#pages)).
 
 ## Issue templates and security policy
 

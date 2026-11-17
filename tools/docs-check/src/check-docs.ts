@@ -101,11 +101,10 @@ export const RULES: readonly Rule[] = [
   },
   {
     id: 'F3',
-    source: String.raw`^(apps/web/|netlify\.toml$)`,
+    source: String.raw`^apps/web/`,
     docs: String.raw`^docs/features/web-app-(user|technical)\.md$`,
     message:
-      'Web app or its Netlify configuration changed: update docs/features/web-app-technical.md ' +
-      '(or docs/features/web-app-user.md)',
+      'Web app changed: update docs/features/web-app-technical.md (or docs/features/web-app-user.md)',
   },
   {
     id: 'F4',

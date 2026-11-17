@@ -42,7 +42,7 @@ The web version runs in desktop Chrome, Edge and Safari:
 
 Tested in Chrome 157 and Safari 27.0.1 on macOS; the minimum versions come from browser compatibility data. Even in a supported browser, temperatures are rebuilt from the browser's video frames instead of read exactly, readings assume high gain until you declare the camera mode, and camera commands are available only in the desktop app. Why these versions, and the features that need newer ones (MP4 export with audio in Safari needs 26): [supported browsers](docs/features/web-app-user.md#supported-browsers).
 
-The web version is not published yet ([#54](https://github.com/mateuszsikora/irvis/issues/54)). [Run it locally](docs/features/web-app-user.md#run-it-locally) instead.
+Open it at [no-plan.dev/irvis](https://no-plan.dev/irvis/), which GitHub Pages publishes from the latest release ([details](docs/features/web-app-user.md#open-the-web-version)). Before the first release the site does not exist yet; [run it locally](docs/features/web-app-user.md#run-it-locally) instead.
 
 ## Documentation
 
