@@ -27,8 +27,11 @@ jobs:
     name: Set the version
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    # Includes the CI run on the version branch.
+    timeout-minutes: 30
     permissions:
+      # actions: starts CI on the version branch and waits for it.
+      actions: write
       contents: write
       pull-requests: write
     outputs:
@@ -162,12 +165,30 @@ jobs:
             echo "::error::could not open the pull request; is \"Allow GitHub Actions to create and approve pull requests\" on?"
             exit 1
           fi
-          # GitHub computes mergeability after the pull request is opened.
-          # A pull request opened with GITHUB_TOKEN starts no CI, so the
-          # required checks of .github/rulesets/main.json never report;
-          # --admin merges through the ruleset's bypass for GitHub Actions.
+          # A pull request opened with GITHUB_TOKEN starts no workflow, but
+          # workflow_dispatch does: CI on the branch reports the checks that
+          # .github/rulesets/main.json requires ("Documentation contract" is
+          # skipped outside pull requests, which counts as passing).
+          head=$(git rev-parse HEAD)
+          gh workflow run ci.yml --ref "$branch"
+          run=''
+          for attempt in $(seq 1 12); do
+            run=$(gh run list --workflow ci.yml --branch "$branch" --event workflow_dispatch \
+              --commit "$head" --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+            if [ -n "$run" ]; then break; fi
+            sleep 5
+          done
+          if [ -z "$run" ]; then
+            echo "::error::CI did not start on $branch; close $url, delete the branch and run again"
+            exit 1
+          fi
+          if ! gh run watch "$run" --exit-status --interval 15 > /dev/null; then
+            echo "::error::CI failed on $url ($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run); fix main, close the pull request, delete the branch and run again"
+            exit 1
+          fi
+          # GitHub computes mergeability after the checks report.
           for attempt in 1 2 3 4 5; do
-            if gh pr merge "$url" --squash --admin; then break; fi
+            if gh pr merge "$url" --squash; then break; fi
             if [ "$attempt" = 5 ]; then
               echo "::error::could not merge $url"
               exit 1
@@ -219,6 +240,8 @@ jobs:
         with:
           ref: ${{ needs.version.outputs.sha }}
           path: source
+          # Two files are read; nothing here pushes.
+          persist-credentials: false
           sparse-checkout: |
             .nvmrc
             package-lock.json

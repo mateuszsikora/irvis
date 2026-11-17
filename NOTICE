@@ -15,9 +15,9 @@ the material, in this form:
 Third-party npm packages are not listed here, except the two below whose
 licences ask for more than their notice. The web build carries the licence
 texts of the npm packages bundled into it in THIRD-PARTY-LICENSES.md, next to
-index.html (resources/web/ in the desktop packages); Electron and Chromium
-ship theirs as LICENSE.electron.txt and LICENSES.chromium.html in the desktop
-packages.
+index.html (resources/web/ in the desktop packages); node-usb and its runtime
+dependencies keep theirs in app.asar; Electron and Chromium ship theirs as
+LICENSE.electron.txt and LICENSES.chromium.html in the desktop packages.
 
 LeoDJ/P2Pro-Viewer (https://github.com/LeoDJ/P2Pro-Viewer)
 Copyright (c) 2023 LeoDJ
@@ -64,7 +64,7 @@ Copyright: the libusb authors, listed in AUTHORS
 Licence: LGPL-2.1-or-later
 Used in: the desktop packages, linked statically into the node-usb
   (https://github.com/node-usb/node-usb, MIT) prebuilds
-What: unmodified libusb 1.0.30 as node-usb ships it. Its licence and
+What: unmodified libusb, the version that node-usb ships. Its licence and
   authors are in resources/libusb/ of each package, and the node-usb
   source package (usb-<version>.tgz), which holds the libusb source and
   rebuilds the prebuild, is published with each release.

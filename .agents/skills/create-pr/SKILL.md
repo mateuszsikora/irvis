@@ -39,6 +39,8 @@ gh auth status
 gh repo view --json nameWithOwner,defaultBranchRef --jq '.nameWithOwner + " " + .defaultBranchRef.name'
 gh api repos/mateuszsikora/irvis --jq '{allow_squash_merge, allow_merge_commit, allow_rebase_merge, delete_branch_on_merge, squash_merge_commit_title, squash_merge_commit_message}'
 gh api repos/mateuszsikora/irvis/actions/permissions/workflow --jq '{can_approve_pull_request_reviews}'
+gh api repos/mateuszsikora/irvis/actions/permissions/fork-pr-contributor-approval --jq .approval_policy
+gh api repos/mateuszsikora/irvis/rulesets --jq '.[] | {name, enforcement}'
 git status --short --branch
 git rev-parse --abbrev-ref HEAD
 git log --oneline origin/main..HEAD
@@ -69,7 +71,7 @@ Then decide:
 - **Behind `main`, conflicts:** list the conflicted files and ask how to proceed. Never rebase or merge `main` on your own.
 - **Open PR for this branch:** update mode. Push new commits to it and rewrite its title and body (step 9); do not open a second PR. Keep the branch name.
 - **Only merged or closed PRs for this branch:** warn that the branch was probably already merged and is stale; ask before continuing.
-- **Repository settings differ from `CONTRIBUTING.md`** (merge commit or rebase allowed, branch deletion off, other squash title/message, `can_approve_pull_request_reviews` not `true`): continue, and mention it once in the report. Changing them is the owner's decision; never change them yourself.
+- **Repository settings differ from `CONTRIBUTING.md`** (merge commit or rebase allowed, branch deletion off, other squash title/message, `can_approve_pull_request_reviews` not `true`, fork approval policy not `all_external_contributors`, no active ruleset `main`): continue, and mention it once in the report. Changing them is the owner's decision; never change them yourself.
 
 ## 2. Gather context
 
@@ -146,7 +148,7 @@ Traps in this repository:
 - With `core.symlinks=false` (some Windows checkouts) the symlink becomes a text file holding the path; the check catches it.
 - An absolute symlink (`/Users/.../.agents/skills/x`) resolves locally and passes `-L`, `-f` and mode `120000`, but dangles in every other clone; that is why the check compares `readlink` with the relative path.
 - `allowed-tools` is read by Claude Code only and `agents/openai.yaml` by Codex only; neither is a safeguard for the other agent.
-- While the repository is private, branch protection and rulesets return HTTP 403 on the free plan. That is expected, not an error, and it means nothing on GitHub enforces these rules. Once it is public, the ruleset from `.github/rulesets/main.json` requires the CI checks, a pull request and squash merges on `main` ([how](../../../docs/guides/development.md#required-checks)); the other rules still rest on contributors and agents.
+- The ruleset `main` (a copy of `.github/rulesets/main.json`, [how](../../../docs/guides/development.md#required-checks)) requires the CI checks, a pull request and squash merges on `main`, with no bypass, so a PR with a red or missing required check cannot be merged; the other rules still rest on contributors and agents. A PR that renames a required CI job must change `.github/rulesets/main.json` in the same change.
 - Never write "passes" or "verified" for a command you did not run in this session. Put what was not verified in Verification.
 
 ## 4. Ready or draft
@@ -301,6 +303,6 @@ In the user's language:
 - linked issue with `Closes`/`Refs`, or that none fit;
 - labels;
 - what was verified (commands and results) and what was not;
-- anything the user should act on: repository settings that differ from `CONTRIBUTING.md` (with the command that would fix them, for the owner to run or approve: `gh api -X PATCH repos/mateuszsikora/irvis ...` for the merge settings, `gh api -X PUT repos/mateuszsikora/irvis/actions/permissions/workflow -f default_workflow_permissions=read -F can_approve_pull_request_reviews=true` for the Actions setting), commits that need fixing at merge time, local `main` ahead of `origin/main`.
+- anything the user should act on: repository settings that differ from `CONTRIBUTING.md` (with the command that would fix them, for the owner to run or approve: `gh api -X PATCH repos/mateuszsikora/irvis ...` for the merge settings, `gh api -X PUT repos/mateuszsikora/irvis/actions/permissions/workflow -f default_workflow_permissions=read -F can_approve_pull_request_reviews=true` for the Actions setting, `gh api -X PUT repos/mateuszsikora/irvis/actions/permissions/fork-pr-contributor-approval -f approval_policy=all_external_contributors` for fork approval, the commands in `docs/guides/development.md#required-checks` for the ruleset), commits that need fixing at merge time, local `main` ahead of `origin/main`.
 
 If the PR's branch is not the one checked out, check it out (`git switch <branch>`) so the IDE or Conductor shows it.

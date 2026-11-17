@@ -122,15 +122,23 @@ The CI job should be a required check, but the plan does not allow it: `gh api r
 
 Status: decided (#26)
 
-A public repository gets rulesets on the free plan, so the checks that [CONTRIBUTING.md](../../CONTRIBUTING.md#verification) makes a blocker by rule become a blocker in GitHub. The ruleset is kept in `.github/rulesets/main.json`, so that a change to it is reviewed like code; GitHub does not read the file, and the owner applies it with `gh api` once the repository is public ([how](../guides/development.md#required-checks)). It applies to the default branch and:
+A public repository gets rulesets on the free plan, so the checks that [CONTRIBUTING.md](../../CONTRIBUTING.md#verification) makes a blocker by rule become a blocker in GitHub. The ruleset is kept in `.github/rulesets/main.json`, so that a change to it is reviewed like code; GitHub does not read the file, and the owner applies it with `gh api` ([how](../guides/development.md#required-checks)); it was applied on 17 November 2026, after the repository went public. It applies to the default branch and:
 
 - requires the checks "Documentation contract" and "TypeScript", reported by GitHub Actions (app id 15368), so that no other app or commit status can satisfy them. "Documentation integrity" runs only on pushes to `main` and "Desktop packages" only on some paths; a required check that never runs on a pull request would block it forever;
 - does not require the branch to be up to date with `main` before merging: that would make every open pull request update after each merge, and the integrity job on `main` already reports two pull requests that break `main` together;
 - requires a pull request, with squash as the only merge method and no approving review, because the only maintainer cannot approve their own pull requests; it blocks deleting `main` and force pushes to it.
 
-The Release workflow opens its version pull request with `GITHUB_TOKEN`, and events made with that token start no workflow, so the required checks never report on it. The ruleset therefore lists GitHub Actions as a bypass actor in the mode `pull_request` (it can merge a pull request past the rules, not push to `main`), and the workflow merges with `gh pr merge --admin`.
+The ruleset has no bypass actor. The Release workflow opens its version pull request with `GITHUB_TOKEN`, and events made with that token start no workflow, except `workflow_dispatch` and `repository_dispatch`. So `ci.yml` also runs on `workflow_dispatch`, and the workflow starts it on the version branch, waits for it and then merges as any pull request merges. "TypeScript" then checks the version commit. "Documentation contract" runs only on pull request events and is skipped, and GitHub counts a job skipped by its condition as a passing required check. That is on purpose: the contract would ask for a desktop document for the `version` field, and the version pull request is exempt from the pull request rules ([CONTRIBUTING.md](../../CONTRIBUTING.md#what-reaches-main)).
 
-**Rejected:** classic branch protection, because a ruleset can be kept as JSON in the repository and restricts the merge method; requiring an approving review, for the reason above; protecting `release` in the same change, because publishing on GitHub Pages ([#54](https://github.com/mateuszsikora/irvis/issues/54)) may remove the branch and "Promote to release".
+**Rejected:**
+
+- GitHub Actions as a bypass actor (app 15368, mode `pull_request`), which was the first plan: GitHub refuses it in a repository of a personal account with HTTP 422, `Actor GitHub Actions integration must be part of the ruleset source or owner organization`.
+- A deploy key with bypass that pushes the version commit to `main`, because it needs a secret and drops the version pull request.
+- A bypass for the admin role, with the owner merging every version pull request by hand, because the Release workflow is meant to run unattended ([decision](architecture.md#a-release-is-a-draft-github-release-built-from-a-version-commit-on-main)).
+- A GitHub App token that opens the pull request, so that CI starts by itself, because it needs an app and a private-key secret.
+- Classic branch protection, because a ruleset can be kept as JSON in the repository and restricts the merge method.
+- Requiring an approving review, for the reason above.
+- Protecting `release` in the same change, because publishing on GitHub Pages ([#54](https://github.com/mateuszsikora/irvis/issues/54)) may remove the branch and "Promote to release".
 
 ## Tests use unittest from the standard library
 
