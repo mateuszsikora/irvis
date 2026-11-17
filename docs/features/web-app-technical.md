@@ -1,6 +1,6 @@
 # Web app: technical
 
-How `apps/web` and its Netlify deployment work, for whoever changes them. Why there is one build for the web and the desktop app: [decision](../decisions/architecture.md#one-ui-build-serves-the-web-and-the-desktop-app). Why production publishes from `release`: [decision](../decisions/architecture.md#the-web-version-is-hosted-on-netlify-and-goes-to-production-from-release).
+How `apps/web` and its Netlify configuration work, for whoever changes them. Why there is one build for the web and the desktop app: [decision](../decisions/architecture.md#one-ui-build-serves-the-web-and-the-desktop-app). Why production publishes from `release`: [decision](../decisions/architecture.md#the-web-version-is-hosted-on-netlify-and-goes-to-production-from-release).
 
 ## Data flow
 
@@ -28,14 +28,16 @@ Scripts in `apps/web/package.json`: `dev` (`vite`), `build` (`vite build`), `pre
 
 | Setting | Value | Why |
 | --- | --- | --- |
-| `base` | `'/'` | Netlify serves the site from the root, and Electron serves the same files from `app://irvis/` |
+| `base` | `'/'` | Electron serves the files from `app://irvis/`, and a site built from `netlify.toml` would serve them from its root |
 | `plugins` | `@vitejs/plugin-react` | JSX and React Fast Refresh in `dev` |
-| `build.outDir` | `dist` (emptied first) | What Netlify publishes |
+| `build.outDir` | `dist` (emptied first) | What the desktop app copies to `web/` and what `netlify.toml` names as `build.publish` |
 | `test` | project `web`, environment `jsdom`, files `src/**/*.test.{ts,tsx}` | Read by Vitest ([testing guide](../guides/testing.md#react-component-tests)) |
 
 TypeScript: `apps/web/tsconfig.json` is a solution file for `tsconfig.app.json` (`src/`, `lib` ES2022 + DOM + DOM.Iterable, `types: ["vite/client"]`, `jsx: "react-jsx"`, `noEmit`, references core's library project, so `src/` type-checks against core's declarations) and `tsconfig.node.json` (`vite.config.ts`, `types: ["node"]`). Both extend the root `tsconfig.base.json`.
 
 ### Netlify
+
+No Netlify site is connected to the repository, and none will be: this configuration publishes nothing, and publishing on GitHub Pages ([#54](https://github.com/mateuszsikora/irvis/issues/54)) replaces it.
 
 `netlify.toml` at the repository root:
 
@@ -47,7 +49,7 @@ TypeScript: `apps/web/tsconfig.json` is a solution file for `tsconfig.app.json` 
 
 Netlify installs the dependencies itself (it finds `package-lock.json`) with the Node version from `.nvmrc`. The production branch is chosen in the Netlify UI, not in the file; the `ignore` command is a second guard: a production build of any branch other than `release` is cancelled, because an `ignore` command that exits 0 cancels the build. That command replaces Netlify's default check, so a production build of `release` runs even when nothing changed since the last deploy. Deploy previews and branch deploys use the default.
 
-Settings that live in the Netlify UI, for the owner:
+Settings a connected site would need in the Netlify UI:
 
 - Production branch: `release`.
 - Deploy previews: on, for pull requests against `main`.

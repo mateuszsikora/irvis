@@ -64,7 +64,7 @@ Every message is listed in the [technical document](cameras-technical.md#failure
 
 | Profile | Camera | Modes | What works |
 | --- | --- | --- | --- |
-| `infiray-p2pro` | InfiRay P2 Pro, also sold as the TOOLTOP T7 (USB `0x0bda:0x5830` or `0x0bda:0x5840`) | 256×384 at 25 fps with temperature data in the lower half; 256×192 at 25 fps without | Temperatures in high gain only, °C = raw / 64 − 273.15, from other projects; absolute temperature accuracy is not independently verified. No commands yet |
+| `infiray-p2pro` | InfiRay P2 Pro, also sold as the TOOLTOP T7 (USB `0x0bda:0x5830` or `0x0bda:0x5840`) | 256×384 at 25 fps with temperature data in the lower half; 256×192 at 25 fps without | Temperatures in high gain (readings above 160 °C marked uncertain) and low gain (below 90 °C marked uncertain), both °C = raw / 64 − 273.15 from other projects and the vendor app; absolute temperature accuracy is not independently verified. Desktop app: switch the gain and set the camera's emissivity, reflected temperature, ambient temperature and atmospheric transmittance; no NUC or distance command. Browser: temperatures rebuilt from the video image, high gain assumed until you declare the camera mode, no commands. Tested with a TOOLTOP T7 on macOS; Linux and Windows not yet tested with the camera |
 
 Where each constant of the P2 Pro profile comes from: [its README](../../packages/core/src/cameras/infiray-p2pro/README.md). The TOPDON TC001 reports the same USB ID; it has no profile, so it would be matched as a P2 Pro.
 
