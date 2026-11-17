@@ -32,7 +32,9 @@ describe('viewer backend', () => {
       modeId: profile.videoModes[0]!.id,
     });
     await session.command?.('gain-high');
-    expect(command).toHaveBeenCalledWith('gain-high');
+    expect(command).toHaveBeenCalledWith('gain-high', undefined);
+    await session.command?.('set-emissivity', 0.875);
+    expect(command).toHaveBeenLastCalledWith('set-emissivity', 0.875);
     await session.close();
     await expect(session.command?.('gain-high')).rejects.toThrow('Camera session is closed');
     await session.close();

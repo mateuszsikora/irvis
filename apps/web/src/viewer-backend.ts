@@ -73,9 +73,9 @@ export function liveBackend(onError: (message: string) => void): CameraBackend {
         },
         ...(bridge?.command
           ? {
-              command: async (id: string) => {
+              command: async (id: string, value?: number) => {
                 if (!isCurrent()) throw new Error('Camera session is closed');
-                await bridge.command!(id);
+                await bridge.command!(id, value);
               },
             }
           : {}),

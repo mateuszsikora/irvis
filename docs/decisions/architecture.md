@@ -545,6 +545,30 @@ Status: decided (#22)
 
 The desktop exposes the existing profile gain commands and confirms their requested state before resolving. A host command-generation snapshot field forces the next recorded frame to start a chunk even if intermediate unsupported gain frames were omitted. This does not establish sensor exposure timing.
 
-NUC, vendor Auto/Manual range and camera correction remain unavailable until command semantics are verified. Low gain retains no temperature conversion. Persistence after reconnect or power loss remains hardware acceptance work.
+The initial M5 implementation left these operations unavailable. Subsequent hardware and Android inspection establish correction writes, both reported gain conversions and the host Auto policy; see the later decisions and M5 findings. NUC remains unavailable after a rejected candidate, and power-cycle testing establishes volatile settings on this T7.
 
-**Rejected:** mapping Android Low/High directly to sensor gain, guessing NUC opcodes or interpreting raw correction fields as calibrated settings. The audit and USB measurements do not establish those meanings.
+**Rejected:** mapping Android Low/High directly to sensor gain, guessing NUC opcodes or interpreting raw correction fields as calibrated settings. The initial audit alone did not establish those meanings; the subsequent M5 observations supply the mapping and correction evidence.
+
+## Numeric camera settings are encoded by the profile and remain volatile
+
+Status: decided (#22)
+
+M5 measured thermal effects from EMS/TU and TAU/TA on the T7 and loss of deliberately changed settings after physical USB power removal. Numeric commands therefore carry bounded profile metadata, with main-process encoding and matching raw readback. The renderer supplies only an ID and a number. Decoded camera emissivity and reflected temperature provide the baseline for the existing approximate host correction model on live frames as well as replay; camera atmospheric correction is retained.
+
+**Rejected:** a renderer-supplied USB payload, guessed persistent-save/reset commands, or applying the host emissivity correction as though the camera applied none. Ratios are initially restricted to the tested 0.5–1 interval; narrower quantization is declared in the UI. No calibrated low-gain conversion or successful NUC is inferred from these observations.
+
+When a read leaves the camera's emissivity or reflected temperature unknown, the renderer keeps the camera's readings, photos and recording frames and blocks only Host correction, with a warning. While gain, emissivity or reflected temperature is unknown, the desktop poll repeats the full state read, backing off from 1 s to 30 s, and reads only sensor bytes in between, so a persistent failure cannot keep the control busy and starve video. The camera's readings already carry its correction, so withholding them would turn one transient USB failure into lost measurements and recording frames.
+
+**Rejected:** assuming unity for an unknown camera correction (it would apply Host correction twice or not at all without a sign), dropping readings and recording frames until the next command or reconnect, and an unbounded one-second full read, which keeps the control busy and drops video frames when a value never becomes valid.
+
+The inspected Android reset is implemented as an explicit UI sequence of three existing confirmed commands (EMS 128, TA 298, TU 298), followed by clearing host correction. It neither invents a reset opcode nor writes flash. A failure stops the sequence and preserves the remaining settings; unmounting the session panel prevents subsequent writes. The UI explains partial application and leaves gain and transmittance unchanged.
+
+## Sensor range uses reported conversion limits and a host switching policy
+
+Status: decided (#22)
+
+Android Tiny1C applies raw / 64 − 273.15 in both gains. Its Low/High selection maps to sensor gain 1/0, while display clipping excludes high-gain readings above 160 °C and low-gain readings below 90 °C. A repeated hot-kettle comparison corroborates numeric low-gain readings within that window; it does not calibrate the camera. Both conversions therefore remain reported. Optional profile conversion limits mark readings uncertain before host correction, and the existing recorded mask preserves those exclusions in replay without changing the file format.
+
+Auto is a host policy with 100 settling frames and 100 consecutive crossings at 160/150 °C. It uses camera-converted maxima before host edits, waits for each gain readback and exits on errors or session changes. Numeric corrections reset settling. Explicit gain selection preserves the chosen transmittance rather than copying Android's model-specific constants.
+
+**Rejected:** inferring a different low-gain divisor from a room scene below the vendor's valid range, adjusting coefficients to make a cooling kettle read 100 °C, treating display limits as calibrated accuracy, or inventing an Auto USB opcode. Physical switching above 160 °C remains untested; both policy thresholds are tested with controlled frame values and both gain commands are tested on hardware.

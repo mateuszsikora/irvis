@@ -56,6 +56,8 @@ describe('desktop capture', () => {
         origin: 'camera',
         values: {
           gain: 'low',
+          emissivity: 'unknown',
+          'reflected-temperature': 'unknown',
           'usb-distance': 0,
           'usb-tu': 0,
           'usb-ta': 0,
@@ -133,6 +135,89 @@ describe('desktop capture', () => {
       await expect(control.command('gain-low')).rejects.toThrow('Disconnected');
       expect(control.snapshot.values.gain).toBe('unknown');
       expect(control.busy).toBe(false);
+    } finally {
+      await control.close();
+    }
+  });
+  it('repeats the full state read while gain, emissivity or reflected temperature is unknown', async () => {
+    vi.useFakeTimers();
+    const state = vi
+      .spyOn(CameraUsb.prototype, 'state')
+      .mockResolvedValueOnce({ gain: 1, ems: { error: 'IOKit request failed' }, tu: 300 })
+      .mockResolvedValueOnce({ gain: { error: 'IOKit request failed' }, ems: 112, tu: 300 })
+      .mockResolvedValueOnce({ gain: 1, ems: 112, tu: 300 });
+    const standard = vi.spyOn(CameraUsb.prototype, 'standard');
+    const control = await openControl(profile);
+    try {
+      expect((await control.read()).values.emissivity).toBe('unknown');
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(state).toHaveBeenCalledTimes(2);
+      expect(control.snapshot.values.emissivity).toBe(0.875);
+      expect(control.snapshot.values.gain).toBe('unknown');
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(state).toHaveBeenCalledTimes(3);
+      expect(standard).not.toHaveBeenCalled();
+      expect(control.snapshot.values.gain).toBe('high');
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(state).toHaveBeenCalledTimes(3);
+      expect(standard).toHaveBeenCalledOnce();
+    } finally {
+      await control.close();
+    }
+  });
+  it('backs off repeated full state reads to 30 seconds and polls sensor bytes between them', async () => {
+    vi.useFakeTimers();
+    const state = vi
+      .spyOn(CameraUsb.prototype, 'state')
+      .mockResolvedValue({ gain: 1, ems: 0, tu: 300 });
+    const standard = vi.spyOn(CameraUsb.prototype, 'standard');
+    const control = await openControl(profile);
+    try {
+      await control.read();
+      const reads = [];
+      for (let second = 1; second <= 120; second++) {
+        const before = state.mock.calls.length;
+        await vi.advanceTimersByTimeAsync(1000);
+        if (state.mock.calls.length > before) reads.push(second);
+      }
+      // Gaps 1, 2, 4, 8, 16, then 30 seconds.
+      expect(reads).toEqual([1, 2, 4, 8, 16, 32, 62, 92]);
+      expect(standard).toHaveBeenCalledTimes(120 - reads.length);
+      expect(control.snapshot.values.emissivity).toBe('unknown');
+    } finally {
+      await control.close();
+    }
+  });
+  it('encodes bounded camera settings and confirms their raw readback', async () => {
+    vi.spyOn(CameraUsb.prototype, 'state').mockResolvedValue({ gain: 1, ems: 112, tu: 300 });
+    const control = await openControl(profile);
+    try {
+      await control.command('set-emissivity', 0.875);
+      expect(control.snapshot.values.emissivity).toBe(0.875);
+      expect(control.snapshot.values['reflected-temperature']).toBe(300 - 273.15);
+      expect(
+        usb.device.controlTransfer.mock.calls.some(
+          (call) =>
+            Buffer.isBuffer(call[4]) &&
+            call[4].equals(Buffer.from([0x14, 0xc5, 0, 3, 0, 0, 0, 112])),
+        ),
+      ).toBe(true);
+      await expect(control.command('set-emissivity', 1)).rejects.toThrow(
+        'did not confirm the requested setting',
+      );
+    } finally {
+      await control.close();
+    }
+  });
+  it('rejects missing nonfinite and out of range settings before USB access', async () => {
+    const control = await openControl(profile);
+    try {
+      for (const value of [undefined, NaN, Infinity, 0.49, 1.01, '0.875'])
+        await expect(control.command('set-emissivity', value)).rejects.toThrow(
+          'outside the supported range',
+        );
+      await expect(control.command('gain-high', 1)).rejects.toThrow('does not accept a value');
+      expect(usb.device.controlTransfer).not.toHaveBeenCalled();
     } finally {
       await control.close();
     }

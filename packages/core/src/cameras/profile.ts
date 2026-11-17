@@ -110,6 +110,9 @@ export interface ProfileConversion extends Provenance {
   readonly conversion: Conversion;
   /** Suggested .irvis error bound in raw units for this gain; writers still take an explicit threshold. */
   readonly recordingThreshold?: number;
+  /** Readings outside these limits are uncertain; this is not an accuracy specification. */
+  readonly minCelsius?: number;
+  readonly maxCelsius?: number;
 }
 
 /** A temperature range the camera measures in one gain mode. */
@@ -221,6 +224,19 @@ export interface CameraCommand extends Provenance {
   readonly followUp?: readonly VendorControlTransport[];
   /** CameraStateField.id values that the command changes; re-read after it runs. */
   readonly changes: readonly string[];
+  /** Numeric UI value encoded into the first vendor transfer as an unsigned BE u32. */
+  readonly parameter?: {
+    readonly min: number;
+    readonly max: number;
+    readonly step: number;
+    readonly default: number;
+    readonly unit: string;
+    readonly scale: number;
+    readonly offset: number;
+    readonly byteOffset: number;
+    /** Snapshot field containing the raw integer readback. */
+    readonly readback: string;
+  };
 }
 
 /** Everything irvis knows about one camera model. */

@@ -122,10 +122,10 @@ async function boot() {
     authorize(event);
     return listDevices();
   });
-  ipcMain.handle('capture:command', async (event, id) => {
+  ipcMain.handle('capture:command', async (event, id, value) => {
     authorize(event);
     if (!control) throw new Error('Camera control is unavailable');
-    await control.command(id);
+    await control.command(id, value);
   });
   ipcMain.handle('capture:start', async (event, options) => {
     authorize(event);

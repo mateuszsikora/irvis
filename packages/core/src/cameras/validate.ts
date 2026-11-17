@@ -192,6 +192,36 @@ export function validateProfile(profile: CameraProfile): string[] {
     const where = `commands.${command.id}`;
     if (!KEBAB.test(command.id)) out.push(`commands: id '${command.id}' is not kebab-case`);
     checkProvenance(where, command, out);
+    const parameter = command.parameter;
+    if (parameter) {
+      const values = [
+        parameter.min,
+        parameter.max,
+        parameter.default,
+        parameter.step,
+        parameter.scale,
+        parameter.offset,
+      ];
+      if (
+        !values.every(Number.isFinite) ||
+        parameter.min > parameter.max ||
+        parameter.default < parameter.min ||
+        parameter.default > parameter.max ||
+        parameter.step <= 0 ||
+        parameter.scale <= 0 ||
+        Math.round(parameter.min * parameter.scale + parameter.offset) < 0 ||
+        Math.round(parameter.max * parameter.scale + parameter.offset) > 0xffffffff
+      )
+        out.push(where + ': invalid numeric command parameter');
+      if (
+        command.transport.kind !== 'vendor-control' ||
+        !Number.isInteger(parameter.byteOffset) ||
+        parameter.byteOffset < 0 ||
+        parameter.byteOffset + 4 > command.transport.data.length
+      )
+        out.push(where + ': parameter must fit a u32 in the first vendor transfer');
+      if (!KEBAB.test(parameter.readback)) out.push(where + ': invalid parameter readback field');
+    }
     checkTransport(where, command.transport, out);
     for (const transfer of command.followUp ?? []) checkTransport(where, transfer, out);
     for (const id of command.changes) {
@@ -267,6 +297,12 @@ export function validateProfile(profile: CameraProfile): string[] {
     const where = `conversions.${c.gain}`;
     checkProvenance(where, c, out);
     checkConversion(where, c.conversion, out);
+    if (
+      (c.minCelsius !== undefined && !Number.isFinite(c.minCelsius)) ||
+      (c.maxCelsius !== undefined && !Number.isFinite(c.maxCelsius)) ||
+      (c.minCelsius !== undefined && c.maxCelsius !== undefined && c.minCelsius >= c.maxCelsius)
+    )
+      out.push(`${where}: temperature limits must be finite and increasing`);
     if (c.recordingThreshold !== undefined && !isUint(c.recordingThreshold, 32767)) {
       out.push(`${where}: recordingThreshold must be an integer from 0 to 32767`);
     }

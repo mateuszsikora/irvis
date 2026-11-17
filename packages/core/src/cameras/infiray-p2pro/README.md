@@ -18,10 +18,12 @@ confidence remains reported. The high-gain `recordingThreshold` is 10 raw
 units (0.15625 K): twice that noise rounded upward. See the
 [decision](../../../../../docs/decisions/architecture.md#recording-defaults-use-twice-the-static-scene-noise).
 
-Not in the profile yet:
+Additional profile findings:
 
-- **Low gain.** Probably another divisor; the profile has no `gain` state field and one conversion, which is labelled `high`. The M2 probe can switch gain, but a low-gain conversion and state defaults await hardware measurements.
+- **Low gain.** Android 3.07.48 uses the same divisor 64 in its Tiny1C callback. M5 compared Low/High/Low on a cooling boiled kettle and observed numeric High-range readings around 90–92 °C. Both conversions remain reported, not calibrated. Low-gain readings below 90 °C and high-gain readings above 160 °C are marked uncertain following vendor display limits. The gain state enum defaults to high only for assumed/browser state.
 - **Accuracy and measurement ranges.** `sensor.ranges` is empty and `accuracy` is absent.
-- **Camera state and commands.** `state` remains empty pending measurements. `commands` contains reported `gain-high` and `gain-low` sequences; `usbProtocol` supplies diagnostic constants. See [protocol](../../../../../docs/protocol.md) for confidence, unsupported NUC and experimental sensor-temperature reads.
+- **Camera state and commands.** `state` declares gain, camera emissivity and reflected temperature; the desktop decodes their readback after [M5 observations](../../../../../docs/findings/m5-hardware.md) established a thermal-pixel effect. `commands` contains gain switching plus bounded emissivity, reflected/ambient temperature and transmittance writes; `usbProtocol` supplies diagnostic constants. See [protocol](../../../../../docs/protocol.md) for confidence, unsupported NUC and experimental sensor-temperature reads.
 
 Third-party projects used here are listed in [NOTICE](../../../../../NOTICE).
+
+Profile version 3 adds these controls, both gain conversions and their display-derived uncertainty limits. Numeric write completion is confirmed against raw state. Corrections use raw / 128 for ratios and raw − 273.15 for temperatures. These settings are volatile across a power cycle on the measured T7.

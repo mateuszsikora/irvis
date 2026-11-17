@@ -8,6 +8,8 @@ import {
   type SnapshotOptions,
   correctFrame,
   temperatureCorrection,
+  correctionFor,
+  cameraCorrection,
   settingsFromCamera,
   evaluateAlarms,
   paintIsotherms,
@@ -18,6 +20,7 @@ import {
   renderPalette,
   toCelsiusArray,
   type CameraProfile,
+  type CameraStateSnapshot,
   type RawFrame,
   type VideoMode,
   type TemperatureRange,
@@ -39,6 +42,24 @@ export interface ViewSettings {
   captureMetadata?: Pick<SnapshotOptions, 'profile' | 'fps' | 'path'>;
   /** Identity of the frame source; a new source starts without alarm hysteresis. */
   alarmGeneration?: number;
+}
+
+/** Shown while a frame's camera emissivity or reflected temperature is unknown. */
+export const CAMERA_CORRECTION_UNKNOWN =
+  'Camera correction could not be read. Readings are shown as the camera reported them; Host correction is not applied.';
+
+/**
+ * False when `cameraCorrection` rejects the state, e.g. when a failed USB read
+ * left `emissivity` or `reflected-temperature` as `unknown`. Host correction
+ * relative to such a state would guess the camera's correction.
+ */
+function cameraCorrectionKnown(state: CameraStateSnapshot): boolean {
+  try {
+    cameraCorrection(state);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Mutable frame state belongs to the canvas subscription, never React state. */
@@ -79,14 +100,15 @@ export class FrameRenderer {
       this.alarmState = null;
       this.alarmGeneration = settings.alarmGeneration;
     }
-    const conversion = profile.conversions.find(
+    const selectedConversion = profile.conversions.find(
       (c) =>
         c.gain ===
         (input.kind === 'yuyv'
           ? (input.cameraState?.values['gain'] ??
             (input.cameraState?.origin === 'camera' ? 'unknown' : settings.gain))
           : settings.gain),
-    )?.conversion;
+    );
+    const conversion = selectedConversion?.conversion;
     if (input.kind !== 'thermal' && (!conversion || !mode.layout)) {
       this.warning.textContent = 'No verified conversion for this mode. Readings unavailable.';
       this.canvas.getContext('2d')?.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -96,7 +118,7 @@ export class FrameRenderer {
       this.onAlarm?.(false);
       return;
     }
-    const decoded =
+    let decoded =
       input.kind === 'thermal'
         ? input.frame
         : input.kind === 'yuyv'
@@ -111,15 +133,45 @@ export class FrameRenderer {
       decoded.raw,
       input.kind === 'thermal' ? input.frame.conversion : conversion!,
     );
+    let outsideRange = false;
+    if (input.kind !== 'thermal' && selectedConversion) {
+      const { minCelsius, maxCelsius } = selectedConversion;
+      if (minCelsius !== undefined || maxCelsius !== undefined) {
+        const uncertain = decoded.uncertain?.slice() ?? new Uint8Array(decoded.raw.length);
+        for (let i = 0; i < celsius.length; i++) {
+          const value = celsius[i]!;
+          if (
+            (minCelsius !== undefined && value < minCelsius) ||
+            (maxCelsius !== undefined && value > maxCelsius)
+          ) {
+            uncertain[i] = 1;
+            outsideRange = true;
+          }
+        }
+        if (outsideRange) decoded = { ...decoded, uncertain };
+      }
+    }
+    const frameState =
+      input.kind === 'thermal'
+        ? input.frame.cameraState
+        : input.kind === 'yuyv'
+          ? input.cameraState
+          : undefined;
+    // The camera's readings stay usable; only a correction relative to them is blocked.
+    const correctionUnknown = frameState !== undefined && !cameraCorrectionKnown(frameState);
     const analysis = settings.analysis;
-    if (analysis) {
+    if (analysis && !correctionUnknown) {
       if (input.kind === 'thermal')
         celsius = correctFrame(
           input.frame,
           analysis.correction ?? settingsFromCamera(input.frame.cameraState),
         );
       else if (analysis.correction)
-        celsius = celsius.map(temperatureCorrection(analysis.correction));
+        celsius = celsius.map(
+          input.kind === 'yuyv' && input.cameraState
+            ? correctionFor(analysis.correction, input.cameraState)
+            : temperatureCorrection(analysis.correction),
+        );
     }
     const image = { ...decoded, celsius };
     const result = analysis ? analyze(image, analysis) : null;
@@ -139,12 +191,17 @@ export class FrameRenderer {
     if (settings.range) this.range = settings.range;
     else if (!settings.locked && automatic) this.range = automatic;
     const expected = profile.sensor.ranges.find((r) => r.gain === settings.gain);
-    this.warning.textContent = !automatic
+    const readingsWarning = !automatic
       ? 'No certain temperature readings.'
       : expected &&
           (automatic.minCelsius < expected.minCelsius || automatic.maxCelsius > expected.maxCelsius)
         ? 'Data look inconsistent with the declared camera mode. Check gain and factory settings.'
-        : '';
+        : outsideRange
+          ? 'Readings outside this sensor range are uncertain and excluded from measurements.'
+          : '';
+    this.warning.textContent = correctionUnknown
+      ? [CAMERA_CORRECTION_UNKNOWN, readingsWarning].filter(Boolean).join(' ')
+      : readingsWarning;
     const rgba = renderPalette(celsius, this.range, settings.palette);
     if (analysis?.isotherm)
       paintIsotherms(rgba, celsius, decoded.uncertain, [
@@ -253,11 +310,18 @@ export class FrameRenderer {
         fps: settings.captureMetadata?.fps ?? mode.fps,
         path:
           settings.captureMetadata?.path ??
-          (input.kind === 'yuv420' || thermal.uncertain ? 'reconstructed' : 'exact'),
+          (input.kind === 'yuv420' || (input.kind === 'thermal' && thermal.uncertain)
+            ? 'reconstructed'
+            : 'exact'),
         viewState: {
           palette: settings.palette,
           range: { ...this.range },
-          correction: { ...(analysis?.correction ?? settingsFromCamera(thermal.cameraState)) },
+          // null: no Host correction and the camera's own is unknown, so nothing to restore.
+          correction: analysis?.correction
+            ? { ...analysis.correction }
+            : correctionUnknown
+              ? null
+              : { ...settingsFromCamera(thermal.cameraState) },
           unit: analysis?.unit ?? 'C',
           capturedOverlays: true,
         },

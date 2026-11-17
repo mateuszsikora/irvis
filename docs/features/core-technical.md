@@ -27,7 +27,7 @@ Every field has a TSDoc comment in the source; this is the summary.
 | `YuyvFrame` | `kind: 'yuyv'`, `width`, `height`, `data`, `timestamp` | `data` is width × height × 2 bytes, row-major, `[Y0 U Y1 V]` per pair of pixels, unchanged from the camera |
 | `Yuv420Frame` | `kind: 'yuv420'`, `layout: 'i420' \| 'nv12'`, `width`, `height`, `data`, `planes`, `timestamp` | `planes` holds an `offset` and a `stride` per plane, as WebCodecs `PlaneLayout`: Y, U, V for `i420`; Y and interleaved UV for `nv12` |
 | `ThermalRawFrame` | `kind: 'thermal'`, `frame: ThermalFrame` | The third `RawFrame` variant, for sources that already hold temperature data |
-| `ThermalFrame` | `width`, `height`, `timestamp`, `raw`, `conversion`, `cameraState`, `uncertain` | `raw` is a `Uint16Array` of width × height thermal pixels; `conversion` is the profile's `Conversion` for the frame's gain; `cameraState` a `CameraStateSnapshot`; `uncertain` a `Uint8Array` mask (1 = uncertain) or `null` when every value is exact |
+| `ThermalFrame` | `width`, `height`, `timestamp`, `raw`, `conversion`, `cameraState`, `uncertain` | `raw` is a `Uint16Array` of width × height thermal pixels; `conversion` is the profile's `Conversion` for the frame's gain; `cameraState` a `CameraStateSnapshot`; `uncertain` a `Uint8Array` mask (1 = uncertain) or `null` when every value is usable; ambiguity may come from reconstruction or profile temperature limits |
 
 Timestamps are milliseconds on the source's monotonic clock. `Conversion` and `CameraStateSnapshot` are part of the profile schema ([cameras: technical](cameras-technical.md#schema)).
 
@@ -322,7 +322,7 @@ The dependency test (`packages/core/test/package-dependencies.test.ts`) fails wi
 
 Real-frame coverage: `packages/core/test/real-frames.test.ts` checks ten packed wall frames, frozen v1 lossless decoding in reverse order, and every pixel at lossless, 8, 16 and the profile default thresholds ([invariant 41](../invariants.md)). Long-series results are in [codec findings](../findings/irvis-codec.md).
 
-Not covered: moving-camera codec measurements or independently confirmed shutter events; whether the P2 Pro applies emissivity to its raw values (#7) and how the T⁴ law compares with the vendor's app on a real object; that the types fit the backends, which do not exist yet; files larger than memory, whose 1 MiB scanning windows only the cut-file test exercises at a small size; bit-identical decoding, palette tables and measurements in browsers (#21; the tests run in Node only); whether the palettes look like the vendor app's (#11); the TypeScript library settings, which `npm run typecheck` exercises on every run but no test asserts (a file that uses `document` was checked by hand when they were set up). The ESLint test cannot see a rule that type-aware linting would add or change for a real file.
+Not covered: moving-camera codec measurements or independently confirmed shutter events; how the T⁴ law compares with the vendor's app on a real object; files larger than memory, whose 1 MiB scanning windows only the cut-file test exercises at a small size; whether the palettes look like the vendor app's (#11); the TypeScript library settings, which `npm run typecheck` exercises on every run but no test asserts (a file that uses `document` was checked by hand when they were set up). The ESLint test cannot see a rule that type-aware linting would add or change for a real file.
 
 ## See also
 
@@ -404,4 +404,8 @@ is not covered.
 
 ## Live backend integration
 
-CameraSession has an optional asynchronous `command(id)` method. YuyvFrame can carry a CameraStateSnapshot; Yuv420Frame can carry optional Worker-computed `reconstructed` dimensions, raw values and uncertainty mask. Consumers can still decode frames without these optional fields.
+CameraSession has an optional asynchronous `command(id, value?)` method. YuyvFrame can carry a CameraStateSnapshot; Yuv420Frame can carry optional Worker-computed `reconstructed` dimensions, raw values and uncertainty mask. Consumers can still decode frames without these optional fields.
+
+Numeric command argument meaning and encoding are declared by the selected camera profile; implementations must validate before transport.
+
+`ThermalFrame.uncertain` also carries profile temperature-limit exclusions. Exact packed raw bytes can therefore have an uncertainty mask without being reconstructed. The viewer generates this mask before host correction; core analysis, alarms, isotherms and replay retain their existing exclusion rules. The file format and conversion representation are unchanged. `decodeThermalFrame` alone still returns no mask: callers applying a profile must apply its limits separately.

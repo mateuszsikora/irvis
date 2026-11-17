@@ -84,13 +84,44 @@ export async function openControl(profile, helper) {
         values[key === 'gain' ? 'gain' : `usb-${key}`] =
           key === 'gain' ? (value === 1 ? 'high' : 'low') : value;
     }
-    snapshot = { origin: Object.keys(values).length ? 'camera' : 'assumed', values };
+    values.emissivity =
+      typeof raw.ems === 'number' && raw.ems > 0 && raw.ems <= 128 ? raw.ems / 128 : 'unknown';
+    values['reflected-temperature'] =
+      typeof raw.tu === 'number' && raw.tu > 0 && raw.tu <= 1024 ? raw.tu - 273.15 : 'unknown';
+    snapshot = { origin: 'camera', values };
+    if (!stateUnknown()) {
+      fullReadDelay = FIRST_FULL_READ_DELAY;
+      nextFullRead = 0;
+    }
     return snapshot;
+  }
+  // Unknown gain blocks readings and unknown EMS/TU blocks Host correction, so the
+  // poll repeats the full state read, backing off so a persistent failure keeps video.
+  const FIRST_FULL_READ_DELAY = 1000;
+  const MAX_FULL_READ_DELAY = 30000;
+  let fullReadDelay = FIRST_FULL_READ_DELAY;
+  let nextFullRead = 0;
+  function stateUnknown() {
+    return (
+      snapshot.origin === 'camera' &&
+      ['gain', 'emissivity', 'reflected-temperature'].some((k) => snapshot.values[k] === 'unknown')
+    );
   }
   const timer = setInterval(() => {
     if (closed || polling) return;
     polling = true;
     void serial(async () => {
+      if (stateUnknown() && Date.now() >= nextFullRead) {
+        try {
+          await readState();
+        } finally {
+          if (stateUnknown()) {
+            nextFullRead = Date.now() + fullReadDelay;
+            fullReadDelay = Math.min(fullReadDelay * 2, MAX_FULL_READ_DELAY);
+          }
+        }
+        return;
+      }
       const bytes = await camera.standard(
         usbProtocol.sensorTemperature,
         usbProtocol.sensorTemperatureReadLength,
@@ -120,10 +151,24 @@ export async function openControl(profile, helper) {
       return snapshot;
     },
     read: () => serial(readState),
-    async command(id) {
+    async command(id, value) {
       if (closed) throw new Error('Camera control is closed');
       const command = profile.commands.find((c) => c.id === id);
       if (!command) throw new Error('Unknown camera command');
+      const parameter = command.parameter;
+      let encoded;
+      if (parameter) {
+        if (
+          typeof value !== 'number' ||
+          !Number.isFinite(value) ||
+          value < parameter.min ||
+          value > parameter.max
+        )
+          throw new Error('Camera command value is outside the supported range');
+        encoded = Math.round(value * parameter.scale + parameter.offset);
+      } else if (value !== undefined) {
+        throw new Error('Camera command does not accept a value');
+      }
       if (commandPending) throw new Error('Camera command is already in progress');
       commandPending = true;
       try {
@@ -136,20 +181,18 @@ export async function openControl(profile, helper) {
           };
           try {
             await camera.ready();
-            for (const t of [command.transport, ...(command.followUp ?? [])]) {
+            for (const [index, t] of [command.transport, ...(command.followUp ?? [])].entries()) {
               if (t.kind !== 'vendor-control') throw new Error('Unsupported command transport');
-              await camera.transfer(
-                t.requestType,
-                t.request,
-                t.value,
-                t.index,
-                Buffer.from(t.data),
-              );
+              const data = Buffer.from(t.data);
+              if (index === 0 && parameter) data.writeUInt32BE(encoded, parameter.byteOffset);
+              await camera.transfer(t.requestType, t.request, t.value, t.index, data);
             }
             await camera.ready();
           } finally {
             await readState();
           }
+          if (parameter && snapshot.values[parameter.readback] !== encoded)
+            throw new Error('Camera did not confirm the requested setting');
           const expected = id === 'gain-high' ? 'high' : id === 'gain-low' ? 'low' : undefined;
           if (expected && snapshot.values.gain !== expected)
             throw new Error('Camera did not confirm the requested gain');
