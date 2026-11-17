@@ -39,11 +39,10 @@ describe('version-bump filter', () => {
   });
 
   it('moved uses line is not a bump', () => {
-    repo.replace(
-      WORKFLOW,
-      '    timeout-minutes: 10\n    steps:\n      - uses: actions/checkout@v7\n',
-      '    timeout-minutes: 10\n    steps:\n',
-    );
+    // The TypeScript job is the only one with the npm cache.
+    const setup =
+      '      - uses: actions/setup-node@v7\n        with:\n          node-version-file: .nvmrc\n          cache: npm\n';
+    repo.replace(WORKFLOW, `      - uses: actions/checkout@v7\n${setup}`, setup);
     repo.replace(
       WORKFLOW,
       '      - name: Documentation integrity',
