@@ -110,11 +110,27 @@ Renaming a heading or a file breaks links in documents that did not change. Chec
 
 ## The documentation check is not a required status check yet
 
-Status: postponed
+Status: superseded (#26)
+
+Once the repository is public, a ruleset makes the checks required; see [the replacement decision](#ci-checks-are-required-through-a-ruleset-once-the-repository-is-public).
 
 The CI job should be a required check, but the plan does not allow it: `gh api repos/mateuszsikora/irvis/branches/main/protection` and `.../rulesets` return HTTP 403 ("Upgrade to GitHub Pro or make this repository public to enable this feature") for this private repository on the free plan. The job runs on every pull request, and [CONTRIBUTING.md](../../CONTRIBUTING.md#verification) makes a red job a blocker by rule. Make it required, with the job name "Documentation contract", once the plan or the repository's visibility allows it.
 
 **Rejected:** a workaround that fails the merge by other means (a bot, a scheduled job), because it adds moving parts for what one repository setting will do.
+
+## CI checks are required through a ruleset once the repository is public
+
+Status: decided (#26)
+
+A public repository gets rulesets on the free plan, so the checks that [CONTRIBUTING.md](../../CONTRIBUTING.md#verification) makes a blocker by rule become a blocker in GitHub. The ruleset is kept in `.github/rulesets/main.json`, so that a change to it is reviewed like code; GitHub does not read the file, and the owner applies it with `gh api` once the repository is public ([how](../guides/development.md#required-checks)). It applies to the default branch and:
+
+- requires the checks "Documentation contract" and "TypeScript", reported by GitHub Actions (app id 15368), so that no other app or commit status can satisfy them. "Documentation integrity" runs only on pushes to `main` and "Desktop packages" only on some paths; a required check that never runs on a pull request would block it forever;
+- does not require the branch to be up to date with `main` before merging: that would make every open pull request update after each merge, and the integrity job on `main` already reports two pull requests that break `main` together;
+- requires a pull request, with squash as the only merge method and no approving review, because the only maintainer cannot approve their own pull requests; it blocks deleting `main` and force pushes to it.
+
+The Release workflow opens its version pull request with `GITHUB_TOKEN`, and events made with that token start no workflow, so the required checks never report on it. The ruleset therefore lists GitHub Actions as a bypass actor in the mode `pull_request` (it can merge a pull request past the rules, not push to `main`), and the workflow merges with `gh pr merge --admin`.
+
+**Rejected:** classic branch protection, because a ruleset can be kept as JSON in the repository and restricts the merge method; requiring an approving review, for the reason above; protecting `release` in the same change, because publishing on GitHub Pages ([#54](https://github.com/mateuszsikora/irvis/issues/54)) may remove the branch and "Promote to release".
 
 ## Tests use unittest from the standard library
 

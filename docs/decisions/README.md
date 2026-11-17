@@ -20,7 +20,8 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [Test files are left out of the source side](docs.md#test-files-are-left-out-of-the-source-side) | [docs.md](docs.md) | decided |
 | [The decisions index is generated](docs.md#the-decisions-index-is-generated) | [docs.md](docs.md) | decided |
 | [Integrity checks run on the whole tree every time](docs.md#integrity-checks-run-on-the-whole-tree-every-time) | [docs.md](docs.md) | decided |
-| [The documentation check is not a required status check yet](docs.md#the-documentation-check-is-not-a-required-status-check-yet) | [docs.md](docs.md) | postponed |
+| [The documentation check is not a required status check yet](docs.md#the-documentation-check-is-not-a-required-status-check-yet) | [docs.md](docs.md) | superseded (#26) |
+| [CI checks are required through a ruleset once the repository is public](docs.md#ci-checks-are-required-through-a-ruleset-once-the-repository-is-public) | [docs.md](docs.md) | decided (#26) |
 | [Tests use unittest from the standard library](docs.md#tests-use-unittest-from-the-standard-library) | [docs.md](docs.md) | superseded (#30) |
 | [CLAUDE.md is a symlink to AGENTS.md](docs.md#claudemd-is-a-symlink-to-agentsmd) | [docs.md](docs.md) | decided |
 | [No path-scoped rule file for agents](docs.md#no-path-scoped-rule-file-for-agents) | [docs.md](docs.md) | decided |

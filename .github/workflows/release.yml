@@ -1,6 +1,7 @@
 # Run by hand from main: sets the version through a pull request, builds the
-# desktop packages and leaves a draft GitHub Release with them and the ffmpeg
-# source. Publishing that release moves the release branch for Netlify.
+# desktop packages and leaves a draft GitHub Release with them and the source
+# of the LGPL parts they carry (ffmpeg, and libusb inside node-usb).
+# Publishing that release moves the release branch for Netlify.
 # Why and how: docs/guides/development.md#release
 name: Release
 
@@ -162,8 +163,11 @@ jobs:
             exit 1
           fi
           # GitHub computes mergeability after the pull request is opened.
+          # A pull request opened with GITHUB_TOKEN starts no CI, so the
+          # required checks of .github/rulesets/main.json never report;
+          # --admin merges through the ruleset's bypass for GitHub Actions.
           for attempt in 1 2 3 4 5; do
-            if gh pr merge "$url" --squash; then break; fi
+            if gh pr merge "$url" --squash --admin; then break; fi
             if [ "$attempt" = 5 ]; then
               echo "::error::could not merge $url"
               exit 1
@@ -209,6 +213,29 @@ jobs:
         with:
           name: ffmpeg-source
           path: assets
+      # The node-usb prebuilds link libusb (LGPL) statically, so its source
+      # goes next to the packages, as ffmpeg's does.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+          path: source
+          sparse-checkout: |
+            .nvmrc
+            package-lock.json
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: source/.nvmrc
+      - name: Fetch the node-usb source
+        run: |
+          set -eu
+          read -r version integrity < <(node -p "const u = require('./source/package-lock.json').packages['node_modules/usb']; u.version + ' ' + u.integrity")
+          npm pack "usb@$version" --pack-destination assets --json --silent > "$RUNNER_TEMP/usb-pack.json"
+          packed=$(node -p "require(process.argv[1])[0].integrity" "$RUNNER_TEMP/usb-pack.json")
+          if [ "$packed" != "$integrity" ]; then
+            echo "::error::usb-$version.tgz from the registry is not the package in package-lock.json"
+            exit 1
+          fi
       - name: Create the draft release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -226,7 +253,7 @@ jobs:
           for pattern in "irvis-$VERSION-mac-arm64.dmg" "irvis-$VERSION-mac-x64.dmg" \
             "irvis-$VERSION-win-x64.exe" "irvis-$VERSION-win-x64.zip" \
             "irvis-$VERSION-linux-x86_64.AppImage" "irvis-$VERSION-linux-amd64.deb" \
-            'ffmpeg-*.tar.xz' build.sh; do
+            'ffmpeg-*.tar.xz' build.sh 'usb-*.tgz'; do
             # shellcheck disable=SC2206 # the pattern is meant to expand
             found=($pattern)
             # A name without a wildcard stays as it is even when the file is missing.
@@ -246,7 +273,7 @@ jobs:
           if [ "$PRERELEASE" = true ]; then flags+=(--prerelease); fi
           url=$(gh release create "$tag" "${files[@]}" --draft --target "$SHA" "${flags[@]}" \
             --title "irvis $VERSION" --generate-notes \
-            --notes "Unsigned desktop packages for macOS, Windows and Linux; how to install them: $GITHUB_SERVER_URL/$GH_REPO/blob/$tag/docs/features/desktop-user.md#install-a-package. Each package carries an LGPL ffmpeg; its source tarball and build.sh are attached.")
+            --notes "Unsigned desktop packages for macOS, Windows and Linux; how to install them: $GITHUB_SERVER_URL/$GH_REPO/blob/$tag/docs/features/desktop-user.md#install-a-package. Each package carries an LGPL ffmpeg and node-usb with the LGPL libusb built in; the ffmpeg source tarball, its build.sh and the node-usb source package with libusb are attached.")
           if [ "$PRERELEASE" = true ]; then
             next="Publish it to tag $SHA; as a prerelease it does not move release."
           else

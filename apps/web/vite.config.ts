@@ -9,6 +9,9 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    // The bundle drops the licence comments of the packages it contains;
+    // this file carries their licence texts instead.
+    license: { fileName: 'THIRD-PARTY-LICENSES.md' },
   },
   test: {
     name: 'web',

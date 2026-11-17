@@ -125,4 +125,4 @@ gh api repos/mateuszsikora/irvis/actions/permissions/workflow --jq '{can_approve
 
 `can_approve_pull_request_reviews` must be `true`.
 
-If GitHub still allows merge commits or rebase merges, the rule still holds: use "Squash and merge". The `create-pr` skill reports any difference. Branch protection and rulesets are not available on the current plan, so GitHub cannot require the CI checks to pass or enforce the rules in this file; contributors and agents do.
+If GitHub still allows merge commits or rebase merges, the rule still holds: use "Squash and merge". The `create-pr` skill reports any difference. Branch protection and rulesets are not available while the repository is private on the current plan, so GitHub cannot require the CI checks to pass or enforce the rules in this file; contributors and agents do. Once the repository is public, the owner applies the ruleset in `.github/rulesets/main.json`, which requires the checks "Documentation contract" and "TypeScript", a pull request and squash merges on `main` ([how](docs/guides/development.md#required-checks)); the other rules here stay rules for contributors and agents.
