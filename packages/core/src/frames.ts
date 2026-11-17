@@ -70,8 +70,9 @@ export interface ThermalFrame {
   /** The camera state the frame was taken in, and whether it is known. */
   readonly cameraState: CameraStateSnapshot;
   /**
-   * 1 where the value is uncertain (the reconstruction could not recover it
-   * exactly), 0 elsewhere; width × height. Null when every value is exact.
+   * 1 where the value is uncertain (reconstruction ambiguity or a reading outside
+   * the profile's temperature limits), 0 elsewhere; width × height. Null when
+   * every value is usable. Raw bytes can be exact even when a reading is uncertain.
    */
   readonly uncertain: Uint8Array | null;
 }

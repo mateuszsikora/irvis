@@ -25,7 +25,7 @@ All numeric codes above are hexadecimal. The CLI checks ready before a transacti
 | 8514 / c514 | Read / write TPD; reply u16 BE | reported |
 | TPD 0 | Distance: raw / 163.835 metres, raw 0–32767 | reported |
 | TPD 1, 2 | Reflected and atmospheric temperature, raw kelvin 0–1024 | reported |
-| TPD 3, 4 | Emissivity and atmospheric transmittance: upstream claims raw / 127 and 0–127; this T7 returns 128 for both. Probe accepts 0–128 so the observed values can be restored; scaling remains unresolved | reported scaling; measured initial raw 128 |
+| TPD 3, 4 | Emissivity and atmospheric transmittance: upstream claims raw / 127 and 0–127; this T7 returns 128 for both. Probe accepts 0–128 so the observed values can be restored; M5 adopts raw / 128, corroborated by p2pro-rs and the measured unity value | reported scaling; measured writes and thermal effect |
 | TPD 5 | Gain: 0 low, 1 high | reported |
 | 8409 / c409 | Read / write palette on preview path zero; 1 white hot, 3 iron red, 11 black hot, 2 reserved | reported |
 | 8b0d | Current sensor temperature command | reported name only |
@@ -35,7 +35,7 @@ All numeric codes above are hexadecimal. The CLI checks ready before a transacti
 | 840c | Shutter temperature; not an established NUC trigger | reported name only |
 | NUC | Unknown; `usb nuc` logs unsupported and sends nothing | unresolved |
 
-The TPD ranges are source claims, not proof that their extremes are useful. The CLI stores raw values. It does not populate the reserved software emissivity state fields until the effect on thermal pixels is known, and does not add a low-gain temperature conversion.
+The TPD ranges are source claims, not proof that their extremes are useful. The CLI stores raw values. The desktop now decodes reserved software emissivity/reflected-temperature fields after M5 established their thermal effect. The Android Tiny1C callback and M5 hot-target comparison support the same reported raw / 64 − 273.15 conversion in both gains. Low-gain readings below 90 °C and high-gain readings above 160 °C are excluded through the uncertainty mask; these are vendor display limits, not calibrated bounds.
 
 ## NUC investigation and fallback
 
@@ -50,3 +50,9 @@ The CLI uses the [node-usb legacy API](https://node-usb.github.io/node-usb/) to 
 Attempt (b), `--detach`, explicitly detaches interface 0, never claims it, and tries to reattach in cleanup. Stop all video consumers first. On macOS 12+ detaching may need root or an entitlement; it is a diagnostic experiment, not a release strategy. Do not infer streaming coexistence from this attempt.
 
 If (a) fails on macOS, attempt (c) is an IOKit helper using `IOUSBDeviceInterface::DeviceRequest` without seizing the video interface. `tools/capture-cli/iokit-request.c` implements this diagnostic helper; `--iokit <path>` uses it for each transfer with a two-second process timeout. It opens and closes the device per request without seizing it. Compilation and state reads during streaming were verified on one TOOLTOP T7 on macOS 27.0.1; see the [local hardware run](findings/m2.md#local-hardware-run). This does not establish compatibility with other devices or environments. Linux with udev access is the other fallback, pending a real-device run. On Windows, installing WinUSB through Zadig can remove the UVC interface from video capture; Windows is not a supported execution target for this spike.
+
+## M5 follow-up
+
+[M5 hardware observations](findings/m5-hardware.md) record continuous gain and correction experiments, a real desktop recording and power-cycle testing. TPD writes survive handle close/open but the tested T7 resets to its startup values when USB power is removed. No persistent-save command is established.
+
+A Tiny1C-source NUC candidate, standard write `0xc10d` parameter 0, returned status 14 on TC1_V1.02 and is not in the profile allow-list. Shutter-state read `0x830c` returned `0101`; this alone does not establish a NUC trigger. A known device-info read recovered the transaction status. Device-info command `0x8405` uses the selector as a little-endian parameter; interpreting it as big-endian returned repeated data and is not valid identity evidence.

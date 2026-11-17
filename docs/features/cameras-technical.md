@@ -46,14 +46,14 @@ Gain commands encode fixed values as transfer sequences. TODO(owner): measure ca
 
 | Part | Value |
 | --- | --- |
-| `version` | 2 |
+| `version` | 3 |
 | `identification` | USB `0x0bda:0x5830` and `0x0bda:0x5840`, no `labelPattern` (`USB Camera` is not specific enough to identify a model) |
 | `videoModes` | `yuyv-256x384`, 25 fps, `image` rows 0–191, `thermal` rows 192–383 `u16le`, no `enableCommand`; `yuyv-256x192`, 25 fps, `layout: null` |
 | `sensor` | 256×192, scene-based `netd.kelvin` 0.07545446351476191 (`measured`), no `accuracy`, `ranges` empty |
-| `conversions` | One, `gain: 'high'`: linear, `scale` 1/64, `offset` −273.15, confidence `reported`, `recordingThreshold: 10` (0.15625 K) |
-| `state`, `commands` | State unconfirmed; reported `gain-high` and `gain-low` commands |
+| `conversions` | High and low gain: linear, `scale` 1/64, `offset` −273.15, confidence `reported`; high `maxCelsius: 160`, low `minCelsius: 90`; high `recordingThreshold: 10` (0.15625 K) |
+| `state`, `commands` | Gain enum, emissivity and reflected temperature; fixed gain commands and four bounded numeric correction commands |
 
-With no `gain` state field, the validator requires exactly one conversion, so the low-gain conversion waits for #7. The M1 spike checks the modes and the conversion on a camera ([findings](../findings/m1.md)).
+M5 inspected the Android implementation and compared both gains on a cooling hot kettle. Both use raw / 64 − 273.15; the confidence stays reported because there was no independent reference thermometer. Vendor Low maps to high sensor gain and High to low sensor gain. Conversion limits follow vendor display clipping, not a calibrated accuracy specification.
 
 The high-gain recording suggestion is ceil(2 × NETD × 64). It uses unadjusted temporal noise from 256 event-free frames of the stationary wall scene; it is not a calibrated NETD specification. Writers still require an explicit threshold. Photos remain lossless by default. See the [decision](../decisions/architecture.md#recording-defaults-use-twice-the-static-scene-noise).
 
@@ -136,4 +136,10 @@ Not covered: every message in the table above has its check in `validate.ts`, bu
 
 ## Experimental USB commands
 
-`CameraCommand.followUp` optionally holds vendor transfers sent after `transport`, in order, before checking readiness. `validateProfile` validates their fields like the first transport. The P2 Pro profile declares `gain-high` and `gain-low`; its exported `usbProtocol` holds TPD limits, selectors and transfer constants, plus the explicitly hypothetical sensor-temperature reply length. EMS/TAU accept raw 128 to restore the initial values observed on the T7; their ratio scaling remains unverified. See [protocol](../protocol.md) for provenance and confidence. The CLI rereads all probe state after commands independently of `changes`, which stays empty because the profile has no verified state defaults or low-gain conversion.
+`CameraCommand.followUp` optionally holds vendor transfers sent after `transport`, in order, before checking readiness. `validateProfile` validates their fields like the first transport. The P2 Pro profile declares `gain-high` and `gain-low`; its exported `usbProtocol` holds TPD limits, selectors and transfer constants, plus the explicitly hypothetical sensor-temperature reply length. EMS/TAU accept raw 128 to restore the initial values observed on the T7; the desktop ratio decoding now uses 128 following M5 measurements and the newer open implementation. See [protocol](../protocol.md) for provenance and confidence. The CLI rereads all probe state after commands independently of `changes`, which names decoded correction fields for the numeric commands; gain now selects one of the two reported conversions.
+
+`CameraCommand.parameter` optionally declares numeric `min`, `max`, `step`, `default`, `unit`, positive `scale`, `offset`, `byteOffset` and raw snapshot `readback` field. Encoding is round(value × scale + offset) as unsigned BE u32 in the first vendor transfer. Validation checks finite bounds/default/scale, encoded range, offset fit and kebab-case readback ID.
+
+P2 Pro profile version 3 adds four numeric TPD writes and decoded emissivity/reflected-temperature state. Ratio input bounds are 0.5–1, step 1/128; reflected temperature is −20–120 °C and ambient temperature −20–50 °C, step 1 K. Defaults reflect the tested T7 startup state, not universal factory settings. Raw TPD fields remain available in snapshots. Both gains now have reported conversions and display-derived reading limits. Automatic range and reset are host sequences using these verified commands, not new USB opcodes; NUC and distance writes remain unavailable. See [M5 observations](../findings/m5-hardware.md).
+
+`ProfileConversion.minCelsius` and `maxCelsius` are optional finite reading limits; when both are present they must increase. The viewer marks readings outside them uncertain before host correction, preserving the mask in photos and recordings. They do not alter conversion coefficients or claim a calibrated sensor range.

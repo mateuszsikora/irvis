@@ -1,8 +1,77 @@
 import { describe, expect, it, vi } from 'vitest';
 import { cameraProfiles, IrvisReader, memoryByteSource, type ThermalFrame } from '@irvis/core';
 import { initialAnalysis } from '../src/measurements.ts';
-import { FrameRenderer, type ViewSettings } from '../src/render.ts';
+import { CAMERA_CORRECTION_UNKNOWN, FrameRenderer, type ViewSettings } from '../src/render.ts';
 describe('FrameRenderer', () => {
+  it('retains exact raw bytes but excludes out-of-range readings in live and replay', () => {
+    const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+    try {
+      for (const [gain, temperature] of [
+        ['low', 85],
+        ['high', 170],
+      ] as const) {
+        const alarm = vi.fn();
+        const renderer = new FrameRenderer(
+          document.createElement('canvas'),
+          document.createElement('canvas'),
+          document.createElement('output'),
+          document.createElement('p'),
+          undefined,
+          alarm,
+        );
+        const profile = cameraProfiles[0]!;
+        const data = new Uint8Array(256 * 384 * 2);
+        const raw = Math.round((temperature + 273.15) * 64);
+        const view = new DataView(data.buffer);
+        for (let i = 256 * 192 * 2; i < data.length; i += 2) view.setUint16(i, raw, true);
+        const settings: ViewSettings = {
+          palette: 'iron',
+          range: null,
+          locked: false,
+          rotation: 0,
+          mirrorX: false,
+          mirrorY: false,
+          smooth: false,
+          uncertain: false,
+          gain: 'high',
+          analysis: {
+            ...initialAnalysis,
+            alarm: true,
+            threshold: 80,
+            correction: { emissivity: 1, reflectedCelsius: 20, offsetKelvin: 20 },
+          },
+        };
+        renderer.draw(
+          {
+            kind: 'yuyv',
+            width: 256,
+            height: 384,
+            timestamp: 0,
+            data,
+            cameraState: { origin: 'camera', values: { gain } },
+          },
+          profile,
+          profile.videoModes[0]!,
+          settings,
+        );
+        const recorded = renderer.recordingFrame()!;
+        expect(recorded.frame.raw[0]).toBe(raw);
+        expect(recorded.frame.uncertain?.every((value) => value === 1)).toBe(true);
+        expect(recorded.options.path).toBe('exact');
+        expect(alarm).toHaveBeenLastCalledWith(false);
+        renderer.draw(
+          { kind: 'thermal', frame: recorded.frame },
+          profile,
+          profile.videoModes[0]!,
+          settings,
+        );
+        expect(alarm).toHaveBeenLastCalledWith(false);
+        expect(renderer.recordingFrame()?.frame.uncertain).toEqual(recorded.frame.uncertain);
+      }
+    } finally {
+      context.mockRestore();
+    }
+  });
   it('refuses a camera-reported gain without a conversion despite the host assumption', () => {
     const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
     try {
@@ -22,7 +91,7 @@ describe('FrameRenderer', () => {
           height: 384,
           timestamp: 0,
           data: new Uint8Array(256 * 384 * 2),
-          cameraState: { origin: 'camera', values: { gain: 'low' } },
+          cameraState: { origin: 'camera', values: { gain: 'unsupported' } },
         },
         profile,
         profile.videoModes[0]!,
@@ -85,6 +154,135 @@ describe('FrameRenderer', () => {
       } finally {
         context.mockRestore();
       }
+    }
+  });
+  it('uses camera emissivity for relative correction of live exact frames', () => {
+    const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+    try {
+      const bounds = document.createElement('output');
+      const renderer = new FrameRenderer(
+        document.createElement('canvas'),
+        document.createElement('canvas'),
+        bounds,
+        document.createElement('p'),
+      );
+      const profile = cameraProfiles[0]!;
+      const data = new Uint8Array(256 * 384 * 2);
+      const raw = 20000;
+      for (let i = 256 * 192 * 2; i < data.length; i += 2) {
+        data[i] = raw & 255;
+        data[i + 1] = raw >> 8;
+      }
+      renderer.draw(
+        {
+          kind: 'yuyv',
+          width: 256,
+          height: 384,
+          timestamp: 0,
+          data,
+          cameraState: {
+            origin: 'camera',
+            values: { gain: 'high', emissivity: 0.5, 'reflected-temperature': 20 },
+          },
+        },
+        profile,
+        profile.videoModes[0]!,
+        {
+          palette: 'iron',
+          range: null,
+          locked: false,
+          rotation: 0,
+          mirrorX: false,
+          mirrorY: false,
+          smooth: false,
+          uncertain: false,
+          gain: 'high',
+          analysis: {
+            ...initialAnalysis,
+            correction: { emissivity: 0.5, reflectedCelsius: 20, offsetKelvin: 0 },
+          },
+        },
+      );
+      expect(bounds.textContent).toBe('38.9 °C — 39.9 °C');
+    } finally {
+      context.mockRestore();
+    }
+  });
+  it('keeps camera readings and recording when the camera correction is unknown', () => {
+    const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+    try {
+      const bounds = document.createElement('output');
+      const warning = document.createElement('p');
+      const renderer = new FrameRenderer(
+        document.createElement('canvas'),
+        document.createElement('canvas'),
+        bounds,
+        warning,
+      );
+      const profile = cameraProfiles[0]!;
+      const data = new Uint8Array(256 * 384 * 2);
+      const raw = 20000;
+      for (let i = 256 * 192 * 2; i < data.length; i += 2) {
+        data[i] = raw & 255;
+        data[i + 1] = raw >> 8;
+      }
+      const settings = (analysis: ViewSettings['analysis']) =>
+        ({
+          palette: 'iron',
+          range: null,
+          locked: false,
+          rotation: 0,
+          mirrorX: false,
+          mirrorY: false,
+          smooth: false,
+          uncertain: false,
+          gain: 'high',
+          analysis,
+        }) as ViewSettings;
+      const host = { emissivity: 1, reflectedCelsius: 20, offsetKelvin: 20 };
+      for (const [key, correction] of [
+        ['emissivity', null],
+        ['reflected-temperature', host],
+      ] as const) {
+        renderer.draw(
+          {
+            kind: 'yuyv',
+            width: 256,
+            height: 384,
+            timestamp: 0,
+            data,
+            cameraState: {
+              origin: 'camera',
+              values: {
+                gain: 'high',
+                emissivity: 0.875,
+                'reflected-temperature': 26.85,
+                [key]: 'unknown',
+              },
+            },
+          },
+          profile,
+          profile.videoModes[0]!,
+          settings({ ...initialAnalysis, correction }),
+        );
+        // Unchanged camera readings: the +20 K Host offset is not applied.
+        expect(bounds.textContent).toBe('38.9 °C — 39.9 °C');
+        expect(warning.textContent).toBe(CAMERA_CORRECTION_UNKNOWN);
+        const recorded = renderer.recordingFrame()!;
+        expect(recorded.frame.cameraState.values[key]).toBe('unknown');
+        expect(recorded.options.viewState?.['correction']).toEqual(correction);
+        renderer.draw(
+          { kind: 'thermal', frame: recorded.frame },
+          profile,
+          profile.videoModes[0]!,
+          settings({ ...initialAnalysis, correction: host }),
+        );
+        expect(bounds.textContent).toBe('38.9 °C — 39.9 °C');
+        expect(warning.textContent).toBe(CAMERA_CORRECTION_UNKNOWN);
+        expect(renderer.recordingFrame()).not.toBeNull();
+      }
+    } finally {
+      context.mockRestore();
     }
   });
   it('resets alarm hysteresis when the frame source changes', () => {

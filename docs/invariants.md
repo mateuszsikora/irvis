@@ -292,3 +292,31 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
 - **74.** Camera command feedback belongs to one connection: Stop/Start clears it, and an old command's completion cannot change the new connection's status or pending state.
   - `packages/ui/test/viewer.test.tsx::Viewer::clears camera command confirmation on Stop and Start`
   - `packages/ui/test/viewer.test.tsx::Viewer::ignores an old command failure while a new session waits for confirmation`
+
+- **75.** Numeric camera settings are bounded and encoded by the selected profile; invalid values cannot cause USB transfers and success requires matching raw readback.
+  - `apps/desktop/test/capture.test.js::desktop capture::encodes bounded camera settings and confirms their raw readback`
+  - `apps/desktop/test/capture.test.js::desktop capture::rejects missing nonfinite and out of range settings before USB access`
+  - `packages/core/src/cameras/infiray-p2pro/profile.test.ts::infiray-p2pro profile::rejects unsafe numeric command encodings`
+
+- **76.** A host emissivity edit on exact live frames is relative to the camera's applied correction, matching replay instead of correcting twice.
+  - `packages/ui/test/render.test.ts::FrameRenderer::uses camera emissivity for relative correction of live exact frames`
+
+- **77.** A camera correction reset confirms writes sequentially, clears host correction only after full success, and sends no remaining writes after the session panel unmounts.
+  - `packages/ui/test/camera-controls.test.tsx::CameraControls::confirms each reset write before clearing host correction`
+  - `packages/ui/test/camera-controls.test.tsx::CameraControls::stops a partial reset on failure and keeps host correction`
+  - `packages/ui/test/camera-controls.test.tsx::CameraControls::does not continue a reset after its camera session ends`
+
+- **78.** Temperature limits mark readings uncertain before host correction while retaining exact raw bytes and the mask in replay; excluded readings cannot trigger alarms.
+  - `packages/ui/test/render.test.ts::FrameRenderer::retains exact raw bytes but excludes out-of-range readings in live and replay`
+  - `packages/core/src/cameras/infiray-p2pro/profile.test.ts::infiray-p2pro profile::rejects invalid reading limits without changing the conversion`
+
+- **79.** Automatic sensor range waits for settling and consecutive threshold crossings, shares command confirmation locking, and stops automatic requests after failure.
+  - `packages/ui/test/sensor-range.test.ts::SensorRangePolicy::requires settling and consecutive threshold crossings in both directions`
+  - `packages/ui/test/sensor-range.test.ts::SensorRangePolicy::rejects isolated peaks, boundary readings and unknown state`
+  - `packages/ui/test/camera-controls.test.tsx::CameraControls::waits for automatic gain confirmation and exits Auto on failure`
+  - `packages/ui/test/camera-controls.test.tsx::CameraControls::disables Auto for a video mode without temperature data`
+
+- **80.** An unknown camera emissivity or reflected temperature blocks only Host correction: camera readings, photos and recording frames remain, and the viewer warns. While gain, emissivity or reflected temperature is unknown, the desktop poll repeats the full state read with a backoff from 1 s to 30 s and reads sensor bytes in between.
+  - `packages/ui/test/render.test.ts::FrameRenderer::keeps camera readings and recording when the camera correction is unknown`
+  - `apps/desktop/test/capture.test.js::desktop capture::repeats the full state read while gain, emissivity or reflected temperature is unknown`
+  - `apps/desktop/test/capture.test.js::desktop capture::backs off repeated full state reads to 30 seconds and polls sensor bytes between them`

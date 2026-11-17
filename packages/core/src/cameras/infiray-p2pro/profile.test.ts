@@ -12,13 +12,47 @@ describe('infiray-p2pro profile', () => {
     expect(validateProfile(profile)).toEqual([]);
   });
 
+  it('rejects unsafe numeric command encodings', () => {
+    const command = profile.commands.find((c) => c.parameter)!;
+    for (const patch of [
+      { scale: Infinity },
+      { min: 2 },
+      { byteOffset: 5 },
+      { offset: -1000 },
+      { readback: 'raw bytes' },
+    ]) {
+      expect(
+        validateProfile({
+          ...profile,
+          commands: [{ ...command, parameter: { ...command.parameter!, ...patch } }],
+        }).length,
+      ).toBeGreaterThan(0);
+    }
+  });
+  it('rejects invalid reading limits without changing the conversion', () => {
+    const conversion = profile.conversions[0]!;
+    for (const limits of [
+      { minCelsius: NaN },
+      { maxCelsius: Infinity },
+      { minCelsius: 100, maxCelsius: 90 },
+    ]) {
+      expect(
+        validateProfile({
+          ...profile,
+          conversions: [{ ...conversion, ...limits }, profile.conversions[1]!],
+        }),
+      ).toContain('conversions.high: temperature limits must be finite and increasing');
+    }
+    expect(profile.conversions[1]?.conversion).toEqual(conversion.conversion);
+  });
+
   it('derives the recording threshold from twice the measured scene noise', () => {
     const noise = profile.sensor.netd?.kelvin;
     const conversion = profile.conversions[0];
     expect(noise).toBeGreaterThan(0);
     expect(conversion?.recordingThreshold).toBe(Math.ceil(2 * (noise ?? NaN) * 64));
     expect(conversion?.recordingThreshold).toBe(10);
-    expect(profile.version).toBe(2);
+    expect(profile.version).toBe(3);
   });
 
   it('matches the Realtek USB IDs', () => {

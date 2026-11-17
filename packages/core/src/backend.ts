@@ -42,7 +42,7 @@ export interface CameraSession {
   /** Frames in the order they arrive. A slow listener makes the backend drop frames, not queue them. */
   readonly frames: Subscribable<RawFrame>;
   /** Stops the stream and releases the device. */
-  command?: (id: string) => Promise<void>;
+  command?: (id: string, value?: number) => Promise<void>;
   close(): Promise<void>;
 }
 

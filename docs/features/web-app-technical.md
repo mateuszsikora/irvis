@@ -110,3 +110,5 @@ Each operation opens a connection and closes it after its transaction. Saves res
 ## Recording storage injection
 
 `App.tsx` constructs one `RecordingStorage`: the preload's recording API selects `createDesktopRecordingStorage`; otherwise `createBrowserRecordingStorage` supplies OPFS or an explicitly warned memory fallback. The same instance survives source/profile remounts. External recording files use `fileByteSource`.
+
+The desktop live backend forwards optional numeric command values through `bridge.command(id, value)` while retaining its session-ownership check. Browser capture exposes no command dispatcher. Numeric camera controls are part of the shared viewer.

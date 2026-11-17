@@ -97,7 +97,11 @@ describe('Viewer', () => {
     expect(screen.getByRole<HTMLButtonElement>('button', { name: '90°' }).disabled).toBe(true);
     fireEvent.click(screen.getByText('Camera commands'));
     for (const c of profile.commands)
-      expect(screen.getByRole<HTMLButtonElement>('button', { name: c.label }).disabled).toBe(true);
+      expect(
+        screen.getByRole<HTMLButtonElement>('button', {
+          name: c.parameter ? 'Apply ' + c.label.toLowerCase() : c.label,
+        }).disabled,
+      ).toBe(true);
     expect(screen.getByRole('link', { name: 'Download desktop app' })).toBeTruthy();
   });
   function controlledBackend(command: (id: string) => Promise<void>): CameraBackend {

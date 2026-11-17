@@ -4,7 +4,7 @@ contextBridge.exposeInMainWorld('irvisDesktop', {
   recordingStorage: (op, name, bytes, offset, length) =>
     ipcRenderer.invoke('recording:storage', op, name, bytes, offset, length),
   listDevices: () => ipcRenderer.invoke('capture:devices'),
-  command: (id) => ipcRenderer.invoke('capture:command', id),
+  command: (id, value) => ipcRenderer.invoke('capture:command', id, value),
   start: (options) => ipcRenderer.invoke('capture:start', options),
   stop: () => ipcRenderer.invoke('capture:stop'),
   subscribe: (frame, error) => {

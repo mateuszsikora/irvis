@@ -41,9 +41,9 @@ Readings appear below the preview. Points and the centre use a 3×3 neighbourhoo
 
 ## Apply host correction
 
-Initially the viewer preserves the camera correction stored with thermal frames. Raw live capture assumes factory settings, as indicated by the camera setup notice. Edit emissivity (0.01–1.00), offset (-20–20 °C) and reflected temperature (-20–120 °C), then press `Apply correction`. Invalid or blank inputs cannot be applied. These inputs use the core fourth-power host model relative to the stored camera state, so an existing camera correction is not applied twice.
+Initially the viewer preserves the camera correction stored with thermal frames. Desktop exact capture uses the correction read from the camera. Browser capture still requires declared factory settings. Edit emissivity (0.01–1.00), offset (-20–20 °C) and reflected temperature (-20–120 °C), then press `Apply correction`. Invalid or blank inputs cannot be applied. These inputs use the core fourth-power host model relative to the stored camera state, so an existing camera correction is not applied twice. If the desktop app cannot read the camera's emissivity or reflected temperature, the viewer shows "Camera correction could not be read. Readings are shown as the camera reported them; Host correction is not applied." Readings, photos and recording continue with the camera's own correction, and Host correction resumes once a later read succeeds: the app retries after 1 second, then less often, up to every 30 seconds.
 
-`Reset parameters` explicitly applies emissivity 1, offset 0 and reflected temperature 25 °C, matching the reference reset. Core's general default reflected temperature remains 20 °C; the viewer's reset deliberately uses 25 °C. Ambient temperature is displayed as 25 °C but disabled with `Ambient correction unsupported. No camera commands are sent.` It has no effect. Camera commands and a justified ambient model remain separate work.
+`Reset parameters` explicitly applies emissivity 1, offset 0 and reflected temperature 25 °C, matching the reference reset. Core's general default reflected temperature remains 20 °C; the viewer's reset deliberately uses 25 °C. Ambient temperature is displayed as 25 °C but disabled with `Ambient correction unsupported. No camera commands are sent.` It has no effect. This is the host panel; desktop camera ambient temperature is separately available under `Camera commands`.
 
 ## Analyze a saved photo
 
@@ -73,3 +73,15 @@ Opening a recording restores its saved temperature correction. Playback and seek
 Desktop Camera commands use the selected profile’s allow-list. They require USB access to exactly one matching camera. Unavailable USB access reports `Camera control is unavailable`; browser commands remain disabled. Camera state is read on connect and after commands. Selecting a gain without a verified conversion disables readings.
 
 After plugging in a camera, open Camera setup and select `Refresh cameras`. Stop capture first. The current camera stays selected if it is still connected; otherwise the first available camera is selected. If the camera's gain cannot be read, readings stay unavailable until a successful state read after reconnecting or sending another camera command.
+
+## Change camera correction
+
+In the desktop app, start the camera and open `Camera commands`. The panel shows the reported gain and current values separately from requested values. Set camera emissivity or atmospheric transmittance from 0.5 to 1 (resolution 1/128), or reflected temperature from −20 to 120 °C and ambient temperature from −20 to 50 °C (whole-kelvin resolution), then press the corresponding Apply button. Requests are rounded to the camera's resolution and confirmed by readback. The initial requested values are 1 for ratios and 26.85 °C for temperatures; they are not a claim about the connected camera's current values.
+
+These settings change thermal data in the camera. Unedited readings preserve that correction; Host correction edits emissivity relative to the camera setting using the documented approximate model. On the tested TOOLTOP T7, settings survive connection close/open but reset after USB power removal. Camera distance and camera-side temperature adjustment remain disabled; a software temperature offset is available under `Host correction`. Browser camera controls remain disabled.
+
+`Reset camera correction` under Camera commands sets emissivity to 1 and reflected/ambient temperature to 24.85 °C (298 K, the value Android labels 25 °C). It then clears Host correction, including its offset. Gain and atmospheric transmittance remain unchanged. Wait for confirmation; if a write fails, earlier settings may already have changed and the error is shown. This reset does not save settings across USB power loss.
+
+For manual temperature range selection, use `High gain` for the vendor's Low range and `Low gain` for its High range. `Auto sensor range` starts in high gain and switches after 100 consecutive frames above 160 °C or below 150 °C, following 100 settling frames. `Manual sensor range` keeps the current confirmed gain and allows manual selection. Stop or a command error ends Auto. Gain changes preserve atmospheric transmittance; the Android app instead selects its own device-specific values.
+
+Readings above 160 °C in high gain or below 90 °C in low gain are uncertain and excluded from measurements and alarms. Their raw pixels and uncertainty mask remain in photos and recordings. These limits follow the vendor display and do not guarantee absolute accuracy.

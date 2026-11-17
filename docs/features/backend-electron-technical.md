@@ -36,4 +36,6 @@ Large appends (including a final index) are split into sequential 4 MiB IPC chun
 
 ## Live backend integration
 
-The preload interface also exposes optional `listDevices()` and `command(id)` promises. The web adapter exposes commands on the current CameraSession and reports `exactRaw: true`, `deviceControl: true` when command dispatch exists, and `concurrentWith: [browser]` on macOS (empty elsewhere). Concurrent camera access still depends on OS drivers. Frame snapshots carry raw USB observations; see [desktop control](desktop-technical.md#camera-control).
+The preload interface also exposes optional `listDevices()` and `command(id, value?)` promises. The web adapter exposes commands on the current CameraSession and reports `exactRaw: true`, `deviceControl: true` when command dispatch exists, and `concurrentWith: [browser]` on macOS (empty elsewhere). Concurrent camera access still depends on OS drivers. Frame snapshots carry raw USB observations; see [desktop control](desktop-technical.md#camera-control).
+
+`DesktopBridge.command(id, value?)` forwards an optional numeric setting. The preload sends only the command ID and value; main selects the profile transport and validates/encodes the value. No raw USB interface is exposed.

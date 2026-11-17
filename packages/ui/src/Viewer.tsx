@@ -17,6 +17,7 @@ import {
   rangeProblems,
   type CameraBackend,
   type CameraProfile,
+  type CameraStateSnapshot,
   type CameraSession,
   type RawFrame,
   type VideoMode,
@@ -33,7 +34,7 @@ export interface ViewerProps {
   profile: CameraProfile;
   /** Only supply when the backend actually implements command dispatch. */
   captureError?: string;
-  command?: (id: string) => Promise<void>;
+  command?: (id: string, value?: number) => Promise<void>;
 }
 export function Viewer({
   backend,
@@ -51,6 +52,7 @@ export function Viewer({
   const [modeId, setModeId] = useState(profile.videoModes.find((m) => m.layout)?.id ?? '');
   const [session, setSession] = useState<CameraSession | null>(null);
   const [commandSession, setCommandSession] = useState(0);
+  const [cameraState, setCameraState] = useState<CameraStateSnapshot>();
   const [hasFrame, setHasFrame] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -275,6 +277,12 @@ export function Viewer({
     let received = false;
     return session.frames.subscribe((frame) => {
       if (token !== generation.current) return;
+      if (frame.kind === 'yuyv') {
+        const snapshot = frame.cameraState;
+        setCameraState((previous) =>
+          JSON.stringify(previous) === JSON.stringify(snapshot) ? previous : snapshot,
+        );
+      }
       if (!received) {
         received = true;
         setHasFrame(true);
@@ -289,6 +297,7 @@ export function Viewer({
   }, [session]);
   async function connect() {
     setCommandSession((value) => value + 1);
+    setCameraState(undefined);
     playbackRef.current?.close();
     playbackRef.current = null;
     photoGeneration.current++;
@@ -317,6 +326,7 @@ export function Viewer({
   }
   async function stop() {
     setCommandSession((value) => value + 1);
+    setCameraState(undefined);
     playbackRef.current?.pause();
     generation.current++;
     setTriggered(false);
@@ -902,6 +912,13 @@ export function Viewer({
             key={backend.id + profile.id + commandSession}
             profile={profile}
             browser={backend.id === 'browser'}
+            cameraState={cameraState}
+            frames={session?.frames}
+            mode={session?.mode}
+            resetHostCorrection={() => {
+              setSettings((s) => ({ ...s, analysis: { ...s.analysis!, correction: null } }));
+              setAnalysisRevision((value) => value + 1);
+            }}
             command={
               session && backend.capabilities.deviceControl
                 ? (command ?? session.command)
