@@ -114,7 +114,14 @@ const MATH_RULES = [
 export default defineConfig(
   {
     // ESLint does not read .gitignore; these are the ignored paths it would otherwise lint.
-    ignores: ['**/node_modules/', '**/dist/', '**/coverage/', '.context/', '.claude/worktrees/'],
+    ignores: [
+      '**/node_modules/',
+      '**/dist/',
+      '**/coverage/',
+      'apps/desktop/release/',
+      '.context/',
+      '.claude/worktrees/',
+    ],
   },
   {
     linterOptions: { reportUnusedDisableDirectives: 'error' },

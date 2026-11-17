@@ -26,6 +26,9 @@
     "spike:m3:web": "npm run dev --workspace @irvis/web -- --host localhost",
     "spike:m3:desktop": "npm run build && npm run start --workspace @irvis/desktop",
     "test:desktop": "npm run build && npm run test:smoke --workspace @irvis/desktop",
+    "ffmpeg:build": "bash apps/desktop/ffmpeg/build.sh",
+    "ffmpeg:verify": "node apps/desktop/ffmpeg/verify.mjs",
+    "package:desktop": "npm run build && npm run package --workspace @irvis/desktop --",
     "test:parity": "vitest run --config packages/ui/test/parity/vitest.config.mjs"
   },
   "devDependencies": {

@@ -85,3 +85,7 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [Camera controls require readback and preserve unsupported states](architecture.md#camera-controls-require-readback-and-preserve-unsupported-states) | [architecture.md](architecture.md) | decided (#22) |
 | [Numeric camera settings are encoded by the profile and remain volatile](architecture.md#numeric-camera-settings-are-encoded-by-the-profile-and-remain-volatile) | [architecture.md](architecture.md) | decided (#22) |
 | [Sensor range uses reported conversion limits and a host switching policy](architecture.md#sensor-range-uses-reported-conversion-limits-and-a-host-switching-policy) | [architecture.md](architecture.md) | decided (#22) |
+| [Desktop packages are built on GitHub-hosted runners](architecture.md#desktop-packages-are-built-on-github-hosted-runners) | [architecture.md](architecture.md) | decided (#23) |
+| [The bundled ffmpeg is a static build of a pinned release with nothing but the camera path](architecture.md#the-bundled-ffmpeg-is-a-static-build-of-a-pinned-release-with-nothing-but-the-camera-path) | [architecture.md](architecture.md) | decided (#23) |
+| [Unsigned macOS packages carry an ad-hoc signature without the hardened runtime](architecture.md#unsigned-macos-packages-carry-an-ad-hoc-signature-without-the-hardened-runtime) | [architecture.md](architecture.md) | decided (#23) |
+| [Windows packages are an NSIS installer and a zip](architecture.md#windows-packages-are-an-nsis-installer-and-a-zip) | [architecture.md](architecture.md) | decided (#23) |

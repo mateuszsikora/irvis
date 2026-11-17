@@ -1,0 +1,182 @@
+# What runs here and why: docs/guides/development.md#desktop-packages
+name: Desktop packages
+
+on:
+  pull_request:
+    paths:
+      - apps/desktop/ffmpeg/**
+      - apps/desktop/electron-builder.config.mjs
+      - apps/desktop/package.json
+      - apps/desktop/test/package-smoke.mjs
+      - .github/workflows/desktop.yml
+  workflow_dispatch:
+    inputs:
+      allow-system-ffmpeg:
+        description: Package a system whose ffmpeg build fails without ffmpeg (users then set IRVIS_FFMPEG)
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      allow-system-ffmpeg:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  ffmpeg:
+    name: ffmpeg ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: mac-arm64, runner: macos-15 }
+          - { target: mac-x64, runner: macos-15 }
+          - { target: linux-x64, runner: ubuntu-24.04 }
+          - { target: win-x64, runner: windows-2025 }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    continue-on-error: ${{ inputs.allow-system-ffmpeg == true }}
+    steps:
+      # build.sh must keep LF line endings for the MSYS2 bash.
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - name: Restore ffmpeg
+        id: cache
+        uses: actions/cache/restore@v6
+        with:
+          path: apps/desktop/ffmpeg/dist/${{ matrix.target }}
+          key: ffmpeg-${{ matrix.target }}-${{ hashFiles('apps/desktop/ffmpeg/build.sh') }}
+      - name: Set up MSYS2
+        if: matrix.target == 'win-x64' && steps.cache.outputs.cache-hit != 'true'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: make diffutils curl tar xz mingw-w64-ucrt-x86_64-gcc
+      - name: Build ffmpeg (MSYS2)
+        if: matrix.target == 'win-x64' && steps.cache.outputs.cache-hit != 'true'
+        shell: msys2 {0}
+        run: apps/desktop/ffmpeg/build.sh win-x64
+      - name: Build ffmpeg
+        if: matrix.target != 'win-x64' && steps.cache.outputs.cache-hit != 'true'
+        run: apps/desktop/ffmpeg/build.sh ${{ matrix.target }}
+      - name: Verify ffmpeg
+        run: node apps/desktop/ffmpeg/verify.mjs ${{ matrix.target }}
+      - name: Save ffmpeg
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: apps/desktop/ffmpeg/dist/${{ matrix.target }}
+          key: ${{ steps.cache.outputs.cache-primary-key }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ffmpeg-${{ matrix.target }}
+          path: apps/desktop/ffmpeg/dist/${{ matrix.target }}
+          retention-days: 14
+
+  ffmpeg-source:
+    name: ffmpeg source
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download and check the tarball
+        run: |
+          apps/desktop/ffmpeg/build.sh source
+          cp apps/desktop/ffmpeg/build.sh apps/desktop/ffmpeg/dist/build.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ffmpeg-source
+          path: |
+            apps/desktop/ffmpeg/dist/ffmpeg-*.tar.xz
+            apps/desktop/ffmpeg/dist/build.sh
+          compression-level: 0
+          retention-days: 14
+
+  package:
+    name: Package ${{ matrix.os }}
+    # A failed ffmpeg job stops packaging unless allow-system-ffmpeg is set.
+    needs: ffmpeg
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: mac
+            runner: macos-15
+            args: --mac --arm64 --x64
+            unpacked: release/mac-arm64 release/mac
+          - os: linux
+            runner: ubuntu-24.04
+            args: --linux --x64
+            unpacked: release/linux-unpacked
+          - os: win
+            runner: windows-2025
+            args: --win --x64
+            unpacked: release/win-unpacked
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/download-artifact@v8
+        # With allow-system-ffmpeg, a system may have no ffmpeg artifact.
+        continue-on-error: ${{ inputs.allow-system-ffmpeg == true }}
+        with:
+          pattern: ffmpeg-${{ matrix.os }}-*
+          path: apps/desktop/ffmpeg/artifacts
+      - name: Install
+        run: npm ci
+      - name: Package
+        shell: bash
+        env:
+          IRVIS_PACKAGE_WITHOUT_FFMPEG: ${{ inputs.allow-system-ffmpeg == true && '1' || '' }}
+        run: |
+          cd apps/desktop/ffmpeg
+          mkdir -p dist
+          # artifacts/ffmpeg-<target> -> dist/<target>; artifacts lose the executable bit.
+          for dir in artifacts/ffmpeg-*; do
+            [ -d "$dir" ] || continue
+            mv "$dir" "dist/${dir#artifacts/ffmpeg-}"
+            chmod +x dist/"${dir#artifacts/ffmpeg-}"/ffmpeg*
+          done
+          cd ../../..
+          npm run package:desktop -- ${{ matrix.args }}
+      - name: Check the udev rule in the deb
+        if: matrix.os == 'linux'
+        run: dpkg-deb -c apps/desktop/release/*.deb | grep -F ./usr/lib/udev/rules.d/60-irvis.rules
+      - name: Extract the udev rule from the AppImage
+        if: matrix.os == 'linux'
+        working-directory: apps/desktop/release
+        # The commands of docs/features/desktop-user.md#install-a-package.
+        run: |
+          ./irvis-*-linux-x86_64.AppImage --appimage-extract resources/60-irvis.rules
+          cmp squashfs-root/resources/60-irvis.rules ../../../tools/capture-cli/60-irvis.rules
+          rm -r squashfs-root
+      - name: Smoke test
+        shell: bash
+        working-directory: apps/desktop
+        run: |
+          if [ "${{ matrix.os }}" = linux ] && ! command -v xvfb-run > /dev/null; then
+            sudo apt-get update -q && sudo apt-get install -y -q xvfb
+          fi
+          for dir in ${{ matrix.unpacked }}; do
+            ${{ matrix.os == 'linux' && 'xvfb-run -a' || '' }} node test/package-smoke.mjs "$dir" ${{ inputs.allow-system-ffmpeg == true && '--ffmpeg-optional' || '' }}
+          done
+      - uses: actions/upload-artifact@v7
+        with:
+          name: irvis-${{ matrix.os }}
+          path: |
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.zip
+            apps/desktop/release/*.AppImage
+            apps/desktop/release/*.deb
+          compression-level: 0
+          retention-days: 14

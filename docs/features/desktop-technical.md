@@ -16,11 +16,11 @@ The reference has `kind: yuyv`, profile dimensions, Uint8Array bytes, main-proce
 
 ## Configuration
 
-`IRVIS_FFMPEG` selects an executable; otherwise capture-cli searches PATH. Input is AVFoundation on macOS, V4L2 on Linux and DirectShow on Windows. Capture has no fixed duration limit. `IRVIS_TEST_CORS=1` enables the scheme's CORS privilege for the smoke experiment; production defaults to disabled. esbuild bundles the main process and CommonJS preload into `apps/desktop/dist`.
+`src/ffmpeg.js` `locateFfmpeg` picks the ffmpeg: `IRVIS_FFMPEG` if set (capture-cli's `findFfmpeg` checks that it is an executable file), else, in a package (`app.isPackaged`), the bundled `resources/ffmpeg/ffmpeg` (`ffmpeg.exe` on Windows), else the first ffmpeg on PATH. Device listing and capture both use it. See [Bundled ffmpeg](#bundled-ffmpeg). Input is AVFoundation on macOS, V4L2 on Linux and DirectShow on Windows. Capture has no fixed duration limit. `IRVIS_TEST_CORS=1` enables the scheme's CORS privilege for the smoke experiment; production defaults to disabled. esbuild bundles the main process and CommonJS preload into `apps/desktop/dist`.
 
 ## Failure modes
 
-Invalid IPC sources throw `Untrusted IPC sender`. Invalid mode/device throws `Invalid capture selection`. Invalid platform/device combinations throw `Invalid capture selection`. A different native format reports `Exact reference requires native yuyv422; received <format>`. Child errors and exit diagnostics are shown in the comparison status.
+Invalid IPC sources throw `Untrusted IPC sender`. A package without ffmpeg whose PATH has none either throws `This irvis package has no ffmpeg. Install ffmpeg and start irvis with IRVIS_FFMPEG set to its path.`; from the repository the message is capture-cli's `ffmpeg not found: install it (brew install ffmpeg) or set IRVIS_FFMPEG to its path`, and a bad `IRVIS_FFMPEG` gives `IRVIS_FFMPEG=<path> is not an executable file` in both. Invalid mode/device throws `Invalid capture selection`. Invalid platform/device combinations throw `Invalid capture selection`. A different native format reports `Exact reference requires native yuyv422; received <format>`. Child errors and exit diagnostics are shown in the comparison status.
 
 ## Tests
 
@@ -40,7 +40,7 @@ Replacing the main-frame document (including reload) also stops capture and clos
 
 Snapshots contain `gain` (`high`/`low`, or `unknown` when the read fails or returns a value other than 0/1), raw TPD values under `usb-` keys, and hexadecimal `usb-pseudo_color` and `usb-cur_vtemp`. Failed reads omit other raw fields. Valid EMS and TU also populate `emissivity` (raw / 128) and `reflected-temperature` (raw − 273.15 °C); invalid or failed values become `unknown` so correction cannot silently assume unity. The renderer then keeps the camera's readings and recordings but does not apply Host correction (see [UI technical](ui-technical.md)). Unknown gain blocks temperature conversion. While `gain`, `emissivity` or `reflected-temperature` is `unknown` in a camera snapshot, the one-second poll repeats the full state read instead of reading only `cur_vtemp`, so a transient USB failure clears on the next successful read. Each full read that still leaves a value `unknown` doubles the wait before the next one (1, 2, 4, 8, 16 s, then every 30 s); the polls in between read only `cur_vtemp`, so a persistent failure or an out-of-range value does not keep the control `busy` and drop video frames every second. Any full read with all three known (poll, command or reconnect) resets the wait to 1 s. A failed periodic read removes stale sensor bytes. Closing capture cancels polling and closes USB after in-flight work settles. A generation check prevents an obsolete asynchronous open from launching ffmpeg.
 
-`src/permissions.js` runs during build on macOS. It requires the Xcode command-line C compiler, builds the helper and sets `NSCameraUsageDescription` in the development Electron.app Info.plist to `irvis uses the camera to display and record thermal images.` Release packaging must preserve this key in its own application bundle.
+`src/permissions.js` runs during build on macOS. It requires the Xcode command-line C compiler, builds the helper as a universal (arm64 and x86_64) binary and sets `NSCameraUsageDescription` in the development Electron.app Info.plist to `irvis uses the camera to display and record thermal images.` Packages set the same key themselves ([Packages](#packages)).
 
 The `desktop` Vitest project tests per-platform input arguments, exact output, rejected selectors, USB ambiguity, command allow-listing, state reads, polling and cleanup with a fake USB device. Real camera capture and USB permissions on Linux/Windows remain hardware verification work.
 
@@ -53,3 +53,50 @@ Each command attempt increments the snapshot's `command-generation` number. It i
 Numeric profile commands accept `command(id, value)`. Main rejects a missing, nonfinite or out-of-range value with `Camera command value is outside the supported range`, and an argument on a parameterless command with `Camera command does not accept a value`, before any USB traffic. It copies the profile's first transfer and writes `round(value * scale + offset)` as a big-endian u32 at the declared byte offset. The renderer supplies no bytes, offsets or USB parameters. After the usual serialized sequence and full state read, mismatch at the declared raw snapshot field throws `Camera did not confirm the requested setting`.
 
 See [M5 hardware observations](../findings/m5-hardware.md) for measured thermal effects, volatile settings, recording acceptance and the rejected NUC candidate.
+
+## Packages
+
+`apps/desktop/electron-builder.config.mjs` configures electron-builder 26. `npm run package:desktop -- <electron-builder options>` runs `npm run build` (web build, main and preload bundles, on macOS the IOKit helper) and then `electron-builder --config electron-builder.config.mjs --publish never` in `apps/desktop`. Without options it packages the host system and architecture. Packages go to `apps/desktop/release/` (ignored by git), named `irvis-<version>-<os>-<arch>.<ext>` with the version of `apps/desktop/package.json` (now `0.0.0`); electron-builder writes `x86_64` (AppImage) and `amd64` (deb) for x64 on Linux.
+
+| System | Options used in CI | Targets | Architectures |
+| --- | --- | --- | --- |
+| macOS 12 or later | `--mac --arm64 --x64` | dmg | arm64, x64 |
+| Windows | `--win --x64` | NSIS installer (assisted, per user, installation directory can be changed) and zip | x64 |
+| Linux | `--linux --x64` | AppImage and deb | x64 |
+
+What a package holds:
+
+- `app.asar`: `package.json`, `dist/main.cjs`, `dist/preload.cjs` and the production dependency node-usb (`usb`) with its runtime dependencies. esbuild bundles `@irvis/core` and the capture-cli modules into `main.cjs`, so `@irvis/core` is a development dependency. Of node-usb, only `LICENSE`, `package.json`, `dist/` and the prebuilds of the packaged system (`prebuilds/<platform>-*`) are kept; electron-builder unpacks the `.node` file into `app.asar.unpacked`. `npmRebuild` is `false`: the prebuilds use N-API, which Electron loads as they are.
+- In the resources directory (`process.resourcesPath`), outside `app.asar` so that they can be fetched and spawned: `web/` (a copy of `apps/web/dist`), `ffmpeg/` (`ffmpeg` or `ffmpeg.exe`, `COPYING.LGPLv2.1`, `README.txt`), `LICENSE.irvis.txt` and `NOTICE.irvis.txt`; on macOS `iokit-request`; on Linux `60-irvis.rules`.
+- The deb also installs `tools/capture-cli/60-irvis.rules` as `/usr/lib/udev/rules.d/60-irvis.rules` (through electron-builder's `deb.fpm`). It grants the logged-in user USB access to both profile PIDs, so camera commands work without root once the camera is plugged in again. The AppImage cannot install it; the [user document](desktop-user.md#install-a-package) gives the commands.
+
+When `app.isPackaged`, `src/main.js` serves `resources/web` instead of `../../web/dist`, passes the bundled ffmpeg path to `locateFfmpeg` and runs `resources/iokit-request` instead of `dist/iokit-request`.
+
+The config reads `electronVersion` from the installed `electron/package.json`: npm hoists Electron to the workspace root, and electron-builder refuses the `^45.3.2` range in `apps/desktop/package.json`. Its `beforePack` hook stops when `apps/desktop/ffmpeg/dist/<os>-<arch>` is missing, with `apps/desktop/ffmpeg/dist/<target> is missing: run npm run ffmpeg:build -- <target>, or set IRVIS_PACKAGE_WITHOUT_FFMPEG=1 to package without ffmpeg`. With `IRVIS_PACKAGE_WITHOUT_FFMPEG=1` it prints `packaging <target> without ffmpeg; users must set IRVIS_FFMPEG` and packages without ffmpeg: the fallback for a system whose ffmpeg build fails.
+
+Signing: none of the packages is signed for distribution. macOS packages carry an ad-hoc signature (`identity: '-'`) without the hardened runtime, because arm64 code must have a valid signature to run; Gatekeeper still treats them as from an unidentified developer. Their Info.plist sets `NSCameraUsageDescription` to `irvis uses the camera to display and record thermal images.` and `NSMicrophoneUsageDescription` to `irvis records optional microphone audio with a recording.` Signing and notarisation are separate work; the hardened runtime they need will also need the camera and audio-input entitlements. There is no application icon yet, so electron-builder uses Electron's. TODO(owner): an application icon.
+
+## Bundled ffmpeg
+
+`apps/desktop/ffmpeg/build.sh [mac-arm64|mac-x64|linux-x64|win-x64|source]` (`npm run ffmpeg:build -- <target>`; the default is the host) builds the ffmpeg that packages ship ([decision](../decisions/architecture.md#the-desktop-app-ships-its-own-lgpl-ffmpeg-build)). It downloads `https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz` into `apps/desktop/ffmpeg/dist/`, stops unless its SHA-256 is `8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e` (the tarball whose FFmpeg release-key signature was checked when the version was pinned), and builds the unmodified source in `dist/build/<target>/`. `source` stops after the check; CI uses it to publish the tarball.
+
+`configure` gets `--disable-everything --disable-autodetect --disable-doc --disable-debug --disable-network --disable-ffplay --disable-ffprobe --disable-swresample --disable-swscale --disable-x86asm`, then enables only the `pipe` protocol, the `rawvideo` demuxer, decoder, encoder and muxer, and the input of the system. Without `--enable-gpl`, `--enable-nonfree` or `--enable-version3`, the result is LGPL 2.1 or later. The rawvideo demuxer exists only so that `verify.mjs` can feed frames through a pipe.
+
+| Target | Input | Threads | Linking | Built on |
+| --- | --- | --- | --- | --- |
+| `mac-arm64`, `mac-x64` | `avfoundation` | pthreads | system frameworks, macOS 12.0 minimum | macOS; `mac-x64` cross-compiles with `-arch x86_64` on an arm64 Mac |
+| `linux-x64` | `v4l2` | pthreads | static | Linux with gcc and the static glibc |
+| `win-x64` | `dshow` | Win32 | static | an MSYS2 UCRT64 shell, or Linux with mingw-w64 (`x86_64-w64-mingw32-gcc`) |
+
+It writes `dist/<target>/` with `ffmpeg` (or `ffmpeg.exe`), `COPYING.LGPLv2.1` from the tarball and `README.txt`: the version, the licence, the source URL and SHA-256, and the `configure` arguments. On macOS the binaries are about 1.3 MB and on Linux 2.5 MB.
+
+`node apps/desktop/ffmpeg/verify.mjs [target]` (`npm run ffmpeg:verify -- <target>`) runs the built ffmpeg and checks that `-version` starts with `ffmpeg version 9.0.2` without `--enable-gpl` or `--enable-nonfree`, that `-L` reports the GNU Lesser General Public License, that `-decoders` and `-encoders` list only `rawvideo` and `-devices` only the input of the system (`avfoundation`, `video4linux2,v4l2` or `dshow`), that `COPYING.LGPLv2.1` and a matching `README.txt` exist, and that three random 256×384 YUYV frames piped through `outputArgs()` from `src/capture.js` (the output arguments of every capture) come back byte for byte. It prints `ffmpeg verify (<target>): ffmpeg 9.0.2, LGPL, <input> input, rawvideo only, 3 YUYV frames passed through unchanged`; any failure prints `ffmpeg verify (<target>): <reason>` and exits with 1. `mac-x64` runs under Rosetta on an arm64 Mac.
+
+## Package tests
+
+`test/ffmpeg.test.js` (Vitest `desktop` project) covers `locateFfmpeg`: bundled before PATH, `IRVIS_FFMPEG` before the bundled ffmpeg, PATH when the package has none, and both messages when nothing is found.
+
+`node test/package-smoke.mjs [unpacked app directory] [--ffmpeg-optional]`, run in `apps/desktop` after packaging, checks the resources listed under [Packages](#packages), the bundled ffmpeg version, that only prebuilds of the system are packaged and, on macOS, both Info.plist strings. It then starts the packaged executable through Playwright with a PATH from which every directory holding an ffmpeg is removed: the page shows `irvis`, `app.isPackaged` is true, node-usb loads from `app.asar`, and device listing succeeds (on macOS and Windows that runs the bundled ffmpeg). A second start with `IRVIS_FFMPEG` pointing to a missing file must make capture start fail with `IRVIS_FFMPEG=<path> is not an executable file`. With `--ffmpeg-optional`, a package without ffmpeg passes if capture start fails with the "no ffmpeg" message instead. On Linux it starts Electron with `--no-sandbox`, because an unpacked `chrome-sandbox` is not setuid root. It prints `package smoke: resources, bundled ffmpeg, node-usb and IRVIS_FFMPEG precedence passed` (or, without ffmpeg, `package smoke: resources, node-usb, IRVIS_FFMPEG instructions and precedence passed`).
+
+The [Desktop packages workflow](../guides/development.md#desktop-packages) runs `verify.mjs` and the package smoke test on every system. Neither proves capture from a real camera, camera permission prompts in a package or the udev rule on a real Linux desktop; those remain owner checks on hardware.
+
