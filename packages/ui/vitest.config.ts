@@ -1,4 +1,9 @@
 import { defineProject } from 'vitest/config';
 export default defineProject({
-  test: { name: 'ui', environment: 'jsdom', include: ['test/**/*.test.{ts,tsx}'] },
+  test: {
+    name: 'ui',
+    environment: 'jsdom',
+    include: ['test/**/*.test.{ts,tsx}'],
+    setupFiles: ['test/setup.ts'],
+  },
 });
