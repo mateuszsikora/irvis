@@ -2,7 +2,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { NO_BUNDLED_FFMPEG, bundledFfmpeg, locateFfmpeg } from '../src/ffmpeg.js';
+import {
+  NO_BUNDLED_FFMPEG,
+  bundledFfmpeg,
+  bundledNotExecutable,
+  locateFfmpeg,
+} from '../src/ffmpeg.js';
 
 const name = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
 let scratch;
@@ -61,6 +66,18 @@ describe('desktop ffmpeg', () => {
       NO_BUNDLED_FFMPEG,
     );
   });
+
+  it.skipIf(process.platform === 'win32')(
+    'says when the bundled ffmpeg is present but not executable',
+    () => {
+      const { resources } = setup();
+      const bundled = executable(join(resources, 'ffmpeg'));
+      chmodSync(bundled, 0o644);
+      expect(() => locateFfmpeg({ env: { PATH: '' }, bundled })).toThrow(
+        bundledNotExecutable(bundled),
+      );
+    },
+  );
 
   it('keeps the capture tool message when running from the repository', () => {
     setup();

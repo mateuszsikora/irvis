@@ -163,6 +163,8 @@ async function boot() {
       control?.close();
       control = undefined;
       if (mode.enableCommand) throw error;
+      // Video goes on without control; the reason is only logged.
+      console.warn('Camera control is unavailable: ' + error.message);
     }
     if (generation !== token) return;
     const proc = spawn(executable, ['-y', ...args], { stdio: ['ignore', 'pipe', 'pipe'] });

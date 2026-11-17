@@ -1,11 +1,13 @@
 // Starts a desktop package built by `npm run package:desktop` and checks what
-// the repository build cannot: the resources layout, the bundled ffmpeg found
-// without PATH, node-usb loading from app.asar, and IRVIS_FFMPEG taking
-// precedence. Run from apps/desktop:
+// the repository build cannot: the resources layout, capture start running
+// the bundled ffmpeg found without PATH, node-usb loading the way camera
+// control loads it, and IRVIS_FFMPEG taking precedence. Run from apps/desktop:
 //
 //   node test/package-smoke.mjs [unpacked app directory, e.g. release/mac-arm64]
-//                               [--ffmpeg-optional]
+//                               [--ffmpeg-optional] [--launch <executable>]
 //
+// --launch starts another executable of the same package, such as the
+// AppImage (with APPIMAGE_EXTRACT_AND_RUN=1 when FUSE is missing).
 // With --ffmpeg-optional, a package without ffmpeg (packaged with
 // IRVIS_PACKAGE_WITHOUT_FFMPEG=1 after its ffmpeg build failed) passes if it
 // asks for IRVIS_FFMPEG instead.
@@ -24,12 +26,17 @@ const fallback = {
   linux: 'release/linux-unpacked',
   win32: 'release/win-unpacked',
 }[platform];
-const unpacked = resolve(process.argv.slice(2).find((a) => !a.startsWith('--')) ?? fallback);
-const executable = {
-  darwin: join(unpacked, 'irvis.app/Contents/MacOS/irvis'),
-  linux: join(unpacked, 'irvis'),
-  win32: join(unpacked, 'irvis.exe'),
-}[platform];
+const args = process.argv.slice(2);
+const launchIndex = args.indexOf('--launch');
+const launchFile = launchIndex >= 0 ? args.splice(launchIndex, 2)[1] : undefined;
+const unpacked = resolve(args.find((a) => !a.startsWith('--')) ?? fallback);
+const executable = launchFile
+  ? resolve(launchFile)
+  : {
+      darwin: join(unpacked, 'irvis.app/Contents/MacOS/irvis'),
+      linux: join(unpacked, 'irvis'),
+      win32: join(unpacked, 'irvis.exe'),
+    }[platform];
 const resources =
   platform === 'darwin'
     ? join(unpacked, 'irvis.app/Contents/Resources')
@@ -57,11 +64,10 @@ if (!withoutFfmpeg)
     execFileSync(ffmpeg, ['-hide_banner', '-version'], { encoding: 'utf8' }),
     /^ffmpeg version 9\.0\.2 /,
   );
-const prebuilds = join(resources, 'app.asar.unpacked/node_modules/usb/prebuilds');
-assert.deepEqual(
-  readdirSync(prebuilds).filter((name) => !name.startsWith(platform + '-')),
-  [],
-  'node-usb prebuilds of other systems are packaged',
+const prebuilds = readdirSync(join(resources, 'app.asar.unpacked/node_modules/usb/prebuilds'));
+assert.ok(
+  prebuilds.length === 1 && prebuilds[0].startsWith(platform + '-'),
+  `node-usb prebuilds other than the packaged system's: ${prebuilds.join(', ')}`,
 );
 if (platform === 'darwin') {
   const plist = join(unpacked, 'irvis.app/Contents/Info.plist');
@@ -74,6 +80,8 @@ if (platform === 'darwin') {
     'irvis uses the camera to display and record thermal images.',
   );
   assert.ok(read('NSMicrophoneUsageDescription'));
+  // docs/features/desktop-user.md#install-a-package states this minimum.
+  assert.equal(read('LSMinimumSystemVersion'), '13.0');
 }
 
 // A PATH without any ffmpeg, so that only the bundled one can be found.
@@ -87,8 +95,14 @@ const mode = cameraProfiles[0].videoModes.find((m) => m.layout);
 const selection = {
   profileId: cameraProfiles[0].id,
   modeId: mode.id,
-  device: { darwin: '0', linux: '/dev/video0', win32: 'irvis smoke' }[platform],
+  // No such camera: ffmpeg starts and exits at once, without a camera prompt.
+  device: { darwin: '99', linux: '/dev/video99', win32: 'irvis smoke' }[platform],
 };
+const startError = (options) =>
+  window.irvisDesktop.start(options).then(
+    () => '',
+    (e) => String(e.message),
+  );
 
 async function launch(extra) {
   const app = await electron.launch({
@@ -97,36 +111,53 @@ async function launch(extra) {
     args: platform === 'linux' ? ['--no-sandbox'] : [],
     env: { ...env, ...extra },
   });
+  const stderr = [];
+  app.process().stderr.on('data', (chunk) => stderr.push(String(chunk)));
   const page = await app.firstWindow();
   await page.waitForSelector('h1');
   assert.equal(await page.locator('h1').textContent(), 'irvis');
-  return { app, page };
+  return { app, page, stderr };
 }
 
-let { app, page } = await launch({});
+let { app, page, stderr } = await launch({});
 try {
   assert.equal(await app.evaluate(({ app }) => app.isPackaged), true);
-  assert.equal(
-    await app.evaluate(() => typeof process.mainModule.require('usb').getDeviceList),
-    'function',
-    'node-usb does not load from app.asar',
-  );
   if (withoutFfmpeg)
     assert.ok(
-      (
-        await page.evaluate(
-          (options) =>
-            window.irvisDesktop.start(options).then(
-              () => '',
-              (e) => String(e.message),
-            ),
-          selection,
-        )
-      ).endsWith(NO_BUNDLED_FFMPEG),
+      (await page.evaluate(startError, selection)).endsWith(NO_BUNDLED_FFMPEG),
       'a package without ffmpeg does not ask for IRVIS_FFMPEG',
     );
-  // On macOS and Windows this runs the bundled ffmpeg; Linux reads /dev.
-  else assert.ok(Array.isArray(await page.evaluate(() => window.irvisDesktop.listDevices())));
+  else {
+    // On macOS and Windows this runs the bundled ffmpeg; Linux reads /dev.
+    assert.ok(Array.isArray(await page.evaluate(() => window.irvisDesktop.listDevices())));
+    // Capture start opens camera control (node-usb through the same dynamic
+    // import as in use) and then spawns the bundled ffmpeg, which exits on
+    // the missing camera.
+    const ended = await page.evaluate(
+      (options) =>
+        new Promise((done) => {
+          const stop = window.irvisDesktop.subscribe(
+            () => {},
+            (message) => {
+              stop();
+              done(message);
+            },
+          );
+          window.irvisDesktop.start(options).catch((e) => done('start: ' + e.message));
+        }),
+      selection,
+    );
+    assert.match(ended, /^Capture ended \(\d+\)/, 'capture start did not run the bundled ffmpeg');
+    await page.evaluate(() => window.irvisDesktop.stop());
+    const reasons = [...stderr.join('').matchAll(/Camera control is unavailable: (.*)/g)].map(
+      (m) => m[1],
+    );
+    // Without a camera node-usb loads and finds none; with one, control opens.
+    assert.ok(
+      reasons.every((r) => r === 'Camera control requires exactly one matching USB camera'),
+      `camera control failed: ${reasons.join('; ')}`,
+    );
+  }
 } finally {
   await app.close();
 }
@@ -134,14 +165,7 @@ try {
 const missing = join(dirname(unpacked), 'no-such-ffmpeg');
 ({ app, page } = await launch({ IRVIS_FFMPEG: missing }));
 try {
-  const error = await page.evaluate(
-    (options) =>
-      window.irvisDesktop.start(options).then(
-        () => '',
-        (e) => String(e.message),
-      ),
-    selection,
-  );
+  const error = await page.evaluate(startError, selection);
   assert.match(error, /IRVIS_FFMPEG=.*no-such-ffmpeg is not an executable file/);
 } finally {
   await app.close();
@@ -149,5 +173,5 @@ try {
 console.log(
   withoutFfmpeg
     ? 'package smoke: resources, node-usb, IRVIS_FFMPEG instructions and precedence passed'
-    : 'package smoke: resources, bundled ffmpeg, node-usb and IRVIS_FFMPEG precedence passed',
+    : 'package smoke: resources, bundled ffmpeg capture start, node-usb and IRVIS_FFMPEG precedence passed',
 );

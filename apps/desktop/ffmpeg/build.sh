@@ -16,7 +16,8 @@ set -euo pipefail
 FFMPEG_VERSION=9.0.2
 FFMPEG_SHA256=8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e
 FFMPEG_URL="https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz"
-MACOS_MIN=12.0
+# Electron 45 itself requires macOS 13 (LSMinimumSystemVersion).
+MACOS_MIN=13.0
 
 here="$(cd "$(dirname "$0")" && pwd)"
 dist="$here/dist"

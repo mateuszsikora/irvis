@@ -3,11 +3,19 @@ name: Desktop packages
 
 on:
   pull_request:
+    # Everything a package is built from or checked with, except the web UI
+    # and the shared packages that esbuild bundles.
     paths:
       - apps/desktop/ffmpeg/**
+      - apps/desktop/src/**
       - apps/desktop/electron-builder.config.mjs
       - apps/desktop/package.json
       - apps/desktop/test/package-smoke.mjs
+      - package.json
+      - package-lock.json
+      - tools/capture-cli/60-irvis.rules
+      - tools/capture-cli/iokit-request.c
+      - tools/capture-cli/src/ffmpeg.ts
       - .github/workflows/desktop.yml
   workflow_dispatch:
     inputs:
@@ -108,14 +116,17 @@ jobs:
           - os: mac
             runner: macos-15
             args: --mac --arm64 --x64
+            targets: mac-arm64 mac-x64
             unpacked: release/mac-arm64 release/mac
           - os: linux
             runner: ubuntu-24.04
             args: --linux --x64
+            targets: linux-x64
             unpacked: release/linux-unpacked
           - os: win
             runner: windows-2025
             args: --win --x64
+            targets: win-x64
             unpacked: release/win-unpacked
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
@@ -142,6 +153,7 @@ jobs:
       - name: Install
         run: npm ci
       - name: Package
+        id: package
         shell: bash
         env:
           IRVIS_PACKAGE_WITHOUT_FFMPEG: ${{ inputs.allow-system-ffmpeg == true && '1' || '' }}
@@ -149,6 +161,14 @@ jobs:
           # Artifacts lose the executable bit.
           chmod +x apps/desktop/ffmpeg/dist/*/ffmpeg* 2> /dev/null || true
           npm run package:desktop -- ${{ matrix.args }}
+          # Mark packages without ffmpeg, so that nobody publishes them unawares.
+          for target in ${{ matrix.targets }}; do
+            if ! ls apps/desktop/ffmpeg/dist/"$target"/ffmpeg* > /dev/null 2>&1; then
+              echo "::warning::The $target package has no ffmpeg; its users must set IRVIS_FFMPEG."
+              echo "- **$target: packaged without ffmpeg**; users must set \`IRVIS_FFMPEG\`." >> "$GITHUB_STEP_SUMMARY"
+              echo "suffix=-without-ffmpeg" >> "$GITHUB_OUTPUT"
+            fi
+          done
       - name: Check the udev rule in the deb
         if: matrix.os == 'linux'
         run: dpkg-deb -c apps/desktop/release/*.deb | grep -F ./usr/lib/udev/rules.d/60-irvis.rules
@@ -170,9 +190,15 @@ jobs:
           for dir in ${{ matrix.unpacked }}; do
             ${{ matrix.os == 'linux' && 'xvfb-run -a' || '' }} node test/package-smoke.mjs "$dir" ${{ inputs.allow-system-ffmpeg == true && '--ffmpeg-optional' || '' }}
           done
+          if [ "${{ matrix.os }}" = linux ]; then
+            # The AppImage itself, as docs/features/desktop-user.md#install-a-package
+            # starts it without FUSE.
+            APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a node test/package-smoke.mjs release/linux-unpacked \
+              --launch release/irvis-*-linux-x86_64.AppImage ${{ inputs.allow-system-ffmpeg == true && '--ffmpeg-optional' || '' }}
+          fi
       - uses: actions/upload-artifact@v7
         with:
-          name: irvis-${{ matrix.os }}
+          name: irvis-${{ matrix.os }}${{ steps.package.outputs.suffix }}
           path: |
             apps/desktop/release/*.dmg
             apps/desktop/release/*.exe

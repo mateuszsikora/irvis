@@ -45,7 +45,8 @@ export default {
     '!**/node_modules/usb/{src,libusb,libusb_config,test}/**',
     '!**/node_modules/usb/{binding.gyp,libusb.gypi,CHANGELOG.md}',
     '!**/node_modules/usb/prebuilds/**',
-    '**/node_modules/usb/prebuilds/${platform}-*/**',
+    // darwin-x64+arm64 is one universal directory; elsewhere one per arch.
+    '**/node_modules/usb/prebuilds/${platform}-*${arch}*/**',
   ],
   // node-usb loads its N-API prebuild, which works in Electron as it is.
   npmRebuild: false,
