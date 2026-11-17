@@ -20,6 +20,8 @@ Pull requests are merged with **squash merge only**. With this repository's squa
 
 Either way, every commit message on the branch ends up in `main`'s history, so every commit message must follow the rules below. Nobody pushes directly to `main`, and PRs are merged with "Squash and merge" even if GitHub offers other buttons (see Repository settings).
 
+One kind of PR is exempt from the rules for branches and descriptions, review and CI below: the PR `chore(release): set the version to <version>` that the [Release workflow](docs/guides/development.md#release) opens from `chore/release-<version>` and squash-merges itself. It changes only the version in `apps/desktop/package.json` and `package-lock.json`, and its commit message follows the commit rules.
+
 ## Branches
 
 ```
@@ -89,7 +91,8 @@ Run the checks for every part of the repository the change touches, and read the
 | Desktop app or Electron comparison | `npm run test:desktop` (macOS; ffmpeg on PATH or IRVIS_FFMPEG) | `desktop smoke: build, bridge isolation, module Worker, fetch, localStorage, video and CSP passed`, exit code 0 |
 | Bundled ffmpeg (`apps/desktop/ffmpeg/`) | `npm run ffmpeg:build -- <target>`, then `npm run ffmpeg:verify -- <target>` for each target the host can build (C compiler, make, curl, xz) | `built <path>/ffmpeg` and `ffmpeg verify (<target>): ffmpeg 9.0.2, LGPL, <input> input, rawvideo only, 3 YUYV frames passed through unchanged`, exit code 0 |
 | Desktop packaging (`apps/desktop/electron-builder.config.mjs`, `apps/desktop/src/`, Electron, electron-builder or node-usb versions) | after the ffmpeg build: `npm run package:desktop`, then `node test/package-smoke.mjs` in `apps/desktop`; the "Desktop packages" workflow runs both on every system when such a path changes | electron-builder's `building target=...` line for each target; `package smoke: resources, bundled ffmpeg capture start, node-usb and IRVIS_FFMPEG precedence passed`, exit code 0 |
-| `.github/workflows/promote.yml` | read the step "Fast-forward release" against [Promote to release](docs/guides/development.md#promote-to-release); it runs only by hand on GitHub | the guide describes every check and message of the step |
+| `.github/workflows/promote.yml` | read the step "Fast-forward release" against [Promote to release](docs/guides/development.md#promote-to-release); it runs only by hand on GitHub and from Release | the guide describes every check and message of the step |
+| `.github/workflows/release.yml` | read the steps "Choose the version", "Merge the version pull request" and "Create the draft release" against [Release](docs/guides/development.md#release). The workflow runs only from `main`, so a change to it can be tried only after it is merged: run it with a prerelease version (whose release does not move `release`), then delete the draft. The try leaves the commit that sets the prerelease version on `main`, and a published prerelease also leaves its tag (`git push origin :refs/tags/v<version>`) | the guide describes every check and message of the steps; the run ends with a draft release holding exactly the six packages, the ffmpeg tarball and `build.sh` |
 | `.agents/skills/**` or `.claude/skills/**` | the skill check from `.agents/skills/create-pr/SKILL.md`, step 3 | `ok: N skill(s)` and nothing else |
 | a rule in this file, `AGENTS.md` or a skill | compare the rule in `CONTRIBUTING.md`, `AGENTS.md` and every skill that restates it | all say the same thing |
 
@@ -113,10 +116,13 @@ Edit the file under `.agents/skills/` only. The symlink must be relative (exactl
 
 ## Repository settings
 
-The rules above assume these GitHub settings, which live outside the repository and are changed by the owner: squash merge only (merge commits and rebase merges disabled), squash commit title `COMMIT_OR_PR_TITLE`, squash commit message `COMMIT_MESSAGES`, and delete head branches after merge. Check the current state with:
+The rules above assume these GitHub settings, which live outside the repository and are changed by the owner: squash merge only (merge commits and rebase merges disabled), squash commit title `COMMIT_OR_PR_TITLE`, squash commit message `COMMIT_MESSAGES`, delete head branches after merge, and, for the [Release workflow](docs/guides/development.md#release), "Allow GitHub Actions to create and approve pull requests" (Settings → Actions → General). Check the current state with:
 
 ```sh
 gh api repos/mateuszsikora/irvis --jq '{allow_squash_merge, allow_merge_commit, allow_rebase_merge, delete_branch_on_merge, squash_merge_commit_title, squash_merge_commit_message}'
+gh api repos/mateuszsikora/irvis/actions/permissions/workflow --jq '{can_approve_pull_request_reviews}'
 ```
+
+`can_approve_pull_request_reviews` must be `true`.
 
 If GitHub still allows merge commits or rebase merges, the rule still holds: use "Squash and merge". The `create-pr` skill reports any difference. Branch protection and rulesets are not available on the current plan, so GitHub cannot require the CI checks to pass or enforce the rules in this file; contributors and agents do.

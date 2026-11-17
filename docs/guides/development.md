@@ -1,6 +1,6 @@
 # Development guide
 
-For anyone who works on this repository, person or agent: what to install, which npm scripts exist, how the TypeScript toolchain is set up, what CI runs, and how the web version reaches production. Branch, commit and pull request rules are in [CONTRIBUTING.md](../../CONTRIBUTING.md).
+For anyone who works on this repository, person or agent: what to install, which npm scripts exist, how the TypeScript toolchain is set up, what CI runs, how the web version reaches production, and how a release is made. Branch, commit and pull request rules are in [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 ## Setup
 
@@ -92,7 +92,7 @@ There are no git hooks. The documentation check looks at the whole branch, and a
 
 ## CI
 
-`ci.yml` and `promote.yml` use runners with all three labels `self-hosted`, `Linux`, and `X64`; the registered runner is `hp600g1`. `desktop.yml` uses GitHub-hosted runners ([Desktop packages](#desktop-packages)). Jobs wait in the queue when no matching runner is available. The runner needs git and Bash; CI installs the Node version from `.nvmrc` with `actions/setup-node`. See the [runner decision](../decisions/architecture.md#github-actions-use-the-self-hosted-linux-x64-runner).
+`ci.yml` and `promote.yml` use runners with all three labels `self-hosted`, `Linux`, and `X64`; the registered runner is `hp600g1`. `desktop.yml` uses GitHub-hosted runners ([Desktop packages](#desktop-packages)), and so do the jobs of `release.yml` other than the one it takes from `promote.yml` ([Release](#release)). Jobs wait in the queue when no matching runner is available. The runner needs git and Bash; CI installs the Node version from `.nvmrc` with `actions/setup-node`. See the [runner decision](../decisions/architecture.md#github-actions-use-the-self-hosted-linux-x64-runner).
 
 [.github/workflows/ci.yml](../../.github/workflows/ci.yml) runs on every pull request event (opened, synchronize, reopened) and on every push to `main`. It has read-only access to the repository contents.
 
@@ -108,7 +108,7 @@ No job is a required check: branch protection and rulesets return HTTP 403 on th
 
 ### Desktop packages
 
-[.github/workflows/desktop.yml](../../.github/workflows/desktop.yml), "Desktop packages", builds the bundled ffmpeg and the desktop packages on GitHub-hosted runners (macOS, Windows and Ubuntu; the self-hosted runner is Linux only, [decision](../decisions/architecture.md#desktop-packages-are-built-on-github-hosted-runners)). It has read-only access to the repository contents. It runs on pull requests that change what a package is built from or checked with: `apps/desktop/ffmpeg/`, `apps/desktop/src/`, `apps/desktop/electron-builder.config.mjs`, `apps/desktop/package.json`, `apps/desktop/test/package-smoke.mjs`, the root `package.json` and `package-lock.json` (Electron, electron-builder and node-usb versions), `tools/capture-cli/60-irvis.rules`, `tools/capture-cli/iokit-request.c`, `tools/capture-cli/src/ffmpeg.ts` or the workflow itself. Changes to the web UI and the shared packages bundled into `main.cjs` do not start it; by hand (Actions → "Desktop packages" → "Run workflow", or `gh workflow run desktop.yml --repo mateuszsikora/irvis --ref <branch>`); and as a reusable workflow (`workflow_call`). Both of the last two take the boolean input `allow-system-ffmpeg` (default `false`).
+[.github/workflows/desktop.yml](../../.github/workflows/desktop.yml), "Desktop packages", builds the bundled ffmpeg and the desktop packages on GitHub-hosted runners (macOS, Windows and Ubuntu; the self-hosted runner is Linux only, [decision](../decisions/architecture.md#desktop-packages-are-built-on-github-hosted-runners)). It has read-only access to the repository contents. It runs on pull requests that change what a package is built from or checked with: `apps/desktop/ffmpeg/`, `apps/desktop/src/`, `apps/desktop/electron-builder.config.mjs`, `apps/desktop/package.json`, `apps/desktop/test/package-smoke.mjs`, the root `package.json` and `package-lock.json` (Electron, electron-builder and node-usb versions), `tools/capture-cli/60-irvis.rules`, `tools/capture-cli/iokit-request.c`, `tools/capture-cli/src/ffmpeg.ts` or the workflow itself. Changes to the web UI and the shared packages bundled into `main.cjs` do not start it; by hand (Actions → "Desktop packages" → "Run workflow", or `gh workflow run desktop.yml --repo mateuszsikora/irvis --ref <branch>`); and as a reusable workflow (`workflow_call`), which [Release](#release) uses. Both of the last two take the boolean input `allow-system-ffmpeg` (default `false`); a call also takes `ref`, the commit that every job checks out (default: the caller's commit), which Release sets to the commit that sets the version.
 
 | Job | Runner | Steps | Timeout |
 | --- | --- | --- | --- |
@@ -118,7 +118,7 @@ No job is a required check: branch protection and rulesets return HTTP 403 on th
 
 Artifacts are kept for 14 days. A cache hit skips the ffmpeg build but not its check. With `allow-system-ffmpeg`, a failing `ffmpeg` job does not stop packaging: the package of that target is built with `IRVIS_PACKAGE_WITHOUT_FFMPEG=1`, and the smoke test runs with `--ffmpeg-optional` ([fallback](../features/desktop-user.md#use-your-own-ffmpeg)). Such a target gets a warning annotation, a line in the job summary and the `-without-ffmpeg` artifact suffix. Without it, a failing `ffmpeg` job skips every package. GitHub bills the minutes of these runners to the repository owner while the repository is private, macOS at a multiple of Linux; the path filter keeps the workflow off pull requests that do not touch packaging.
 
-The packages name `https://github.com/mateuszsikora/irvis/releases` as the place of the ffmpeg source (in `resources/ffmpeg/README.txt` and `NOTICE`), but no release exists yet (#24) and the repository is private, so that address does not reach anyone outside it. Until releases publish the source next to the packages, do not give packages from these artifacts to anyone outside the repository. The cache key depends only on `build.sh`, so a new compiler in a runner image does not rebuild a cached ffmpeg; `verify.mjs` still checks it on every run.
+The packages name `https://github.com/mateuszsikora/irvis/releases` as the place of the ffmpeg source (in `resources/ffmpeg/README.txt` and `NOTICE`). [Release](#release) publishes the tarball and `build.sh` there next to the packages, but the repository is private, so that address does not reach anyone outside it. Until the repository is public (#26), do not give packages, from these artifacts or from a GitHub Release, to anyone outside the repository. The cache key depends only on `build.sh`, so a new compiler in a runner image does not rebuild a cached ffmpeg; `verify.mjs` still checks it on every run.
 
 ## Netlify
 
@@ -126,16 +126,16 @@ Netlify builds `apps/web` from the private repository: a deploy preview for ever
 
 ## Promote to release
 
-[.github/workflows/promote.yml](../../.github/workflows/promote.yml), "Promote to release", moves `release` to a commit on `main`, which makes Netlify publish it to production. It runs only by hand: Actions → "Promote to release" → "Run workflow", or
+[.github/workflows/promote.yml](../../.github/workflows/promote.yml), "Promote to release", moves `release` to a commit on `main`, which makes Netlify publish it to production. [Release](#release) calls it (`workflow_call`, input `sha`) with the commit of a published release's tag; otherwise it runs only by hand: Actions → "Promote to release" → "Run workflow", or
 
 ```sh
 gh workflow run promote.yml --repo mateuszsikora/irvis            # the tip of main
 gh workflow run promote.yml --repo mateuszsikora/irvis -f sha=<sha>
 ```
 
-The job "Promote to release" (5 minutes) is the only one with `contents: write`; the workflow default is `contents: read`. Runs queue one after another (`concurrency: promote-to-release`). Its step "Fast-forward release":
+The job "Promote to release" (5 minutes) is the only one with `contents: write`; the workflow default is `contents: read`. Its runs, by hand or from Release, share the concurrency group `promote-to-release` without cancelling the running one: at most one waits, and a newer run cancels the waiting one. The group is set on the job, so that it also holds in a called workflow. Its step "Fast-forward release":
 
-1. fails with `run this workflow from main, not from <ref>` when it was started from another branch (`gh workflow run --ref` or the branch menu in "Run workflow");
+1. fails with `run this workflow from main, not from <ref>` unless it was started by hand from `main` or called by Release for a published release of a tag `v*` (whose commit steps 3 and 4 still check); a run by hand from another branch (`gh workflow run --ref` or the branch menu in "Run workflow") stops here;
 2. fails with `the sha input must be 7 to 40 lowercase hexadecimal digits` unless `sha` is empty or such a string;
 3. `git fetch origin main`, then resolves `sha` (empty means `origin/main`), and fails with `<sha> is not a commit in this repository` if it cannot;
 4. fails with `<sha> is not on main; only commits on main are published` unless `git merge-base --is-ancestor <sha> origin/main` holds;
@@ -144,6 +144,53 @@ The job "Promote to release" (5 minutes) is the only one with `contents: write`;
 These checks bind the workflow, not the people who can write to the repository. `release` is not protected (branch protection and rulesets return HTTP 403 on this plan, see [CI](#ci)), so anyone with write access can still `git push origin <commit>:release` and Netlify publishes it. A run started from another branch uses that branch's copy of `promote.yml`, with `contents: write`, and a changed copy can drop every check above. That only commits on `main` reach production is therefore a rule for contributors, like the other rules in [CONTRIBUTING.md](../../CONTRIBUTING.md#repository-settings), until the plan allows protecting `release`: then restrict pushes to it to the workflow.
 
 To roll production back, publish an older deploy in the Netlify UI ("Publish deploy"); the next promotion moves forward from `release` as before. A push made with the workflow's `GITHUB_TOKEN` starts no other workflow; Netlify learns about it through its GitHub App, whose webhooks such pushes still trigger. TODO(owner): confirm on the first promotion that Netlify starts a production deploy, and that it honours the `ignore` command in `[context.production]` of `netlify.toml` (a production build of another branch shows as "Canceled").
+
+## Release
+
+[.github/workflows/release.yml](../../.github/workflows/release.yml), "Release", makes a release in two steps ([decision](../decisions/architecture.md#a-release-is-a-draft-github-release-built-from-a-version-commit-on-main)):
+
+1. **Run it** from `main`: Actions → "Release" → "Run workflow", optionally with a version, or `gh workflow run release.yml --repo mateuszsikora/irvis [-f version=0.2.0]`. It merges a pull request that sets the version, builds the desktop packages from that commit and leaves a draft GitHub Release with the packages and the ffmpeg source. The run's summary links the draft.
+2. **Publish the draft**: Releases → the draft → edit → "Publish release". Publishing creates the tag `v<version>` on the version commit and, unless it is a prerelease, moves `release` for Netlify.
+
+To discard a release before it is published, delete the draft. `main` keeps the version; run the workflow again with the same version to rebuild the draft without another pull request. A run with an empty version always takes the next patch version, so a second such run (or a rerun of one that merged its pull request) makes a new version, not a new draft of the same one.
+
+The workflow needs the repository setting "Allow GitHub Actions to create and approve pull requests" (Settings → Actions → General → Workflow permissions), which is off by default; without it, opening the pull request fails. Check it with `gh api repos/mateuszsikora/irvis/actions/permissions/workflow`: `can_approve_pull_request_reviews` must be `true` ([Repository settings](../../CONTRIBUTING.md#repository-settings)).
+
+The workflow default is `contents: read`. Runs of the same event share the concurrency group `release-<event>` without cancelling the running one: at most one run waits, and a newer run cancels the waiting one.
+
+| Job | Runs on | Runner | Steps | Timeout |
+| --- | --- | --- | --- | --- |
+| `version`, shown as "Set the version", with `contents: write` and `pull-requests: write` | a run by hand | `ubuntu-24.04` | `actions/checkout` of `refs/heads/main`, the tip of `main` when the job starts, not the commit the run was started on, so that a waiting run or a rerun sees the version an earlier run merged; the steps "Choose the version" and "Merge the version pull request", below | 10 minutes |
+| `packages`, shown as "Packages", after `version` | a run by hand | as in [Desktop packages](#desktop-packages) | calls `desktop.yml` with `allow-system-ffmpeg: false` (a failing ffmpeg build skips every package, and so the draft) and `ref` set to the version commit | as there |
+| `draft`, shown as "Draft release", after both, with `contents: write` | a run by hand | `ubuntu-24.04` | downloads the artifacts `irvis-mac`, `irvis-win`, `irvis-linux` and `ffmpeg-source` by name (a package without ffmpeg is named `-without-ffmpeg` and is never picked up); then the step "Create the draft release", below | 15 minutes |
+| `promote`, shown as "Promote to release", with `contents: write` | a published release of a tag `v*` that is not a prerelease | the self-hosted runner | calls `promote.yml` with `sha` set to the tag's commit ([Promote to release](#promote-to-release)) | 5 minutes |
+
+The step "Choose the version":
+
+1. fails with `run this workflow from main, not from <ref>` when it was started from another branch;
+2. takes the input without a leading `v`; an empty input means the next patch version of `apps/desktop/package.json` (`0.1.0` → `0.1.1`; `0.2.0-rc.1` → `0.2.0`, as `npm version patch` does);
+3. fails with `<version> is not a version: use <major>.<minor>.<patch>, optionally with -<prerelease>` unless it is a [semantic version](https://semver.org/spec/v2.0.0.html) without build metadata (numbers without leading zeros, as in `1.2.3` or `1.2.3-rc.1`, not `01.2.3` or `1.2.3-01`; no empty prerelease identifiers, as in `1.2.3-a..b`) and `chore/release-<version>` is a valid branch name (`git check-ref-format`);
+4. fails with `<version> is lower than the current version <current>` when it is lower by semantic version precedence: `0.2.0-rc.1` is lower than `0.2.0` and than `0.2.0-rc.2`, and `0.2.0-rc.10` is higher than `0.2.0-rc.9`; the current version itself passes;
+5. fails with `the tag v<version> already exists: choose another version` when the tag is on GitHub, that is, when that version was published, and with `could not list the tags of origin (git ls-remote exited with <code>)` when `git ls-remote` fails for another reason than a missing tag;
+6. treats a version with `-` as a prerelease.
+
+The step "Merge the version pull request":
+
+1. does nothing when `apps/desktop/package.json` already holds the version (the draft is then built from the checked-out tip of `main`);
+2. fails with `the branch chore/release-<version> is left from an earlier run: close its pull request if it has one, delete the branch and run again` when that branch exists;
+3. sets `version` in `apps/desktop/package.json` and the `apps/desktop` entry of `package-lock.json`, commits them as `github-actions[bot]` with the message `chore(release): set the version to <version>`, pushes `chore/release-<version>` and opens a pull request with the same title. If opening it fails, it deletes the pushed branch again and fails with `could not open the pull request; is "Allow GitHub Actions to create and approve pull requests" on?`;
+4. squash-merges it, retrying up to five times five seconds apart while GitHub computes whether it can be merged, then fails with `could not merge <url>`; GitHub deletes the branch after the merge;
+5. hands the merge commit to the later jobs.
+
+The pull request is opened and merged with the workflow's `GITHUB_TOKEN`, so no CI runs on it, and the push to `main` starts no workflow either. It changes nothing but the two versions, and it is exempt from the pull request rules ([CONTRIBUTING.md](../../CONTRIBUTING.md#what-reaches-main)). [Documentation integrity](#ci) and the TypeScript job run on `main` again with the next merged pull request. If a token that starts CI (a personal access token or a GitHub App) ever replaces `GITHUB_TOKEN`, the documentation contract would fail on this pull request: the version-bump filter accepts only the dependency fields of a `package.json` ([documentation contract](../features/docs-contract-technical.md#version-bump-filter)), so `version` in `apps/desktop/package.json` needs a desktop document under rule F7. The merge does not wait for checks either way.
+
+The step "Create the draft release":
+
+1. fails with `the packages hold <n> files matching <pattern> instead of one` unless the downloaded files include exactly one of each: `irvis-<version>-mac-arm64.dmg`, `irvis-<version>-mac-x64.dmg`, `irvis-<version>-win-x64.exe`, `irvis-<version>-win-x64.zip`, `irvis-<version>-linux-x86_64.AppImage`, `irvis-<version>-linux-amd64.deb`, `ffmpeg-*.tar.xz` and `build.sh`. Only these eight files are released; anything else in the artifacts is left out;
+2. deletes every draft release of the tag `v<version>`, which an earlier run of the same version leaves behind;
+3. `gh release create v<version> <the eight files> --draft --target <version commit> --title "irvis <version>" --generate-notes`, with `--prerelease` for a prerelease, and with a first paragraph that the packages are unsigned, links to [Install a package](../features/desktop-user.md#install-a-package) at the tag, and says that the ffmpeg source tarball and `build.sh` are attached. GitHub writes the rest of the notes from the pull requests merged since the previous release. The draft has no tag until it is published. The run's summary gives its URL and says whether publishing it moves `release`.
+
+Publishing starts the workflow again with the `release` event, from the tagged commit's copy of the file. A prerelease (marked as such on the draft, which the workflow does for a version with `-`; the box can also be changed before publishing) does not move `release`. If "Promote to release" fails, for example because `release` already holds a newer commit of `main` and the fast-forward is rejected, the GitHub Release stays published and production stays where it was; promote by hand if needed.
 
 ## Agent skills
 

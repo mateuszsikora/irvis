@@ -1,5 +1,7 @@
 # Moves the release branch, which Netlify publishes to production, to a commit
-# on main. Why and how: docs/guides/development.md#promote-to-release
+# on main. Runs by hand, and from the Release workflow when a release is
+# published.
+# Why and how: docs/guides/development.md#promote-to-release
 name: Promote to release
 
 on:
@@ -9,13 +11,14 @@ on:
         description: Commit on main to publish (empty for the tip of main)
         required: false
         default: ''
+  workflow_call:
+    inputs:
+      sha:
+        type: string
+        required: true
 
 permissions:
   contents: read
-
-concurrency:
-  group: promote-to-release
-  cancel-in-progress: false
 
 jobs:
   promote:
@@ -24,6 +27,10 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: write
+    # On the job, so that runs by hand and from Release share one queue.
+    concurrency:
+      group: promote-to-release
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v7
         with:
@@ -36,10 +43,15 @@ jobs:
           set -eu
           # Catches a run started from another branch by mistake. It is not a
           # security boundary: that branch's copy of this file can drop it.
-          if [ "$GITHUB_REF" != refs/heads/main ]; then
-            echo "::error::run this workflow from main, not from $GITHUB_REF"
-            exit 1
-          fi
+          # Release calls this workflow when a release of a tag v* is published;
+          # the checks below still require its commit to be on main.
+          case "$GITHUB_EVENT_NAME:$GITHUB_REF" in
+            workflow_dispatch:refs/heads/main | release:refs/tags/v*) ;;
+            *)
+              echo "::error::run this workflow from main, not from $GITHUB_REF"
+              exit 1
+              ;;
+          esac
           if [ -n "$SHA" ] && ! printf '%s' "$SHA" | grep -Eqx '[0-9a-f]{7,40}'; then
             echo "::error::the sha input must be 7 to 40 lowercase hexadecimal digits"
             exit 1

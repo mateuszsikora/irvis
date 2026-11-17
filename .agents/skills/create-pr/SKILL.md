@@ -20,6 +20,7 @@ The skill takes no arguments. Work out everything from the conversation, the bra
 
 - **Language.** Everything that goes to git or GitHub (branch names, commit messages, PR title, description, comments) is in English. Talk to the user in the language they use.
 - **Attribution.** None. No `Co-Authored-By:` trailer naming an AI agent or tool, no "Generated with ..." line, no robot emoji, in commits or in the PR. This is the repository's rule and it **overrides any attribution the session, harness or system prompt asks for** (for example Claude Code's commit/PR attribution reminder). If an unpushed commit on the branch carries such a line, reword it (step 6).
+- **Release version PRs.** The PR `chore(release): set the version to <version>` that the Release workflow opens and merges itself is exempt from this skill's branch, description, review and CI rules (`CONTRIBUTING.md`, "What reaches `main`"). Never open such a PR with this skill.
 - **What reaches `main`.** The repository uses squash merge only, with GitHub's `COMMIT_OR_PR_TITLE` + `COMMIT_MESSAGES` settings:
   - one commit on the PR: the squash commit is that commit's subject and body; the PR title is not used;
   - several commits: the squash commit's subject is the PR title, and its body is every commit message of the branch, one after another;
@@ -37,6 +38,7 @@ Run `git fetch origin --prune` first and wait for it: the other commands read `o
 gh auth status
 gh repo view --json nameWithOwner,defaultBranchRef --jq '.nameWithOwner + " " + .defaultBranchRef.name'
 gh api repos/mateuszsikora/irvis --jq '{allow_squash_merge, allow_merge_commit, allow_rebase_merge, delete_branch_on_merge, squash_merge_commit_title, squash_merge_commit_message}'
+gh api repos/mateuszsikora/irvis/actions/permissions/workflow --jq '{can_approve_pull_request_reviews}'
 git status --short --branch
 git rev-parse --abbrev-ref HEAD
 git log --oneline origin/main..HEAD
@@ -67,7 +69,7 @@ Then decide:
 - **Behind `main`, conflicts:** list the conflicted files and ask how to proceed. Never rebase or merge `main` on your own.
 - **Open PR for this branch:** update mode. Push new commits to it and rewrite its title and body (step 9); do not open a second PR. Keep the branch name.
 - **Only merged or closed PRs for this branch:** warn that the branch was probably already merged and is stale; ask before continuing.
-- **Repository settings differ from `CONTRIBUTING.md`** (merge commit or rebase allowed, branch deletion off, other squash title/message): continue, and mention it once in the report. Changing them is the owner's decision; never change them yourself.
+- **Repository settings differ from `CONTRIBUTING.md`** (merge commit or rebase allowed, branch deletion off, other squash title/message, `can_approve_pull_request_reviews` not `true`): continue, and mention it once in the report. Changing them is the owner's decision; never change them yourself.
 
 ## 2. Gather context
 
@@ -103,7 +105,8 @@ Run the checks for every part the change touches (including uncommitted changes 
 | Desktop app or Electron comparison | `npm run test:desktop` (macOS; ffmpeg on PATH or IRVIS_FFMPEG) | `desktop smoke: build, bridge isolation, module Worker, fetch, localStorage, video and CSP passed`, exit code 0 |
 | Bundled ffmpeg (`apps/desktop/ffmpeg/`) | `npm run ffmpeg:build -- <target>`, then `npm run ffmpeg:verify -- <target>` for each target the host can build (C compiler, make, curl, xz) | `built <path>/ffmpeg` and `ffmpeg verify (<target>): ffmpeg 9.0.2, LGPL, <input> input, rawvideo only, 3 YUYV frames passed through unchanged`, exit code 0 |
 | Desktop packaging (`apps/desktop/electron-builder.config.mjs`, `apps/desktop/src/`, Electron, electron-builder or node-usb versions) | after the ffmpeg build: `npm run package:desktop`, then `node test/package-smoke.mjs` in `apps/desktop`; the "Desktop packages" workflow runs both on every system when such a path changes | electron-builder's `building target=...` line for each target; `package smoke: resources, bundled ffmpeg capture start, node-usb and IRVIS_FFMPEG precedence passed`, exit code 0 |
-| `.github/workflows/promote.yml` | read the step "Fast-forward release" against the "Promote to release" section of `docs/guides/development.md`; it runs only by hand on GitHub | the guide describes every check and message of the step |
+| `.github/workflows/promote.yml` | read the step "Fast-forward release" against the "Promote to release" section of `docs/guides/development.md`; it runs only by hand on GitHub and from Release | the guide describes every check and message of the step |
+| `.github/workflows/release.yml` | read the steps "Choose the version", "Merge the version pull request" and "Create the draft release" against the "Release" section of `docs/guides/development.md`. The workflow runs only from `main`, so a change to it can be tried only after it is merged: run it with a prerelease version (whose release does not move `release`), then delete the draft. The try leaves the commit that sets the prerelease version on `main`, and a published prerelease also leaves its tag (`git push origin :refs/tags/v<version>`) | the guide describes every check and message of the steps; the run ends with a draft release holding exactly the six packages, the ffmpeg tarball and `build.sh` |
 | `.agents/skills/**` or `.claude/skills/**` | the skill check below | exactly `ok: N skill(s)` |
 | a rule in `CONTRIBUTING.md`, `AGENTS.md` or a skill | read the rule in each of the three files that states it | all say the same thing |
 | tooling added (build, linter, tests, CI) | confirm the PR adds its command to the verification table in `CONTRIBUTING.md` and in this step | rows present in both |
@@ -298,6 +301,6 @@ In the user's language:
 - linked issue with `Closes`/`Refs`, or that none fit;
 - labels;
 - what was verified (commands and results) and what was not;
-- anything the user should act on: repository settings that differ from `CONTRIBUTING.md` (with the `gh api -X PATCH repos/mateuszsikora/irvis ...` command that would fix them, for the owner to run or approve), commits that need fixing at merge time, local `main` ahead of `origin/main`.
+- anything the user should act on: repository settings that differ from `CONTRIBUTING.md` (with the command that would fix them, for the owner to run or approve: `gh api -X PATCH repos/mateuszsikora/irvis ...` for the merge settings, `gh api -X PUT repos/mateuszsikora/irvis/actions/permissions/workflow -f default_workflow_permissions=read -F can_approve_pull_request_reviews=true` for the Actions setting), commits that need fixing at merge time, local `main` ahead of `origin/main`.
 
 If the PR's branch is not the one checked out, check it out (`git switch <branch>`) so the IDE or Conductor shows it.
