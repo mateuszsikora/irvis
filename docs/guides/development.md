@@ -52,9 +52,13 @@ The root scripts are listed under [npm scripts](#npm-scripts).
 
 Every development tool is a `devDependency` of the root `package.json`; a workspace lists only what its own code imports.
 
+The root `package.json` has one `overrides` entry, `"minimatch@>=7.0.0 <11.0.1": "^11.0.1"`. It lifts every minimatch in the vulnerable range of [CVE-2026-118764](https://github.com/advisories/GHSA-g3hv-75wg-m249) to 11. Without it, electron-builder 26.18.0 would keep 10.x in `app-builder-lib` (which asks for `^10.2.5`) and 9.x in the `@electron/universal@2.0.3` that `app-builder-lib` pins (which asks for `^9.0.3`). Forcing a major outside those ranges is safe here because of what the two packages use: `app-builder-lib` builds `Minimatch` objects and reads `set`, `negate` and `match()`, and `@electron/universal` calls `minimatch(…, { matchBase: true })`; both work the same in 11. The key is a version range, not a parent package: an override nested under a parent, such as `"app-builder-lib": { "minimatch": … }`, applies to that package's whole subtree, so it would also lift the minimatch 3 that `dir-compare` needs. minimatch 3 and 5 are outside the range and stay as they are.
+
+After you change `overrides`, delete the affected `node_modules/.../minimatch` entries from `package-lock.json` before `npm install`, because npm does not re-resolve existing lockfile entries to match a new override. Remove the minimatch entry once `app-builder-lib` and the `@electron/universal` it pins both depend on minimatch 11.0.1 or later: remove it, refresh the lockfile as above and check that `npm ls minimatch --all` shows nothing below 11.0.1 apart from 3.x and 5.x.
+
 ## TypeScript
 
-TypeScript 6.0 (`~6.0.3`), not 7: typescript-eslint 8.72 supports TypeScript below 6.1 only ([decision](../decisions/architecture.md#typescript-stays-on-60-until-typescript-eslint-supports-7)).
+TypeScript 6.0 (`~6.0.3`), not 7: typescript-eslint 8.73 supports TypeScript below 6.1 only ([decision](../decisions/architecture.md#typescript-stays-on-60-until-typescript-eslint-supports-7)).
 
 `tsconfig.base.json` holds the options every project shares: `target` ES2022, `module` esnext with `moduleResolution` bundler, `allowImportingTsExtensions` (relative imports end in `.ts` or `.tsx`), `verbatimModuleSyntax`, `erasableSyntaxOnly`, `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `noImplicitReturns`, `noFallthroughCasesInSwitch`, `noPropertyAccessFromIndexSignature`, `skipLibCheck: false`, `incremental`. Each project sets its own `lib` and `types`.
 
