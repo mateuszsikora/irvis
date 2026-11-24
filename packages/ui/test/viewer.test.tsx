@@ -45,37 +45,8 @@ function backend(): CameraBackend {
   };
 }
 describe('Viewer', () => {
-  it('refreshes connected cameras while preserving or replacing the selection', async () => {
-    const source = backend();
-    let devices: { id: string; label: string }[] = [];
-    source.listDevices = vi.fn(() => Promise.resolve(devices));
-    render(<Viewer profile={profile} backend={source} />);
-    fireEvent.click(screen.getByText('Camera setup'));
-    const refresh = screen.getByRole('button', { name: 'Refresh cameras' });
-    const camera = screen.getByLabelText<HTMLSelectElement>('Camera');
-    await waitFor(() => expect((refresh as HTMLButtonElement).disabled).toBe(false));
-    expect(camera.value).toBe('');
-    devices = [
-      { id: 'cam', label: 'Thermal camera' },
-      { id: 'second', label: 'Other camera' },
-    ];
-    fireEvent.click(refresh);
-    await waitFor(() => expect(camera.value).toBe('cam'));
-    fireEvent.change(camera, { target: { value: 'second' } });
-    devices = [...devices, { id: 'new', label: 'New camera' }];
-    fireEvent.click(refresh);
-    await screen.findByText('New camera', { selector: 'option' });
-    expect(camera.value).toBe('second');
-    devices = [{ id: 'new', label: 'New camera' }];
-    fireEvent.click(refresh);
-    await waitFor(() => expect(camera.value).toBe('new'));
-    devices = [];
-    fireEvent.click(refresh);
-    await waitFor(() => expect(camera.value).toBe(''));
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Start' }).disabled).toBe(true);
-  });
   it('offers six palettes and rejects reversed manual bounds', () => {
-    render(<Viewer profile={profile} backend={backend()} />);
+    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={backend()} />);
     expect(screen.getByRole('group', { name: 'Palette' }).querySelectorAll('button')).toHaveLength(
       6,
     );
@@ -88,7 +59,7 @@ describe('Viewer', () => {
   });
   it('declares camera state without sending a command and locks orientation', () => {
     const source = backend();
-    render(<Viewer profile={profile} backend={source} />);
+    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={source} />);
     expect(screen.getByText('camera mode unknown, readings assume high gain')).toBeTruthy();
     fireEvent.click(screen.getByText('Confirm camera mode and factory settings'));
     expect(screen.getByText('Camera mode declared by user.')).toBeTruthy();
@@ -137,7 +108,14 @@ describe('Viewer', () => {
   }
   it('clears camera command confirmation on Stop and Start', async () => {
     const command = vi.fn(async () => {});
-    render(<Viewer profile={profile} backend={controlledBackend(command)} />);
+    render(
+      <Viewer
+        device="cam"
+        modeId="yuyv-256x384"
+        profile={profile}
+        backend={controlledBackend(command)}
+      />,
+    );
     await startCamera();
     fireEvent.click(screen.getByRole('button', { name: 'High gain' }));
     await waitFor(() => expect(commandStatus().textContent).toBe('Camera command confirmed.'));
@@ -164,7 +142,14 @@ describe('Viewer', () => {
             finishNew = resolve;
           }),
       );
-    render(<Viewer profile={profile} backend={controlledBackend(command)} />);
+    render(
+      <Viewer
+        device="cam"
+        modeId="yuyv-256x384"
+        profile={profile}
+        backend={controlledBackend(command)}
+      />,
+    );
     await startCamera();
     fireEvent.click(screen.getByRole('button', { name: 'High gain' }));
     fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
@@ -194,7 +179,9 @@ describe('Viewer', () => {
       new Promise((r) => {
         resolve = r;
       });
-    const view = render(<Viewer profile={profile} backend={source} />);
+    const view = render(
+      <Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={source} />,
+    );
     await waitFor(() => expect(screen.getByText<HTMLButtonElement>('Start').disabled).toBe(false));
     fireEvent.click(screen.getByText('Start'));
     view.unmount();
@@ -220,7 +207,7 @@ describe('Viewer', () => {
         },
         close: () => Promise.resolve(),
       });
-    render(<Viewer profile={profile} backend={source} />);
+    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={source} />);
     await act(async () => {
       await Promise.resolve();
     });
@@ -264,7 +251,7 @@ describe('Viewer', () => {
 
 describe('measurement controls', () => {
   it('keeps three of each object, edits and deletes objects, and preserves tracking on clear', () => {
-    render(<Viewer profile={profile} backend={backend()} />);
+    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={backend()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Track min' }));
     for (const kind of ['point', 'line', 'area'])
       for (let i = 0; i < 3; i++) fireEvent.click(screen.getByText(`Add ${kind}`));
@@ -281,7 +268,7 @@ describe('measurement controls', () => {
     expect(screen.getByText('Track min').getAttribute('aria-pressed')).toBe('true');
   });
   it('converts committed thresholds between units and validates correction edits', () => {
-    render(<Viewer profile={profile} backend={backend()} />);
+    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={backend()} />);
     fireEvent.change(screen.getByLabelText('High threshold (°C)'), { target: { value: '-10.5' } });
     fireEvent.click(screen.getByText('Apply threshold'));
     fireEvent.change(screen.getByLabelText('Temperature unit'), { target: { value: 'F' } });
@@ -331,7 +318,7 @@ describe('measurement controls', () => {
         },
         close: async () => {},
       } as unknown as CameraSession);
-    render(<Viewer profile={profile} backend={source} />);
+    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={source} />);
     await waitFor(() => expect(screen.getByText<HTMLButtonElement>('Start').disabled).toBe(false));
     fireEvent.click(screen.getByText('Start'));
     await waitFor(() => expect(screen.getByText<HTMLButtonElement>('Stop').disabled).toBe(false));
@@ -363,7 +350,7 @@ describe('measurement controls', () => {
         path: 'exact',
       },
     );
-    render(<Viewer profile={profile} backend={backend()} />);
+    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={backend()} />);
     fireEvent.click(screen.getByText('Add point'));
     fireEvent.change(screen.getByLabelText('Open thermal photo'), {
       target: { files: [{ name: 'scene.png', arrayBuffer: () => Promise.resolve(bytes.buffer) }] },

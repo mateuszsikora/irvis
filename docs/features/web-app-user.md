@@ -22,7 +22,7 @@ The web version needs a desktop browser that hands camera frames to the page as 
 
 - **Chrome and Edge 111** is the build target: `apps/web/vite.config.ts` does not set `build.target`, so Vite 8 uses its default, `'baseline-widely-available'` (`chrome111`, `edge111`, `firefox114`, `safari16.4`), and an older browser may fail to run the page. A Vite upgrade can raise these versions. Live capture itself needs `MediaStreamTrackProcessor` (Chrome and Edge 94).
 - **Safari 18** is the first Safari with `MediaStreamTrackProcessor`. Safari offers it only inside a Worker, so the page moves the camera track into a Worker and reads frames there.
-- **Firefox** has no `MediaStreamTrackProcessor`, so Live camera cannot read the camera and shows `use Chrome, Edge or Safari`.
+- **Firefox** has no `MediaStreamTrackProcessor`, so a camera selected in Source cannot be read and shows `use Chrome, Edge or Safari`.
 - **Mobile browsers** are out of scope and not tested.
 
 Some features need more than the minimum:
@@ -44,9 +44,9 @@ Vite prints the local address (by default `http://localhost:5173/`) and reloads 
 
 ## What the page shows
 
-- The heading `irvis`, Thermal studio, and source/profile controls.
+- The heading `irvis`, Thermal studio, and the Source and Video mode controls with a refresh button for the camera list.
 - While no camera profile is registered: `No camera is supported yet.`
-- Registered cameras appear in Camera profile.
+- Registered cameras appear in Camera profile, next to Start.
 
 ## Inspect browser capture
 
@@ -61,7 +61,7 @@ The **Browser diagnostics — M3** panel inspects camera frames and exports evid
 
 ## View thermal images
 
-The home page now offers Demo or Live camera, camera profile selection and the shared [thermal viewer](ui-user.md). Demo needs no camera. Changing Source or Camera profile clears the previous capture error; late errors from the old selection do not appear in the new view. Expand Capture diagnostics to use the existing diagnostic tools after stopping the viewer.
+The home page offers Demo or a connected camera as the Source, camera profile and video mode selection, and the shared [thermal viewer](ui-user.md). Demo needs no camera. Changing Source, Camera profile or Video mode clears the previous capture error; late errors from the old selection do not appear in the new view. Expand Capture diagnostics to use the existing diagnostic tools after stopping the viewer.
 
 ## Recognize the app
 

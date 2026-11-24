@@ -1,8 +1,22 @@
-import type { CameraBackend, RawFrame } from '@irvis/core';
+import type { CameraBackend, CameraDevice, RawFrame } from '@irvis/core';
 import { startDiagnostics } from '@irvis/backend-browser';
 import { type DesktopBridge, desktopBridge } from '@irvis/backend-electron';
 
 const owners = new WeakMap<DesktopBridge, symbol>();
+
+/** The cameras that a live backend can open: ffmpeg's list in the desktop app, the browser's otherwise. */
+export async function listLiveCameras(): Promise<readonly CameraDevice[]> {
+  const bridge = desktopBridge();
+  if (bridge) return bridge.listDevices ? bridge.listDevices() : [{ id: '0', label: 'Camera 0' }];
+  if (!navigator.mediaDevices) throw new Error('Camera access requires HTTPS or localhost.');
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  return [
+    { id: 'default', label: 'Default camera' },
+    ...devices
+      .filter((d) => d.kind === 'videoinput' && d.deviceId)
+      .map((d) => ({ id: d.deviceId, label: d.label })),
+  ];
+}
 
 /** Adapt the existing capture paths without adding privileged APIs to the UI. */
 export function liveBackend(onError: (message: string) => void): CameraBackend {
@@ -14,18 +28,7 @@ export function liveBackend(onError: (message: string) => void): CameraBackend {
       deviceControl: !!bridge?.command,
       concurrentWith: bridge?.concurrentWith ?? [],
     },
-    async listDevices() {
-      if (bridge)
-        return bridge.listDevices ? bridge.listDevices() : [{ id: '0', label: 'Camera 0' }];
-      if (!navigator.mediaDevices) throw new Error('Camera access requires HTTPS or localhost.');
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      return [
-        { id: 'default', label: 'Default camera' },
-        ...devices
-          .filter((d) => d.kind === 'videoinput' && d.deviceId)
-          .map((d) => ({ id: d.deviceId, label: d.label })),
-      ];
-    },
+    listDevices: listLiveCameras,
     async open({ deviceId, profile, modeId }) {
       const mode = profile.videoModes.find((m) => m.id === modeId);
       if (!mode?.layout) throw new Error('This mode has no thermal data.');

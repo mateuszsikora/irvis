@@ -7,6 +7,7 @@ const paths = {
   photo: 'M3 7h5l2-3h4l2 3h5v13H3ZM16 13a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
   video: 'M3 6h12v12H3Zm12 4 6-3v10l-6-3',
   gallery: 'M7 3h14v14H7ZM3 7v14h14M10 13l3-3 5 5',
+  refresh: 'M20 11a8 8 0 0 0-14.9-3M4 4v4h4M4 13a8 8 0 0 0 14.9 3M20 20v-4h-4',
 } as const;
 export function Icon({ name }: { name: keyof typeof paths }) {
   return (

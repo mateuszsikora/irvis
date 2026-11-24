@@ -70,7 +70,15 @@ async function setup() {
       return Promise.resolve();
     }),
   };
-  render(<Viewer backend={backend} profile={profile} photoLibrary={library} />);
+  render(
+    <Viewer
+      device="test"
+      modeId="yuyv-256x384"
+      backend={backend}
+      profile={profile}
+      photoLibrary={library}
+    />,
+  );
   await waitFor(() => expect(screen.getByText<HTMLButtonElement>('Start').disabled).toBe(false));
   await act(async () => {
     fireEvent.click(screen.getByText('Start'));
