@@ -138,19 +138,22 @@ describe('App', () => {
   });
 
   it('falls back to the profile modes when the camera modes cannot be read', async () => {
+    const listModes = vi.fn(() => Promise.reject(new Error('Reading the camera modes timed out')));
     window.irvisDesktop = {
       start: () => Promise.resolve(),
       stop: () => Promise.resolve(),
       subscribe: () => () => {},
       listDevices: () => Promise.resolve([{ id: '0', label: 'USB Camera' }]),
-      listModes: () => Promise.reject(new Error('Reading the camera modes timed out')),
+      listModes,
     };
     render(<App />);
     await screen.findByText('USB Camera', { selector: 'option' });
     fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'camera:0' } });
-    await waitFor(() =>
-      expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Start' }).disabled).toBe(false),
-    );
+    // The unknown modes before the read look the same, so wait for the read to settle.
+    await waitFor(() => expect(listModes).toHaveBeenCalledWith('0'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Start' }).disabled).toBe(false);
+    expect(screen.queryByText(/has no video mode with temperature data/)).toBeNull();
     expect(options('Video mode')).toEqual([
       ['yuyv-256x384', '256 × 384 · 25 fps'],
       ['yuyv-256x192', '256 × 192 · 25 fps · image only'],
@@ -320,7 +323,8 @@ describe('App', () => {
     devices = [{ id: '0', label: 'USB Camera' }];
     fireEvent.click(screen.getByRole('button', { name: 'Refresh cameras' }));
     await waitFor(() => expect(source.value).toBe('camera:0'));
-    expect(listModes).toHaveBeenLastCalledWith('0');
+    // The read for the new id starts in a passive effect, after the render that shows it.
+    await waitFor(() => expect(listModes).toHaveBeenLastCalledWith('0'));
     expect(options('Video mode')[0]).toEqual([
       'device-256x192-25-25',
       '256 × 192 · 25 fps · image only',

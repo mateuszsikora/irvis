@@ -141,9 +141,15 @@ async function boot() {
     if (process.platform === 'win32' && child) return [];
     const read = new AbortController();
     modesRead = read;
-    return listModes(process.platform, device, ffmpeg, run, read.signal).finally(() => {
-      if (modesRead === read) modesRead = undefined;
-    });
+    // A stopped read answers with no modes (unknown) instead of an IPC error.
+    return listModes(process.platform, device, ffmpeg, run, read.signal)
+      .catch((error) => {
+        if (read.signal.aborted) return [];
+        throw error;
+      })
+      .finally(() => {
+        if (modesRead === read) modesRead = undefined;
+      });
   });
   ipcMain.handle('capture:command', async (event, id, value) => {
     authorize(event);
@@ -187,6 +193,8 @@ async function boot() {
       console.warn('Camera control is unavailable: ' + error.message);
     }
     if (generation !== token) return;
+    // Also a read that started while the camera control was opening.
+    stopModesRead();
     const proc = spawn(executable, ['-y', ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
     child = proc;
     let buffer = Buffer.alloc(0),
