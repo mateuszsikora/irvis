@@ -23,10 +23,12 @@ const MISSING = 'missing';
  * The chosen camera in the latest list. AVFoundation and V4L2 ids are list
  * positions that shift when a device comes or goes, so the id counts only with
  * the same label; otherwise the camera is found by its label if that is unique.
+ * Two cameras with the same name cannot be told apart this way.
  */
 function findCamera(list: readonly CameraDevice[], chosen: CameraDevice) {
   const same = list.find((c) => c.id === chosen.id && c.label === chosen.label);
   if (same) return same;
+  if (!chosen.label) return undefined;
   const named = list.filter((c) => c.label === chosen.label);
   return named.length === 1 ? named[0] : undefined;
 }
@@ -61,6 +63,8 @@ export function App({ profiles = cameraProfiles }: AppProps) {
       .then((list) => {
         if (!alive) return;
         setCameras(list);
+        // Track a camera found under a new id there, so the next refresh starts from it.
+        setCamera((chosen) => (chosen && findCamera(list, chosen)) ?? chosen);
         setCameraError('');
       })
       .catch((e: unknown) => {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { inputArgs, captureArgs, captureEndedMessage } from '../src/capture.js';
+import { inputArgs, captureArgs, captureEndedMessage, listDevices } from '../src/capture.js';
 import { openControl } from '../src/control.js';
 import { cameraProfiles } from '@irvis/core';
 import { CameraUsb } from '../../../tools/capture-cli/src/usb-protocol.ts';
@@ -47,6 +47,28 @@ describe('desktop capture', () => {
     expect(captureArgs('darwin', 0, mode)).toContain('+');
     expect(captureArgs('darwin', 0, mode)).not.toContain('-t');
     expect(() => inputArgs('linux', '/tmp/video', mode)).toThrow('Invalid capture selection');
+  });
+  it('names V4L2 nodes as the kernel does, in number order, without second nodes of a device', async () => {
+    const sysfs = {
+      'video0/name': 'Integrated Camera\n',
+      'video0/index': '0\n',
+      'video2/name': 'USB Camera: USB Camera\n',
+      'video2/index': '0\n',
+      'video3/name': 'USB Camera: USB Camera\n',
+      'video3/index': '1\n',
+    };
+    const fs = {
+      readdir: () => Promise.resolve(['video10', 'video2', 'null', 'video3', 'video0']),
+      readFile: (path) => {
+        const text = sysfs[path.replace('/sys/class/video4linux/', '')];
+        return text === undefined ? Promise.reject(new Error('ENOENT')) : Promise.resolve(text);
+      },
+    };
+    expect(await listDevices('linux', undefined, fs)).toEqual([
+      { id: '/dev/video0', label: 'Integrated Camera' },
+      { id: '/dev/video2', label: 'USB Camera: USB Camera' },
+      { id: '/dev/video10', label: 'video10' },
+    ]);
   });
   it('explains a camera without the thermal video mode instead of quoting ffmpeg', () => {
     const log = [

@@ -173,6 +173,40 @@ describe('App', () => {
     );
   });
 
+  it('keeps following a camera found under a new id when its old id is taken by a namesake', async () => {
+    let devices = [
+      { id: '0', label: 'FaceTime HD Camera' },
+      { id: '1', label: 'USB Camera' },
+    ];
+    window.irvisDesktop = {
+      start: () => Promise.resolve(),
+      stop: () => Promise.resolve(),
+      subscribe: () => () => {},
+      listDevices: () => Promise.resolve(devices),
+    };
+    render(<App />);
+    await screen.findByText('USB Camera', { selector: 'option' });
+    const source = screen.getByLabelText<HTMLSelectElement>('Source');
+    fireEvent.change(source, { target: { value: 'camera:1' } });
+    devices = [
+      { id: '0', label: 'USB Camera' },
+      { id: '1', label: 'FaceTime HD Camera' },
+    ];
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh cameras' }));
+    await waitFor(() => expect(source.value).toBe('camera:0'));
+    devices = [
+      { id: '0', label: 'USB Camera' },
+      { id: '1', label: 'USB Camera' },
+    ];
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh cameras' }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole<HTMLButtonElement>('button', { name: 'Refresh cameras' }).disabled,
+      ).toBe(false),
+    );
+    expect(source.value).toBe('camera:0');
+  });
+
   it('explains why the camera list is unavailable', async () => {
     render(<App />);
     expect(

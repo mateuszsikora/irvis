@@ -1,4 +1,4 @@
-import { readdir } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import {
   findFfmpeg,
   run,
@@ -59,12 +59,35 @@ export function captureEndedMessage(code, log, mode) {
 export function captureArgs(platform, device, mode) {
   return ['-hide_banner', '-nostdin', ...inputArgs(platform, device, mode), ...outputArgs()];
 }
-export async function listDevices(platform = process.platform, ffmpeg = findFfmpeg) {
-  if (platform === 'linux')
-    return (await readdir('/dev'))
-      .filter((n) => /^video\d+$/.test(n))
-      .sort()
-      .map((n) => ({ id: `/dev/${n}`, label: n }));
+/**
+ * V4L2 nodes in number order, labelled with the name the kernel gives the
+ * device (`/sys/class/video4linux/<node>/name`), or the node when it has none.
+ * A node whose `index` is not 0 is a second node of the same device, such as a
+ * UVC camera's metadata node, and is left out.
+ */
+async function v4l2Devices(fs) {
+  const nodes = (await fs.readdir('/dev'))
+    .filter((n) => /^video\d+$/.test(n))
+    .sort((a, b) => Number(a.slice(5)) - Number(b.slice(5)));
+  const read = (node, file) =>
+    fs.readFile(`/sys/class/video4linux/${node}/${file}`, 'utf8').then(
+      (text) => text.trim(),
+      () => '',
+    );
+  const devices = [];
+  for (const node of nodes) {
+    const [name, index] = await Promise.all([read(node, 'name'), read(node, 'index')]);
+    if (index && index !== '0') continue;
+    devices.push({ id: `/dev/${node}`, label: name || node });
+  }
+  return devices;
+}
+export async function listDevices(
+  platform = process.platform,
+  ffmpeg = findFfmpeg,
+  fs = { readdir, readFile },
+) {
+  if (platform === 'linux') return v4l2Devices(fs);
   const format = platform === 'darwin' ? 'avfoundation' : platform === 'win32' ? 'dshow' : null;
   if (!format) throw new Error('Unsupported capture platform');
   const result = await run(
