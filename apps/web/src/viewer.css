@@ -623,6 +623,7 @@ summary::-webkit-details-marker {
   display: none;
 }
 .error-notice {
+  white-space: pre-line;
   background: #322324;
   border-color: #624044;
   color: #ffb3b9;

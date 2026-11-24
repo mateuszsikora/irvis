@@ -16,6 +16,10 @@ For **Live static scene**, first start **Browser diagnostics** on the same camer
 
 A missing recent browser frame shows `Waiting for a browser frame received within 500 ms. Start browser diagnostics too.` Capture rejects a native format other than YUYV instead of silently converting an alleged exact reference. Native input uses AVFoundation on macOS, V4L2 on Linux and DirectShow on Windows. Select the camera in Source, in the header. Profile commands require USB access. Linux and Windows hardware paths still need real-device verification.
 
+## When capture ends with an error
+
+If the camera selected in Source has no video mode of the camera profile, as the built-in FaceTime camera of a Mac, the viewer shows `This camera has no 256 × 384 video mode; it offers …. It is probably not the thermal camera: choose another camera in Source.` Choose the thermal camera in Source (on macOS the TOOLTOP T7 is called `USB Camera`) and press Start again. Any other end of capture shows `Capture ended (<code>).` with the last lines of ffmpeg's log below it.
+
 ## Install a package
 
 Each version's packages are attached to its GitHub Release at https://github.com/mateuszsikora/irvis/releases. Packages are unsigned: macOS and Windows warn that the developer cannot be verified. Each package carries its own ffmpeg, so no other software is needed; the ffmpeg source tarball, the `build.sh` that built it and the node-usb source package (`usb-<version>.tgz`, which holds the source of the libusb linked into node-usb) are attached to the same release.

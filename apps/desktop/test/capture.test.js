@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { inputArgs, captureArgs } from '../src/capture.js';
+import { inputArgs, captureArgs, captureEndedMessage } from '../src/capture.js';
 import { openControl } from '../src/control.js';
 import { cameraProfiles } from '@irvis/core';
 import { CameraUsb } from '../../../tools/capture-cli/src/usb-protocol.ts';
@@ -47,6 +47,41 @@ describe('desktop capture', () => {
     expect(captureArgs('darwin', 0, mode)).toContain('+');
     expect(captureArgs('darwin', 0, mode)).not.toContain('-t');
     expect(() => inputArgs('linux', '/tmp/video', mode)).toThrow('Invalid capture selection');
+  });
+  it('explains a camera without the thermal video mode instead of quoting ffmpeg', () => {
+    const log = [
+      '[in#0 @ 0x7c5101c000] Selected video size (256x384) is not supported by the device.',
+      '[in#0 @ 0x7c5101c000] Supported modes:',
+      '[in#0 @ 0x7c5101c000]   1920x1080@[15.000000 30.000000]fps',
+      '[in#0 @ 0x7c5101c000]   1280x720@[15.000000 30.000000]fps',
+      '[in#0 @ 0x7c5101c000]   1280x720@[60.000000 60.000000]fps',
+      '[in#0 @ 0x7c5101c000]   640x480@[15.000000 30.000000]fps',
+      '[in#0 @ 0x7c51018000] Error opening input: Input/output error',
+      'Error opening input file 0:none.',
+      'Error opening input files: Input/output error',
+      '',
+    ].join('\n');
+    expect(captureEndedMessage(251, log, mode)).toBe(
+      'This camera has no 256 × 384 video mode; it offers 1920 × 1080, 1280 × 720 and 640 × 480. It is probably not the thermal camera: choose another camera in Source.',
+    );
+  });
+  it('ends other capture failures with the exit code and the last ffmpeg lines without their context', () => {
+    const log = [
+      'ffmpeg version 8.0',
+      '[AVFoundation indev @ 0x78ed01c140] Video device not found',
+      '[in#0 @ 0x78ed01c000] Error opening input: Input/output error',
+      'Error opening input file 99:none.',
+      'Error opening input files: Input/output error',
+    ].join('\n');
+    expect(captureEndedMessage(251, log, mode)).toBe(
+      [
+        'Capture ended (251).',
+        'Video device not found',
+        'Error opening input: Input/output error',
+        'Error opening input file 99:none.',
+        'Error opening input files: Input/output error',
+      ].join('\n'),
+    );
   });
   it('reads state, allow-lists commands and refreshes per-frame sensor bytes', async () => {
     vi.useFakeTimers();
