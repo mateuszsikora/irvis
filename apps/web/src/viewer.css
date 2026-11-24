@@ -142,7 +142,28 @@ h3 {
 }
 .app-source {
   display: flex;
-  gap: 20px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px 20px;
+}
+.refresh-cameras {
+  width: 38px;
+  padding: 0;
+  margin-left: -10px;
+}
+.refresh-cameras[aria-busy='true'] svg {
+  animation: refresh-spin 0.8s linear infinite;
+}
+@keyframes refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .refresh-cameras[aria-busy='true'] svg {
+    animation: none;
+  }
 }
 .select-field {
   display: flex;
@@ -204,6 +225,9 @@ h2 {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.transport .select-field {
+  margin-right: 12px;
 }
 .source-note {
   margin-right: 12px;
@@ -571,20 +595,15 @@ summary::-webkit-details-marker {
 .settings-disclosure[open] > summary::after {
   content: '−';
 }
-.connection,
 .command-controls {
   padding: 0 18px 18px;
 }
-.connection label,
 .camera-state > label {
   display: grid;
   gap: 6px;
   font-size: 11px;
   color: var(--muted);
   margin-bottom: 12px;
-}
-.connection select {
-  font-size: 12px;
 }
 .command-controls button {
   font-size: 12px;
@@ -604,6 +623,7 @@ summary::-webkit-details-marker {
   display: none;
 }
 .error-notice {
+  white-space: pre-line;
   background: #322324;
   border-color: #624044;
   color: #ffb3b9;
@@ -683,6 +703,10 @@ summary::-webkit-details-marker {
     width: 100%;
     gap: 12px;
   }
+  .refresh-cameras {
+    margin-left: 0;
+    align-self: flex-end;
+  }
   .select-field {
     display: grid;
     gap: 5px;
@@ -694,6 +718,11 @@ summary::-webkit-details-marker {
   }
   .viewer-topbar {
     padding: 20px 0 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .transport {
+    width: 100%;
   }
   .workspace-grid {
     grid-template-columns: 1fr;

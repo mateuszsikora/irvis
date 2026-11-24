@@ -273,8 +273,7 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
 - **68.** Failed or invalid camera gain readback blocks conversion instead of restoring the host's high-gain assumption; a subsequent valid state read restores the known gain.
   - `apps/desktop/test/capture.test.js::desktop capture::blocks gain conversion after failed readback and recovers only on a valid read`
   - `packages/ui/test/render.test.ts::FrameRenderer::blocks missing or unknown camera gain without falling back to high`
-- **69.** Refreshing the camera list preserves an existing selection, otherwise selects the first available camera, or clears it when no cameras remain.
-  - `packages/ui/test/viewer.test.tsx::Viewer::refreshes connected cameras while preserving or replacing the selection`
+- **69.** ~~Refreshing the camera list preserves an existing selection, otherwise selects the first available camera, or clears it when no cameras remain.~~ Retired: the camera list moved from the viewer's Camera setup to the app's Source select, which never picks a camera on its own; see invariant 81.
 
 - **70.** The recorded exact path preserves every raw value and reading between Node, Chromium, WebKit and Electron; the shared viewer displays the same min/max/centre readings in C, F and K.
   - `packages/ui/test/parity/parity.integration.mjs::preserves exact recorded readings and viewer wiring across runtimes`
@@ -320,3 +319,10 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
   - `packages/ui/test/render.test.ts::FrameRenderer::keeps camera readings and recording when the camera correction is unknown`
   - `apps/desktop/test/capture.test.js::desktop capture::repeats the full state read while gain, emissivity or reflected temperature is unknown`
   - `apps/desktop/test/capture.test.js::desktop capture::backs off repeated full state reads to 30 seconds and polls sensor bytes between them`
+
+- **81.** The Source select offers Demo and every listed camera; a refresh keeps the selected camera, found by its id and label or by its unique label when positional ids shift, and a selected camera missing from the list stays selected as disconnected with Start disabled, not replaced by a camera with another name that moved into its position.
+  - `apps/web/src/App.test.tsx::App::offers Demo and every connected camera as the source, and only thermal video modes`
+  - `apps/web/src/App.test.tsx::App::keeps a camera that disappears on refresh selected as disconnected and disables Start`
+  - `apps/web/src/App.test.tsx::App::does not take another camera that moves into the position of a disconnected one`
+  - `apps/web/src/App.test.tsx::App::follows the chosen camera to its new position and starts it there`
+  - `apps/web/src/App.test.tsx::App::keeps following a camera found under a new id when its old id is taken by a namesake`

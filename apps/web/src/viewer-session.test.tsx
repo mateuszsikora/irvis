@@ -11,6 +11,16 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.clearAllMocks();
 });
+/** Selects the first listed camera, which the Source menu shows once the list arrives. */
+async function selectCamera() {
+  const source = screen.getByLabelText<HTMLSelectElement>('Source');
+  const camera = await waitFor(() => {
+    const option = source.querySelector<HTMLOptionElement>('option[value^="camera:"]');
+    expect(option).toBeTruthy();
+    return option!;
+  });
+  fireEvent.change(source, { target: { value: camera.value } });
+}
 async function start() {
   await waitFor(() =>
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Start' }).disabled).toBe(false),
@@ -21,7 +31,7 @@ describe('viewer sessions', () => {
   it('clears capture errors on retry and ignores errors from the closed browser session', async () => {
     vi.stubGlobal('navigator', { mediaDevices: { enumerateDevices: () => Promise.resolve([]) } });
     render(<App />);
-    fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'live' } });
+    await selectCamera();
     await start();
     await waitFor(() => expect(startDiagnostics).toHaveBeenCalledOnce());
     const old = vi.mocked(startDiagnostics).mock.calls[0]![2];
@@ -48,7 +58,7 @@ describe('viewer sessions', () => {
     const stopBridge = vi.fn(() => Promise.resolve());
     window.irvisDesktop = { start: startBridge, stop: stopBridge, subscribe: () => () => {} };
     render(<App />);
-    fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'live' } });
+    await selectCamera();
     await start();
     fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
     await start();
@@ -78,14 +88,14 @@ describe('viewer sessions', () => {
       },
     };
     render(<App />);
-    fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'live' } });
+    await selectCamera();
     await start();
     fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'demo' } });
     act(() => report('Old camera failed'));
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.queryByText('Capture error')).toBeNull();
     expect(screen.getByText('Ready')).toBeTruthy();
-    fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'live' } });
+    await selectCamera();
     act(() => report('Old camera failed again'));
     expect(screen.queryByRole('alert')).toBeNull();
     await act(async () => {
@@ -121,7 +131,7 @@ describe('viewer sessions', () => {
     render(
       <App profiles={[profile, { ...profile, id: 'second-profile', name: 'Second profile' }]} />,
     );
-    fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'live' } });
+    await selectCamera();
     await start();
     fireEvent.change(screen.getByLabelText('Camera profile'), {
       target: { value: 'second-profile' },

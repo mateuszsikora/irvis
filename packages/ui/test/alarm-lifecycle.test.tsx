@@ -76,7 +76,15 @@ function setup(captureError = '') {
         close: () => Promise.resolve(),
       }),
   };
-  const view = render(<Viewer profile={profile} backend={backend} captureError={captureError} />);
+  const view = render(
+    <Viewer
+      device="cam"
+      modeId="yuyv-256x384"
+      profile={profile}
+      backend={backend}
+      captureError={captureError}
+    />,
+  );
   return { start, stop, listeners, view, backend };
 }
 async function connect() {
@@ -115,7 +123,15 @@ describe('alarm lifecycle', () => {
     expect(screen.queryByText('Capture error')).toBeNull();
     expect(screen.queryByText('Camera disconnected')).toBeNull();
     expect(start).toHaveBeenCalledOnce();
-    view.rerender(<Viewer profile={profile} backend={backend} captureError="Late camera error" />);
+    view.rerender(
+      <Viewer
+        device="cam"
+        modeId="yuyv-256x384"
+        profile={profile}
+        backend={backend}
+        captureError="Late camera error"
+      />,
+    );
     expect(screen.queryByText('Late camera error')).toBeNull();
     expect(stop).not.toHaveBeenCalled();
     await connect();
@@ -127,7 +143,15 @@ describe('alarm lifecycle', () => {
       alarmCallback.current(true);
     });
     expect(start).toHaveBeenCalledOnce();
-    view.rerender(<Viewer profile={profile} backend={backend} captureError="" />);
+    view.rerender(
+      <Viewer
+        device="cam"
+        modeId="yuyv-256x384"
+        profile={profile}
+        backend={backend}
+        captureError=""
+      />,
+    );
     expect(screen.queryByText('Capture error')).toBeNull();
     expect(start).toHaveBeenCalledTimes(2);
   });

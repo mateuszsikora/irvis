@@ -1,4 +1,4 @@
-import { captureArgs, listDevices } from './capture.js';
+import { captureArgs, captureEndedMessage, listDevices } from './capture.js';
 import { openControl } from './control.js';
 import { installRecordingStorage } from './recordings.js';
 import { app, BrowserWindow, ipcMain, protocol, net, session } from 'electron';
@@ -209,7 +209,7 @@ async function boot() {
       }
     });
     proc.on('error', (error) => sendError(error.message));
-    proc.on('close', (code) => sendError('Capture ended (' + code + '). ' + log.slice(-2000)));
+    proc.on('close', (code) => sendError(captureEndedMessage(code, log, mode)));
   });
   ipcMain.handle('capture:stop', (event) => {
     authorize(event);

@@ -12,6 +12,8 @@ export function mount(frame) {
     createElement(Viewer, {
       profile: cameraProfiles[0],
       backend: createReplayBackend([frame]),
+      device: 'demo',
+      modeId: cameraProfiles[0].videoModes.find((mode) => mode.layout).id,
     }),
   );
 }

@@ -82,7 +82,8 @@ export async function ffmpegVersion(ffmpeg: string): Promise<string | null> {
 }
 
 /** ffmpeg log lines start with `[<component> @ 0x<address>] `. */
-function stripLogPrefix(line: string): string {
+/** A log line without ffmpeg's context prefix, such as `[in#0 @ 0x7c5101c000] `. */
+export function stripLogPrefix(line: string): string {
   return line.replace(/^\[[^\]]*@ 0x[0-9a-fA-F]+\] ?/, '');
 }
 

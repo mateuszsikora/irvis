@@ -8,7 +8,7 @@ import { PhotoGallery } from './PhotoGallery.tsx';
 import { photoCorrection, type PhotoLibrary } from './photos.ts';
 import { AnalysisControls } from './AnalysisControls.tsx';
 import { initialAnalysis } from './measurements.ts';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   PALETTES,
   IrvisReader,
@@ -32,6 +32,12 @@ export interface ViewerProps {
   recordingStorage?: RecordingStorage;
   backend: CameraBackend;
   profile: CameraProfile;
+  /** The backend's id of the camera that Start opens; empty disables Start. */
+  device: string;
+  /** The video mode that Start opens; empty disables Start. */
+  modeId: string;
+  /** Shown before Start instead of the profile name, so the app can offer its profile choice there. */
+  profilePicker?: ReactNode;
   /** Only supply when the backend actually implements command dispatch. */
   captureError?: string;
   command?: (id: string, value?: number) => Promise<void>;
@@ -39,17 +45,15 @@ export interface ViewerProps {
 export function Viewer({
   backend,
   profile,
+  device,
+  modeId,
+  profilePicker,
   command,
   photoLibrary,
   recordingStorage,
   openRecording,
   captureError = '',
 }: ViewerProps) {
-  const [devices, setDevices] = useState<readonly { id: string; label: string }[]>([]);
-  const [device, setDevice] = useState('');
-  const [deviceRefresh, setDeviceRefresh] = useState(0);
-  const [enumerating, setEnumerating] = useState(true);
-  const [modeId, setModeId] = useState(profile.videoModes.find((m) => m.layout)?.id ?? '');
   const [session, setSession] = useState<CameraSession | null>(null);
   const [commandSession, setCommandSession] = useState(0);
   const [cameraState, setCameraState] = useState<CameraStateSnapshot>();
@@ -202,29 +206,6 @@ export function Viewer({
     current.current = settings;
   }, [settings]);
   useEffect(() => {
-    let alive = true;
-    setEnumerating(true);
-    void backend
-      .listDevices()
-      .then((list) => {
-        if (alive) {
-          setDevices(list);
-          setDevice((selected) =>
-            list.some((entry) => entry.id === selected) ? selected : (list[0]?.id ?? ''),
-          );
-        }
-      })
-      .catch((e) => {
-        if (alive) setError(String(e));
-      })
-      .finally(() => {
-        if (alive) setEnumerating(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [backend, deviceRefresh]);
-  useEffect(() => {
     return () => {
       generation.current++;
       void active.current?.close().catch(() => {});
@@ -375,12 +356,15 @@ export function Viewer({
           </h2>
         </div>
         <div className="transport">
-          <span className="source-note">
-            {backend.id === 'replay' ? 'Synthetic scene · no camera needed' : profile.name}
-          </span>
+          {backend.id === 'replay' ? (
+            <span className="source-note">Synthetic scene · no camera needed</span>
+          ) : (
+            !profilePicker && <span className="source-note">{profile.name}</span>
+          )}
+          {profilePicker}
           <button
             className="primary-button"
-            disabled={busy || enumerating || !!session || !device || !modeId}
+            disabled={busy || !!session || !device || !modeId}
             onClick={() => void connect()}
           >
             <Icon name="play" />
@@ -835,48 +819,6 @@ export function Viewer({
               </label>
             </div>
           </section>
-          <details className="settings-disclosure">
-            <summary>Camera setup</summary>
-            <div className="connection">
-              <label>
-                Camera
-                <select
-                  aria-label="Camera"
-                  value={device}
-                  disabled={busy || !!session}
-                  onChange={(e) => setDevice(e.target.value)}
-                >
-                  {devices.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.label || d.id}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button
-                type="button"
-                disabled={busy || !!session || enumerating}
-                onClick={() => setDeviceRefresh((value) => value + 1)}
-              >
-                Refresh cameras
-              </button>
-              <label>
-                Video mode
-                <select
-                  aria-label="Video mode"
-                  value={modeId}
-                  disabled={busy || !!session}
-                  onChange={(e) => setModeId(e.target.value)}
-                >
-                  {profile.videoModes
-                    .filter((m) => m.layout)
-                    .map((m) => (
-                      <option key={m.id}>{m.id}</option>
-                    ))}
-                </select>
-              </label>
-            </div>
-          </details>
           {backend.id === 'browser' && (
             <section className="settings-section camera-state">
               <h3>Camera state</h3>

@@ -8,7 +8,7 @@
 
 ## Interfaces
 
-`ViewerProps.backend` and `.profile` are required. `captureError` optionally supplies the current adapter error to the same alert/status presentation as local errors. `command` is optional and used only if `capabilities.deviceControl` is true and a session is open. The app remounts the viewer on source/profile changes. Initial display: iron palette, automatic 20–40 °C fallback range, unlocked scale/orientation, 0° rotation, no mirroring or uncertain overlay, Clear rendering, Fit size, assumed high gain. Manual invalid edits never reach the renderer.
+`ViewerProps.backend`, `.profile`, `.device` and `.modeId` are required. `device` is the backend's device id and `modeId` the profile video mode that Start opens; an empty value of either disables Start. The viewer does not enumerate devices or choose a mode: the app does. The optional `profilePicker` node is rendered before Start in place of the profile name (after `Synthetic scene · no camera needed` for the replay backend); without it the viewer shows the profile name, as in the parity harness. `captureError` optionally supplies the current adapter error to the same alert/status presentation as local errors. `command` is optional and used only if `capabilities.deviceControl` is true and a session is open. The app remounts the viewer on source, camera, profile and mode changes. Initial display: iron palette, automatic 20–40 °C fallback range, unlocked scale/orientation, 0° rotation, no mirroring or uncertain overlay, Clear rendering, Fit size, assumed high gain. Manual invalid edits never reach the renderer.
 
 ## Failure modes
 
@@ -27,7 +27,7 @@ The Vitest project `ui` (`packages/ui/vitest.config.ts`) runs `test/**/*.test.{t
 
 ## Workspace presentation
 
-The viewer uses a preview column and a 300 px settings panel, stacking below 760 px. The canvas fits a bounded viewport with preserved aspect ratio at every rotation. Zoom changes both CSS dimensions and permits scrolling. Palettes use the core palette stops as CSS gradient previews; buttons expose `aria-pressed`. Binary display choices and orientation also use native buttons, and switches retain native checkbox semantics. Camera configuration remains in native selects with explicit accessible names. `apps/web/src/viewer.css` reserves space for select arrows, provides focus rings and reduced-motion support. The first-frame flag updates once per session; live pixels and range labels stay outside React state. `Icon.tsx` supplies decorative inline SVG controls.
+The viewer uses a preview column and a 300 px settings panel, stacking below 760 px. The canvas fits a bounded viewport with preserved aspect ratio at every rotation. Zoom changes both CSS dimensions and permits scrolling. Palettes use the core palette stops as CSS gradient previews; buttons expose `aria-pressed`. Binary display choices and orientation also use native buttons, and switches retain native checkbox semantics. Camera configuration remains in native selects with explicit accessible names. `apps/web/src/viewer.css` reserves space for select arrows, provides focus rings and reduced-motion support. The first-frame flag updates once per session; live pixels and range labels stay outside React state. `Icon.tsx` supplies decorative inline SVG controls; `src/index.ts` exports `Icon` so the app header can use the same set, for example `refresh` on its camera list button.
 
 ## Measurement analysis
 
@@ -73,9 +73,9 @@ Live recording timestamps are captured with `performance.now()` at the camera su
 
 ## Live backend integration
 
-The Camera selector lists backend devices in both environments. Profile command buttons dispatch through the current session when no host command callback is provided. Rendering consumes Worker reconstruction when available and preserves desktop camera state in captured thermal frames. A camera-reported gain selects the conversion ahead of the host assumption; an unknown conversion disables readings. Raw USB state is not used as emissivity correction.
+Profile command buttons dispatch through the current session when no host command callback is provided. Rendering consumes Worker reconstruction when available and preserves desktop camera state in captured thermal frames. A camera-reported gain selects the conversion ahead of the host assumption; an unknown conversion disables readings. Raw USB state is not used as emissivity correction.
 
-`Refresh cameras` repeats enumeration while capture is stopped. It retains the selected ID when present, otherwise selects the first device or an empty value. Start and refresh are disabled during enumeration; stale enumeration results are ignored. Refresh does not retire a capture session. Missing gain in a camera-origin snapshot and explicit `unknown` gain disable readings, photos and recorded-frame output instead of falling back to the host assumption.
+Missing gain in a camera-origin snapshot and explicit `unknown` gain disable readings, photos and recorded-frame output instead of falling back to the host assumption.
 
 ## Cross-runtime acceptance
 

@@ -14,7 +14,11 @@ For **Live static scene**, first start **Browser diagnostics** on the same camer
 
 **Download comparison report** saves `report.json` with the first 100 measurements (or fewer if stopped earlier). **Download frame pair** saves `frame-pair.json` with exact bytes, native or simulated planar bytes, reconstructed raw values and metadata for offline analysis. The frame pair is the latest comparison; after the report fills, this can be a later frame not included in its 100 samples. Review both exports when assessing accuracy. Stop both reference and browser diagnostics to release both camera consumers.
 
-A missing recent browser frame shows `Waiting for a browser frame received within 500 ms. Start browser diagnostics too.` Capture rejects a native format other than YUYV instead of silently converting an alleged exact reference. Native input uses AVFoundation on macOS, V4L2 on Linux and DirectShow on Windows. Select a camera under Camera setup. Profile commands require USB access. Linux and Windows hardware paths still need real-device verification.
+A missing recent browser frame shows `Waiting for a browser frame received within 500 ms. Start browser diagnostics too.` Capture rejects a native format other than YUYV instead of silently converting an alleged exact reference. Native input uses AVFoundation on macOS, V4L2 on Linux and DirectShow on Windows. Select the camera in Source, in the header. Profile commands require USB access. Linux and Windows hardware paths still need real-device verification.
+
+## When capture ends with an error
+
+If the camera selected in Source has no video mode of the camera profile, as the built-in FaceTime camera of a Mac, the viewer shows `This camera has no 256 × 384 video mode; it offers …. It is probably not the thermal camera: choose another camera in Source.` Choose the thermal camera in Source (on macOS the TOOLTOP T7 is called `USB Camera`) and press Start again. Any other end of capture shows `Capture ended (<code>).` with the last lines of ffmpeg's log below it.
 
 ## Install a package
 

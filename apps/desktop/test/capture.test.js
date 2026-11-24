@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { inputArgs, captureArgs } from '../src/capture.js';
+import { inputArgs, captureArgs, captureEndedMessage, listDevices } from '../src/capture.js';
 import { openControl } from '../src/control.js';
 import { cameraProfiles } from '@irvis/core';
 import { CameraUsb } from '../../../tools/capture-cli/src/usb-protocol.ts';
@@ -47,6 +47,63 @@ describe('desktop capture', () => {
     expect(captureArgs('darwin', 0, mode)).toContain('+');
     expect(captureArgs('darwin', 0, mode)).not.toContain('-t');
     expect(() => inputArgs('linux', '/tmp/video', mode)).toThrow('Invalid capture selection');
+  });
+  it('names V4L2 nodes as the kernel does, in number order, without second nodes of a device', async () => {
+    const sysfs = {
+      'video0/name': 'Integrated Camera\n',
+      'video0/index': '0\n',
+      'video2/name': 'USB Camera: USB Camera\n',
+      'video2/index': '0\n',
+      'video3/name': 'USB Camera: USB Camera\n',
+      'video3/index': '1\n',
+    };
+    const fs = {
+      readdir: () => Promise.resolve(['video10', 'video2', 'null', 'video3', 'video0']),
+      readFile: (path) => {
+        const text = sysfs[path.replace('/sys/class/video4linux/', '')];
+        return text === undefined ? Promise.reject(new Error('ENOENT')) : Promise.resolve(text);
+      },
+    };
+    expect(await listDevices('linux', undefined, fs)).toEqual([
+      { id: '/dev/video0', label: 'Integrated Camera' },
+      { id: '/dev/video2', label: 'USB Camera: USB Camera' },
+      { id: '/dev/video10', label: 'video10' },
+    ]);
+  });
+  it('explains a camera without the thermal video mode instead of quoting ffmpeg', () => {
+    const log = [
+      '[in#0 @ 0x7c5101c000] Selected video size (256x384) is not supported by the device.',
+      '[in#0 @ 0x7c5101c000] Supported modes:',
+      '[in#0 @ 0x7c5101c000]   1920x1080@[15.000000 30.000000]fps',
+      '[in#0 @ 0x7c5101c000]   1280x720@[15.000000 30.000000]fps',
+      '[in#0 @ 0x7c5101c000]   1280x720@[60.000000 60.000000]fps',
+      '[in#0 @ 0x7c5101c000]   640x480@[15.000000 30.000000]fps',
+      '[in#0 @ 0x7c51018000] Error opening input: Input/output error',
+      'Error opening input file 0:none.',
+      'Error opening input files: Input/output error',
+      '',
+    ].join('\n');
+    expect(captureEndedMessage(251, log, mode)).toBe(
+      'This camera has no 256 × 384 video mode; it offers 1920 × 1080, 1280 × 720 and 640 × 480. It is probably not the thermal camera: choose another camera in Source.',
+    );
+  });
+  it('ends other capture failures with the exit code and the last ffmpeg lines without their context', () => {
+    const log = [
+      'ffmpeg version 8.0',
+      '[AVFoundation indev @ 0x78ed01c140] Video device not found',
+      '[in#0 @ 0x78ed01c000] Error opening input: Input/output error',
+      'Error opening input file 99:none.',
+      'Error opening input files: Input/output error',
+    ].join('\n');
+    expect(captureEndedMessage(251, log, mode)).toBe(
+      [
+        'Capture ended (251).',
+        'Video device not found',
+        'Error opening input: Input/output error',
+        'Error opening input file 99:none.',
+        'Error opening input files: Input/output error',
+      ].join('\n'),
+    );
   });
   it('reads state, allow-lists commands and refreshes per-frame sensor bytes', async () => {
     vi.useFakeTimers();
