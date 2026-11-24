@@ -43,14 +43,21 @@ export interface RunResult {
   readonly timedOut: boolean;
 }
 
-/** Runs a program to completion, or stops it after timeoutMs. */
+/**
+ * Runs a program to completion, or stops it after timeoutMs. An aborted
+ * `signal` kills it and rejects with Node's AbortError.
+ */
 export function run(
   program: string,
   args: readonly string[],
   timeoutMs: number,
+  signal?: AbortSignal,
 ): Promise<RunResult> {
   return new Promise((resolve, reject) => {
-    const child = spawn(program, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(program, args, {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      ...(signal ? { signal } : {}),
+    });
     let stdout = '';
     let stderr = '';
     let timedOut = false;

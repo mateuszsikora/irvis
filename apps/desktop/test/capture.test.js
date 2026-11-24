@@ -101,7 +101,7 @@ describe('desktop capture', () => {
     });
     const exec = vi.fn((program) =>
       Promise.resolve(
-        program === 'system_profiler'
+        program === '/usr/sbin/system_profiler'
           ? { code: 0, stdout: cameraData, stderr: '', timedOut: false }
           : { code: 1, stdout: '', stderr: avfoundation, timedOut: false },
       ),
@@ -112,7 +112,7 @@ describe('desktop capture', () => {
       { id: '2', label: 'Webcam' },
     ]);
     exec.mockImplementation((program) =>
-      program === 'system_profiler'
+      program === '/usr/sbin/system_profiler'
         ? Promise.reject(new Error('ENOENT'))
         : Promise.resolve({ code: 1, stdout: '', stderr: avfoundation, timedOut: false }),
     );
@@ -193,7 +193,24 @@ describe('desktop capture', () => {
       { width: 256, height: 192, minFps: 25, maxFps: 25 },
       { width: 256, height: 384, minFps: 25, maxFps: 25 },
     ]);
-    expect(exec).toHaveBeenCalledWith('ffmpeg', modesArgs('darwin', '0'), 10000);
+    const signal = new AbortController().signal;
+    await listModes('darwin', '0', () => 'ffmpeg', exec, signal);
+    expect(exec).toHaveBeenLastCalledWith('ffmpeg', modesArgs('darwin', '0'), 10000, signal);
+    // AVFoundation opens a format only at its maximum rate, and reports it unrounded.
+    expect(
+      parseDeviceModes(
+        'darwin',
+        [
+          '[in#0 @ 0x7ad5808000] Supported modes:',
+          '[in#0 @ 0x7ad5808000]   1280x720@[1.000000 30.000030]fps',
+          '[in#0 @ 0x7ad5808000]   1280x720@[15.000000 30.000030]fps',
+          '[in#0 @ 0x7ad5808000]   1280x720@[60.000000 60.000000]fps',
+        ].join('\n'),
+      ),
+    ).toEqual([
+      { width: 1280, height: 720, minFps: 30.00003, maxFps: 30.00003 },
+      { width: 1280, height: 720, minFps: 60, maxFps: 60 },
+    ]);
     const v4l2 = [
       '[video4linux2,v4l2 @ 0x55d5c4a0c840] Compressed:       mjpeg :          Motion-JPEG : 1280x720 640x480',
       '[video4linux2,v4l2 @ 0x55d5c4a0c840] Raw       :     yuyv422 :           YUYV 4:2:2 : 256x384 256x192',

@@ -38,7 +38,7 @@ Timestamps are milliseconds on the source's monotonic clock. `Conversion` and `C
 | `BackendId` | `'browser' \| 'electron' \| 'replay'` |
 | `BackendCapabilities` | `exactRaw` (frames are `YuyvFrame`s), `deviceControl` (can send profile commands), `concurrentWith` (backends that can use the same camera at the same time) |
 | `CameraDevice` | `id`, `label`, optional `vendorId` and `productId` (the browser usually has neither) |
-| `DeviceVideoMode` | `width`, `height`, optional `minFps` and `maxFps`: a video mode a device reports, with the frame-rate range when the platform gives one |
+| `DeviceVideoMode` | `width`, `height`, optional `minFps` and `maxFps`: a video mode a device reports, with the frame-rate range when the platform gives one (one rate as both for an AVFoundation mode in the desktop app) |
 | `OpenRequest` | `deviceId`, `profile`, `modeId` |
 | `CameraSession` | `device`, `profile`, `mode`, `frames: Subscribable<RawFrame>`, `close(): Promise<void>` |
 | `CameraBackend` | `id`, `capabilities`, `listDevices(): Promise<readonly CameraDevice[]>`, `open(request): Promise<CameraSession>` |

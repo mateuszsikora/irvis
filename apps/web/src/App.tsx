@@ -138,7 +138,8 @@ export function App({ profiles = cameraProfiles }: AppProps) {
       : null;
   const modeOptions = profile ? videoModeOptions(profile, modes) : [];
   // The default follows the profile's order, not the device's, so that modes
-  // arriving after a choice cannot change the mode and remount a running viewer.
+  // arriving after a choice do not change a mode the device offers and remount a
+  // running viewer. A mode the device turns out not to offer does change.
   const thermalModes =
     profile?.videoModes.filter((m) => modeOptions.some((o) => o.mode === m)) ?? [];
   const mode = thermalModes.find((m) => m.id === modeId) ?? thermalModes[0];

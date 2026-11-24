@@ -65,7 +65,7 @@ export function captureEndedMessage(code, log, mode) {
 export function captureArgs(platform, device, mode) {
   return ['-hide_banner', '-nostdin', ...inputArgs(platform, device, mode), ...outputArgs()];
 }
-/** USB IDs from text such as `VendorID_3034 ProductID_22592` or `vid_0bda&pid_5830`. */
+/** The USB IDs as device fields, or none when either is not an integer. */
 const usbIds = (vendorId, productId) =>
   Number.isInteger(vendorId) && Number.isInteger(productId) ? { vendorId, productId } : {};
 /**
@@ -91,6 +91,7 @@ async function v4l2Devices(fs) {
       read(node, 'name'),
       read(node, 'index'),
       // `device` is the USB interface; its parent directory is the USB device.
+      // A template, not path.join: the kernel must resolve `..` after following the symlink.
       read(node, 'device/../idVendor'),
       read(node, 'device/../idProduct'),
     ]);
@@ -163,7 +164,7 @@ export async function listDevices(
     exec(ffmpeg(), ['-hide_banner', '-f', format, '-list_devices', 'true', '-i', ''], 10000),
     // Without the USB IDs the devices are still listed; the profile is not chosen for them.
     platform === 'darwin'
-      ? exec('system_profiler', ['SPCameraDataType', '-json'], 10000).then(
+      ? exec('/usr/sbin/system_profiler', ['SPCameraDataType', '-json'], 3000).then(
           (r) => parseCameraData(r.stdout),
           () => new Map(),
         )
@@ -183,7 +184,9 @@ export async function listDevices(
 }
 /**
  * The video modes a device offers, as the platform's ffmpeg input prints them:
- * AVFoundation's `Supported modes:` (any pixel format, with a frame-rate range),
+ * AVFoundation's `Supported modes:` (any pixel format), each at its maximum
+ * frame rate only, because the input opens a format only when `-framerate` is
+ * within 0.01 of that maximum (libavdevice/avfoundation.m);
  * V4L2's `-list_formats all` sizes for `yuyv422` (no frame rates), DirectShow's
  * `-list_options true` for `pixel_format=yuyv422` with one size. Sizes given as
  * a range are left out.
@@ -192,7 +195,7 @@ export function parseDeviceModes(platform, log) {
   const modes = [];
   if (platform === 'darwin')
     for (const m of parseSupportedModes(log))
-      modes.push({ width: m.width, height: m.height, minFps: m.minFps, maxFps: m.maxFps });
+      modes.push({ width: m.width, height: m.height, minFps: m.maxFps, maxFps: m.maxFps });
   for (const raw of log.split(/\r?\n/)) {
     const line = stripLogPrefix(raw);
     if (platform === 'linux') {
@@ -242,8 +245,8 @@ export function modesArgs(platform, device) {
   throw new Error('Invalid capture selection');
 }
 /** The device's video modes; an empty list when ffmpeg printed none it could read. */
-export async function listModes(platform, device, ffmpeg = findFfmpeg, exec = run) {
-  const result = await exec(ffmpeg(), modesArgs(platform, device), 10000);
+export async function listModes(platform, device, ffmpeg = findFfmpeg, exec = run, signal) {
+  const result = await exec(ffmpeg(), modesArgs(platform, device), 10000, signal);
   if (result.timedOut) throw new Error('Reading the camera modes timed out');
   return parseDeviceModes(platform, result.stderr);
 }

@@ -11,6 +11,7 @@ import {
   parseInputPixelFormat,
   parsePixelFormats,
   parseSupportedModes,
+  run,
 } from './ffmpeg.ts';
 
 describe('ffmpeg output', () => {
@@ -150,5 +151,19 @@ describe('findFfmpeg', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('run', () => {
+  it('kills the program and rejects when its signal is aborted', async () => {
+    const abort = new AbortController();
+    const running = run(
+      process.execPath,
+      ['-e', 'setTimeout(() => {}, 5000)'],
+      10_000,
+      abort.signal,
+    );
+    abort.abort();
+    await expect(running).rejects.toMatchObject({ name: 'AbortError' });
   });
 });

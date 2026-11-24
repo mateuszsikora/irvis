@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process';
 import { resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { cameraProfiles } from '@irvis/core';
-import { parseInputPixelFormat } from '../../../tools/capture-cli/src/ffmpeg.ts';
+import { parseInputPixelFormat, run } from '../../../tools/capture-cli/src/ffmpeg.ts';
 import { bundledFfmpeg, locateFfmpeg } from './ffmpeg.js';
 
 protocol.registerSchemesAsPrivileged([
@@ -32,6 +32,12 @@ let pending = false;
 let control;
 let controlCleanup = Promise.resolve();
 let generation = 0;
+/** The mode read in progress; a new read or a capture start stops it. */
+let modesRead;
+function stopModesRead() {
+  modesRead?.abort();
+  modesRead = undefined;
+}
 const trusted = (url) => url.startsWith('app://irvis/');
 function stop() {
   generation++;
@@ -129,7 +135,15 @@ async function boot() {
   });
   ipcMain.handle('capture:modes', (event, device) => {
     authorize(event);
-    return listModes(process.platform, device, ffmpeg);
+    stopModesRead();
+    // DirectShow may not let a second process open a device that is capturing;
+    // an empty list leaves the modes unknown instead of risking the capture.
+    if (process.platform === 'win32' && child) return [];
+    const read = new AbortController();
+    modesRead = read;
+    return listModes(process.platform, device, ffmpeg, run, read.signal).finally(() => {
+      if (modesRead === read) modesRead = undefined;
+    });
   });
   ipcMain.handle('capture:command', async (event, id, value) => {
     authorize(event);
@@ -139,6 +153,8 @@ async function boot() {
   ipcMain.handle('capture:start', async (event, options) => {
     authorize(event);
     stop();
+    // The capture must not share the device with a mode read (DirectShow may refuse it).
+    stopModesRead();
     const token = generation;
     const profile = cameraProfiles.find((p) => p.id === options?.profileId);
     const mode = profile?.videoModes.find((m) => m.id === options?.modeId);
