@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cameraProfiles } from '@irvis/core';
-import { liveBackend } from './viewer-backend.ts';
+import { listCameraModes, listLiveCameras, liveBackend } from './viewer-backend.ts';
 import { startDiagnostics } from '@irvis/backend-browser';
 vi.mock('@irvis/backend-browser', () => ({ startDiagnostics: vi.fn() }));
 afterEach(() => {
@@ -109,5 +109,40 @@ describe('viewer backend', () => {
     expect(nextError).toHaveBeenLastCalledWith('Current error');
     await next.close();
     expect(stop).toHaveBeenCalledOnce();
+  });
+  it('reads the USB IDs that Chrome appends to a browser camera label', async () => {
+    const enumerateDevices = vi.fn(() =>
+      Promise.resolve([
+        { kind: 'videoinput', deviceId: 'a', label: 'USB Camera (0bda:5830)' },
+        { kind: 'videoinput', deviceId: 'b', label: 'FaceTime HD Camera' },
+        { kind: 'audioinput', deviceId: 'c', label: 'Microphone' },
+      ]),
+    );
+    vi.stubGlobal('navigator', { mediaDevices: { enumerateDevices } });
+    try {
+      expect(await listLiveCameras()).toEqual([
+        { id: 'default', label: 'Default camera' },
+        { id: 'a', label: 'USB Camera (0bda:5830)', vendorId: 0x0bda, productId: 0x5830 },
+        { id: 'b', label: 'FaceTime HD Camera' },
+      ]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('knows camera modes only from a desktop bridge that reads some', async () => {
+    expect(await listCameraModes('0')).toBeNull();
+    const listModes = vi.fn(() => Promise.resolve([{ width: 256, height: 384 }]));
+    window.irvisDesktop = {
+      start: () => Promise.resolve(),
+      stop: () => Promise.resolve(),
+      subscribe: () => () => {},
+      listModes,
+    };
+    expect(await listCameraModes('0')).toEqual([{ width: 256, height: 384 }]);
+    listModes.mockResolvedValueOnce([]);
+    expect(await listCameraModes('0')).toBeNull();
+    listModes.mockRejectedValueOnce(new Error('Reading the camera modes timed out'));
+    expect(await listCameraModes('0')).toBeNull();
   });
 });

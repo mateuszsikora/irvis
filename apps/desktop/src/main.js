@@ -1,4 +1,4 @@
-import { captureArgs, captureEndedMessage, listDevices } from './capture.js';
+import { captureArgs, captureEndedMessage, listDevices, listModes } from './capture.js';
 import { openControl } from './control.js';
 import { installRecordingStorage } from './recordings.js';
 import { app, BrowserWindow, ipcMain, protocol, net, session } from 'electron';
@@ -126,6 +126,10 @@ async function boot() {
   ipcMain.handle('capture:devices', (event) => {
     authorize(event);
     return listDevices(process.platform, ffmpeg);
+  });
+  ipcMain.handle('capture:modes', (event, device) => {
+    authorize(event);
+    return listModes(process.platform, device, ffmpeg);
   });
   ipcMain.handle('capture:command', async (event, id, value) => {
     authorize(event);

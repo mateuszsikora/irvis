@@ -321,8 +321,14 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
   - `apps/desktop/test/capture.test.js::desktop capture::backs off repeated full state reads to 30 seconds and polls sensor bytes between them`
 
 - **81.** The Source select offers Demo and every listed camera; a refresh keeps the selected camera, found by its id and label or by its unique label when positional ids shift, and a selected camera missing from the list stays selected as disconnected with Start disabled, not replaced by a camera with another name that moved into its position.
-  - `apps/web/src/App.test.tsx::App::offers Demo and every connected camera as the source, and only thermal video modes`
+  - `apps/web/src/App.test.tsx::App::offers Demo and every connected camera as the source, and the profile modes with image-only ones disabled`
   - `apps/web/src/App.test.tsx::App::keeps a camera that disappears on refresh selected as disconnected and disables Start`
   - `apps/web/src/App.test.tsx::App::does not take another camera that moves into the position of a disconnected one`
   - `apps/web/src/App.test.tsx::App::follows the chosen camera to its new position and starts it there`
   - `apps/web/src/App.test.tsx::App::keeps following a camera found under a new id when its old id is taken by a namesake`
+- **82.** Only a mode of the camera profile with temperature data, and when the device's modes are known one that the device offers in size and frame rate, can be selected in Video mode; every other mode is listed as image only and disabled. A camera whose known modes include none of them shows that it is probably not the thermal camera, with Start disabled.
+  - `apps/web/src/App.test.tsx::App::lists the modes the chosen camera reports, with temperature data only where the profile has it`
+  - `apps/web/src/App.test.tsx::App::says before Start that a camera without a temperature mode is not the thermal camera`
+  - `apps/web/src/video-modes.test.ts::videoModeOptions::matches a device mode to the profile mode by size and a frame-rate range that holds its rate`
+- **83.** Choosing a camera in Source selects the camera profile only when exactly one profile matches the camera's USB IDs (or its label pattern); with none or several, the profile chosen before stays.
+  - `apps/web/src/App.test.tsx::App::chooses the profile that lists the camera USB IDs or, without them, matches its name, and keeps the choice when none or several do`

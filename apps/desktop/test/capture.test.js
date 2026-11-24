@@ -1,5 +1,14 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { inputArgs, captureArgs, captureEndedMessage, listDevices } from '../src/capture.js';
+import {
+  inputArgs,
+  captureArgs,
+  captureEndedMessage,
+  listDevices,
+  listModes,
+  modesArgs,
+  parseCameraData,
+  parseDeviceModes,
+} from '../src/capture.js';
 import { openControl } from '../src/control.js';
 import { cameraProfiles } from '@irvis/core';
 import { CameraUsb } from '../../../tools/capture-cli/src/usb-protocol.ts';
@@ -54,6 +63,8 @@ describe('desktop capture', () => {
       'video0/index': '0\n',
       'video2/name': 'USB Camera: USB Camera\n',
       'video2/index': '0\n',
+      'video2/device/../idVendor': '0bda\n',
+      'video2/device/../idProduct': '5830\n',
       'video3/name': 'USB Camera: USB Camera\n',
       'video3/index': '1\n',
     };
@@ -66,9 +77,151 @@ describe('desktop capture', () => {
     };
     expect(await listDevices('linux', undefined, fs)).toEqual([
       { id: '/dev/video0', label: 'Integrated Camera' },
-      { id: '/dev/video2', label: 'USB Camera: USB Camera' },
+      { id: '/dev/video2', label: 'USB Camera: USB Camera', vendorId: 0x0bda, productId: 0x5830 },
       { id: '/dev/video10', label: 'video10' },
     ]);
+  });
+  it('lists macOS cameras without screens, with the USB IDs macOS reports for a name unless it has two pairs', async () => {
+    const avfoundation = [
+      '[AVFoundation indev @ 0x7b0f018140] AVFoundation video devices:',
+      '[AVFoundation indev @ 0x7b0f018140] [0] USB Camera',
+      '[AVFoundation indev @ 0x7b0f018140] [1] FaceTime HD Camera',
+      '[AVFoundation indev @ 0x7b0f018140] [2] Webcam',
+      '[AVFoundation indev @ 0x7b0f018140] [3] Capture screen 0',
+      '[AVFoundation indev @ 0x7b0f018140] AVFoundation audio devices:',
+      '[AVFoundation indev @ 0x7b0f018140] [0] MacBook Pro Microphone',
+    ].join('\n');
+    const cameraData = JSON.stringify({
+      SPCameraDataType: [
+        { _name: 'USB Camera', 'spcamera_model-id': 'UVC Camera VendorID_3034 ProductID_22592' },
+        { _name: 'FaceTime HD Camera', 'spcamera_model-id': 'FaceTime HD Camera' },
+        { _name: 'Webcam', 'spcamera_model-id': 'UVC Camera VendorID_1133 ProductID_2141' },
+        { _name: 'Webcam', 'spcamera_model-id': 'UVC Camera VendorID_1133 ProductID_2142' },
+      ],
+    });
+    const exec = vi.fn((program) =>
+      Promise.resolve(
+        program === 'system_profiler'
+          ? { code: 0, stdout: cameraData, stderr: '', timedOut: false }
+          : { code: 1, stdout: '', stderr: avfoundation, timedOut: false },
+      ),
+    );
+    expect(await listDevices('darwin', () => 'ffmpeg', undefined, exec)).toEqual([
+      { id: '0', label: 'USB Camera', vendorId: 0x0bda, productId: 0x5840 },
+      { id: '1', label: 'FaceTime HD Camera' },
+      { id: '2', label: 'Webcam' },
+    ]);
+    exec.mockImplementation((program) =>
+      program === 'system_profiler'
+        ? Promise.reject(new Error('ENOENT'))
+        : Promise.resolve({ code: 1, stdout: '', stderr: avfoundation, timedOut: false }),
+    );
+    expect((await listDevices('darwin', () => 'ffmpeg', undefined, exec))[0]).toEqual({
+      id: '0',
+      label: 'USB Camera',
+    });
+  });
+  it('reads no USB IDs from camera data that is not JSON or has no camera list', () => {
+    expect(parseCameraData('')).toEqual(new Map());
+    expect(parseCameraData('{"SPCameraDataType": {}}')).toEqual(new Map());
+    expect(parseCameraData('{"SPCameraDataType": [null, {"_name": 1}]}')).toEqual(new Map());
+  });
+  it('reads the USB IDs of DirectShow devices from their alternative names', async () => {
+    const dshow = [
+      '[dshow @ 000001] "USB Camera" (video)',
+      '[dshow @ 000001]   Alternative name "@device_pnp_\\\\?\\usb#vid_0bda&pid_5830&mi_00#6&2f2c3e5&0&0000#{65e8773d-8f56-11d0-a3b9-00a0c9223196}\\global"',
+      '[dshow @ 000001] "OBS Virtual Camera" (video)',
+      '[dshow @ 000001]   Alternative name "@device_sw_{860BB310-5D01-11D0-BD3B-00A0C911CE86}\\{A3FCE0F5-3493-419F-958A-ABA1250EC20B}"',
+      '[dshow @ 000001] "Microphone (Realtek Audio)" (audio)',
+    ].join('\n');
+    const exec = () => Promise.resolve({ code: 1, stdout: '', stderr: dshow, timedOut: false });
+    expect(await listDevices('win32', () => 'ffmpeg', undefined, exec)).toEqual([
+      { id: 'USB Camera', label: 'USB Camera', vendorId: 0x0bda, productId: 0x5830 },
+      { id: 'OBS Virtual Camera', label: 'OBS Virtual Camera' },
+    ]);
+  });
+  it('asks each platform input for the modes of a valid device only', () => {
+    expect(modesArgs('darwin', '1')).toEqual([
+      '-hide_banner',
+      '-nostdin',
+      '-f',
+      'avfoundation',
+      '-framerate',
+      '1',
+      '-video_size',
+      '1x1',
+      '-i',
+      '1:none',
+    ]);
+    expect(modesArgs('linux', '/dev/video2')).toEqual([
+      '-hide_banner',
+      '-nostdin',
+      '-f',
+      'v4l2',
+      '-list_formats',
+      'all',
+      '-i',
+      '/dev/video2',
+    ]);
+    expect(modesArgs('win32', 'USB Camera').slice(-4)).toEqual([
+      '-list_options',
+      'true',
+      '-i',
+      'video=USB Camera',
+    ]);
+    for (const [platform, device] of [
+      ['darwin', '1:0'],
+      ['linux', '/etc/passwd'],
+      ['win32', ''],
+      ['freebsd', '0'],
+    ])
+      expect(() => modesArgs(platform, device)).toThrow('Invalid capture selection');
+  });
+  it('reads the modes each platform input reports', async () => {
+    const avfoundation = [
+      '[in#0 @ 0x79a940c000] Selected video size (1x1) is not supported by the device.',
+      '[in#0 @ 0x79a940c000] Supported modes:',
+      '[in#0 @ 0x79a940c000]   256x192@[25.000000 25.000000]fps',
+      '[in#0 @ 0x79a940c000]   256x384@[25.000000 25.000000]fps',
+      '[in#0 @ 0x79a940c000]   256x384@[25.000000 25.000000]fps',
+      '[in#0 @ 0x79a9408000] Error opening input: Input/output error',
+    ].join('\n');
+    const exec = vi.fn(() =>
+      Promise.resolve({ code: 251, stdout: '', stderr: avfoundation, timedOut: false }),
+    );
+    expect(await listModes('darwin', '0', () => 'ffmpeg', exec)).toEqual([
+      { width: 256, height: 192, minFps: 25, maxFps: 25 },
+      { width: 256, height: 384, minFps: 25, maxFps: 25 },
+    ]);
+    expect(exec).toHaveBeenCalledWith('ffmpeg', modesArgs('darwin', '0'), 10000);
+    const v4l2 = [
+      '[video4linux2,v4l2 @ 0x55d5c4a0c840] Compressed:       mjpeg :          Motion-JPEG : 1280x720 640x480',
+      '[video4linux2,v4l2 @ 0x55d5c4a0c840] Raw       :     yuyv422 :           YUYV 4:2:2 : 256x384 256x192',
+      '[video4linux2,v4l2 @ 0x55d5c4a0c840] Raw       :     nv12 :           Y/CbCr 4:2:0 : 640x480',
+      '/dev/video2: Immediate exit requested',
+    ].join('\n');
+    expect(parseDeviceModes('linux', v4l2)).toEqual([
+      { width: 256, height: 384 },
+      { width: 256, height: 192 },
+    ]);
+    const stepwise =
+      '[video4linux2,v4l2 @ 0x1] Raw       :     yuyv422 :           YUYV 4:2:2 : {8-1920, 8}x{8-1080, 8}';
+    expect(parseDeviceModes('linux', stepwise)).toEqual([]);
+    const dshow = [
+      '[dshow @ 000001] DirectShow video device options (from video devices)',
+      '[dshow @ 000001]  Pin "Capture" (alternative pin name "0")',
+      '[dshow @ 000001]   pixel_format=yuyv422  min s=256x384 fps=25 max s=256x384 fps=25',
+      '[dshow @ 000001]   pixel_format=yuyv422  min s=256x384 fps=25 max s=256x384 fps=25 (tv, bt470bg/bt709/unknown, topleft)',
+      '[dshow @ 000001]   pixel_format=yuyv422  min s=320x240 fps=5 max s=640x480 fps=30',
+      '[dshow @ 000001]   vcodec=mjpeg  min s=1280x720 fps=30 max s=1280x720 fps=30',
+    ].join('\n');
+    expect(parseDeviceModes('win32', dshow)).toEqual([
+      { width: 256, height: 384, minFps: 25, maxFps: 25 },
+    ]);
+    exec.mockResolvedValueOnce({ code: null, stdout: '', stderr: '', timedOut: true });
+    await expect(listModes('darwin', '0', () => 'ffmpeg', exec)).rejects.toThrow(
+      'Reading the camera modes timed out',
+    );
   });
   it('explains a camera without the thermal video mode instead of quoting ffmpeg', () => {
     const log = [

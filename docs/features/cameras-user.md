@@ -46,7 +46,7 @@ The parts of a profile, field by field, are in the [technical document](cameras-
 
 ## How a camera is recognised
 
-When a device appears, irvis looks for profiles that list its USB IDs. If more than one does, it keeps those whose name pattern matches the device name, unless none matches. In the browser, which usually does not see USB IDs, only the name pattern counts. One remaining profile is used directly; several mean the user picks one; none means the camera is not supported.
+When a device appears, irvis looks for profiles that list its USB IDs. If more than one does, it keeps those whose name pattern matches the device name, unless none matches. In the browser, which usually does not see USB IDs, only the name pattern counts. One remaining profile is chosen when you pick the camera in Source; with several or none, the profile chosen before stays and you pick one yourself. Whether the camera has temperature data shows in Video mode: a mode the profile has no temperature layout for is listed as image only.
 
 ## Problems the check reports
 

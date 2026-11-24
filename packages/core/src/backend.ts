@@ -26,6 +26,18 @@ export interface CameraDevice {
   readonly productId?: number;
 }
 
+/**
+ * A video mode a device reports. What a platform reports differs: the desktop
+ * app's AVFoundation list gives frame-rate ranges, V4L2 gives sizes only.
+ */
+export interface DeviceVideoMode {
+  readonly width: number;
+  readonly height: number;
+  /** The frame-rate range, when the platform reports one. */
+  readonly minFps?: number;
+  readonly maxFps?: number;
+}
+
 /** What to open: a device, the profile chosen for it, and one of its video modes. */
 export interface OpenRequest {
   readonly deviceId: string;

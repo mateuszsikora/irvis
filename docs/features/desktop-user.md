@@ -18,7 +18,7 @@ A missing recent browser frame shows `Waiting for a browser frame received withi
 
 ## When capture ends with an error
 
-If the camera selected in Source has no video mode of the camera profile, as the built-in FaceTime camera of a Mac, the viewer shows `This camera has no 256 × 384 video mode; it offers …. It is probably not the thermal camera: choose another camera in Source.` Choose the thermal camera in Source (on macOS the TOOLTOP T7 is called `USB Camera`) and press Start again. Any other end of capture shows `Capture ended (<code>).` with the last lines of ffmpeg's log below it.
+Choosing a camera in Source reads the video modes it offers. When none of them carries temperature data, as with the built-in FaceTime camera of a Mac, the app says so before Start (see [the viewer](ui-user.md#navigate-the-workspace)) and Start stays disabled. If the modes could not be read and the camera has no video mode of the camera profile, the viewer shows `This camera has no 256 × 384 video mode; it offers …. It is probably not the thermal camera: choose another camera in Source.` Choose the thermal camera in Source (on macOS the TOOLTOP T7 is called `USB Camera`) and press Start again. Any other end of capture shows `Capture ended (<code>).` with the last lines of ffmpeg's log below it.
 
 ## Install a package
 
