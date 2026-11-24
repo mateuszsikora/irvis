@@ -103,26 +103,80 @@ describe('App', () => {
     devices = [{ id: '2', label: 'Other camera' }];
     fireEvent.click(screen.getByRole('button', { name: 'Refresh cameras' }));
     await screen.findByText('Other camera', { selector: 'option' });
-    expect(source.value).toBe('camera:1');
+    expect(source.value).toBe('missing');
     expect(options('Source')).toEqual([
       ['demo', 'Demo'],
       ['camera:2', 'Other camera'],
-      ['camera:1', 'Disconnected camera'],
+      ['missing', 'USB Camera (disconnected)'],
     ]);
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Start' }).disabled).toBe(true);
     devices = [{ id: '1', label: 'USB Camera' }];
     fireEvent.click(screen.getByRole('button', { name: 'Refresh cameras' }));
     await screen.findByText('USB Camera', { selector: 'option' });
-    expect(screen.queryByText('Disconnected camera')).toBeNull();
+    expect(source.value).toBe('camera:1');
+    expect(screen.queryByText('USB Camera (disconnected)')).toBeNull();
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Start' }).disabled).toBe(false);
+  });
+
+  it('does not take another camera that moves into the position of a disconnected one', async () => {
+    let devices = [
+      { id: '0', label: 'FaceTime HD Camera' },
+      { id: '1', label: 'USB Camera' },
+      { id: '2', label: 'iPhone Camera' },
+    ];
+    window.irvisDesktop = {
+      start: () => Promise.resolve(),
+      stop: () => Promise.resolve(),
+      subscribe: () => () => {},
+      listDevices: () => Promise.resolve(devices),
+    };
+    render(<App />);
+    await screen.findByText('USB Camera', { selector: 'option' });
+    const source = screen.getByLabelText<HTMLSelectElement>('Source');
+    fireEvent.change(source, { target: { value: 'camera:1' } });
+    devices = [
+      { id: '0', label: 'FaceTime HD Camera' },
+      { id: '1', label: 'iPhone Camera' },
+    ];
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh cameras' }));
+    await screen.findByText('USB Camera (disconnected)', { selector: 'option' });
+    expect(source.value).toBe('missing');
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Start' }).disabled).toBe(true);
+  });
+
+  it('follows the chosen camera to its new position and starts it there', async () => {
+    const start = vi.fn(() => Promise.resolve());
+    let devices = [
+      { id: '0', label: 'iPhone Camera' },
+      { id: '1', label: 'FaceTime HD Camera' },
+      { id: '2', label: 'USB Camera' },
+    ];
+    window.irvisDesktop = {
+      start,
+      stop: () => Promise.resolve(),
+      subscribe: () => () => {},
+      listDevices: () => Promise.resolve(devices),
+    };
+    render(<App />);
+    await screen.findByText('USB Camera', { selector: 'option' });
+    const source = screen.getByLabelText<HTMLSelectElement>('Source');
+    fireEvent.change(source, { target: { value: 'camera:2' } });
+    devices = [
+      { id: '0', label: 'FaceTime HD Camera' },
+      { id: '1', label: 'USB Camera' },
+    ];
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh cameras' }));
+    await waitFor(() => expect(source.value).toBe('camera:1'));
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    await waitFor(() =>
+      expect(start).toHaveBeenCalledWith(expect.objectContaining({ device: '1' })),
+    );
   });
 
   it('explains why the camera list is unavailable', async () => {
     render(<App />);
     expect(
-      await screen.findByText(
-        'Cameras unavailable: Error: Camera access requires HTTPS or localhost.',
-      ),
+      await screen.findByText('Cameras unavailable: Camera access requires HTTPS or localhost.'),
     ).toBeTruthy();
   });
 });

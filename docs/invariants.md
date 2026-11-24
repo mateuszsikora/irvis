@@ -320,6 +320,8 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
   - `apps/desktop/test/capture.test.js::desktop capture::repeats the full state read while gain, emissivity or reflected temperature is unknown`
   - `apps/desktop/test/capture.test.js::desktop capture::backs off repeated full state reads to 30 seconds and polls sensor bytes between them`
 
-- **81.** The Source select offers Demo and every listed camera; a refresh keeps the selected camera, and a selected camera missing from the list stays selected as disconnected with Start disabled.
+- **81.** The Source select offers Demo and every listed camera; a refresh keeps the selected camera, found by its id and label or by its unique label when positional ids shift, and a selected camera missing from the list stays selected as disconnected with Start disabled, never replaced by a camera that moved into its position.
   - `apps/web/src/App.test.tsx::App::offers Demo and every connected camera as the source, and only thermal video modes`
   - `apps/web/src/App.test.tsx::App::keeps a camera that disappears on refresh selected as disconnected and disables Start`
+  - `apps/web/src/App.test.tsx::App::does not take another camera that moves into the position of a disconnected one`
+  - `apps/web/src/App.test.tsx::App::follows the chosen camera to its new position and starts it there`

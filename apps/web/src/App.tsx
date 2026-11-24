@@ -18,6 +18,18 @@ const DEMO = 'demo';
 /** The replay backend's only device. */
 const DEMO_DEVICE = 'demo';
 const CAMERA = 'camera:';
+const MISSING = 'missing';
+/**
+ * The chosen camera in the latest list. AVFoundation and V4L2 ids are list
+ * positions that shift when a device comes or goes, so the id counts only with
+ * the same label; otherwise the camera is found by its label if that is unique.
+ */
+function findCamera(list: readonly CameraDevice[], chosen: CameraDevice) {
+  const same = list.find((c) => c.id === chosen.id && c.label === chosen.label);
+  if (same) return same;
+  const named = list.filter((c) => c.label === chosen.label);
+  return named.length === 1 ? named[0] : undefined;
+}
 export function App({ profiles = cameraProfiles }: AppProps) {
   const photoLibrary = useMemo(
     () => (typeof indexedDB === 'undefined' ? undefined : createPhotoLibrary()),
@@ -29,7 +41,10 @@ export function App({ profiles = cameraProfiles }: AppProps) {
       ? createDesktopRecordingStorage(bridge)
       : createBrowserRecordingStorage();
   }, []);
-  const [source, setSource] = useState(DEMO);
+  /** null is Demo. */
+  const [camera, setCamera] = useState<CameraDevice | null>(null);
+  /** Counts Source choices, so that each choice mounts a fresh viewer. */
+  const [choice, setChoice] = useState(0);
   const [cameras, setCameras] = useState<readonly CameraDevice[]>([]);
   const [cameraError, setCameraError] = useState('');
   const [listing, setListing] = useState(true);
@@ -49,7 +64,7 @@ export function App({ profiles = cameraProfiles }: AppProps) {
         setCameraError('');
       })
       .catch((e: unknown) => {
-        if (alive) setCameraError(String(e));
+        if (alive) setCameraError(e instanceof Error ? e.message : String(e));
       })
       .finally(() => {
         if (alive) setListing(false);
@@ -76,8 +91,8 @@ export function App({ profiles = cameraProfiles }: AppProps) {
       </select>
     </label>
   );
-  const cameraId = source.startsWith(CAMERA) ? source.slice(CAMERA.length) : null;
-  const cameraMissing = cameraId !== null && !cameras.some((c) => c.id === cameraId);
+  const current = camera && findCamera(cameras, camera);
+  const source = current ? CAMERA + current.id : camera ? MISSING : DEMO;
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -98,7 +113,10 @@ export function App({ profiles = cameraProfiles }: AppProps) {
               aria-label="Source"
               value={source}
               onChange={(e) => {
-                setSource(e.target.value);
+                const value = e.target.value;
+                if (value === MISSING) return;
+                setCamera(cameras.find((c) => CAMERA + c.id === value) ?? null);
+                setChoice((count) => count + 1);
               }}
             >
               <option value={DEMO}>Demo</option>
@@ -107,7 +125,9 @@ export function App({ profiles = cameraProfiles }: AppProps) {
                   {c.label || c.id}
                 </option>
               ))}
-              {cameraMissing && <option value={source}>Disconnected camera</option>}
+              {camera && !current && (
+                <option value={MISSING}>{camera.label || camera.id} (disconnected)</option>
+              )}
             </select>
           </label>
           <button
@@ -147,10 +167,11 @@ export function App({ profiles = cameraProfiles }: AppProps) {
       {profiles.length === 0 && <p>No camera is supported yet.</p>}
       {profile && (
         <SourceViewer
-          // Choosing another source, camera, profile or mode closes the running capture.
-          key={`${source}-${profile.id}-${mode?.id ?? ''}`}
-          live={source !== DEMO}
-          device={source === DEMO ? DEMO_DEVICE : cameraMissing ? '' : (cameraId ?? '')}
+          // Choosing another source, camera, profile or mode closes the running capture;
+          // a refresh that finds the camera under a new id does not.
+          key={`${choice}-${profile.id}-${mode?.id ?? ''}`}
+          live={camera !== null}
+          device={camera ? (current?.id ?? '') : DEMO_DEVICE}
           modeId={mode?.id ?? ''}
           profile={profile}
           profilePicker={profilePicker}
