@@ -1,8 +1,12 @@
 import { reconstructPlanar, type VideoMode, type Yuv420Frame } from '@irvis/core';
 import type { FrameMetadata } from './frame.ts';
 
+/**
+ * A frame's reconstruction and its statistics; a frame of a mode without
+ * temperature data passes through unchanged, with neither.
+ */
 export function analyse(frame: Yuv420Frame, mode: VideoMode, info: FrameMetadata) {
-  if (!mode.layout) throw new Error('This mode has no thermal data.');
+  if (!mode.layout) return { info, frame, reconstructionMs: null, statistics: null };
   const start = performance.now();
   const result = reconstructPlanar(frame, { thermal: mode.layout.thermal });
   const reconstructionMs = performance.now() - start;

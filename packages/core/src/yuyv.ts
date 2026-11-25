@@ -3,6 +3,7 @@
 // docs/features/core-technical.md#interfaces
 import type { CameraStateSnapshot, Conversion, RowRange, VideoMode } from './cameras/profile.ts';
 import type { ThermalFrame, YuyvFrame } from './frames.ts';
+import { putBt601 } from './bt601.ts';
 
 /** The bytes of image rows in a YUYV frame, split into planes. */
 export interface YuyvImage {
@@ -130,22 +131,12 @@ export function yuyvToRgba(frame: YuyvFrame): Uint8ClampedArray<ArrayBuffer> {
   checkYuyvFrame(frame);
   const { data } = frame;
   const rgba = new Uint8ClampedArray(new ArrayBuffer(frame.width * frame.height * 4));
-  const put = (out: number, y: number, red: number, green: number, blue: number) => {
-    const luma = 1.164 * (y - 16);
-    rgba[out] = luma + red;
-    rgba[out + 1] = luma + green;
-    rgba[out + 2] = luma + blue;
-    rgba[out + 3] = 255;
-  };
   // checkYuyvFrame guarantees whole [Y0 U Y1 V] groups, so every index below exists.
   for (let at = 0, out = 0; at < data.length; at += 4, out += 8) {
-    const u = data[at + 1]! - 128;
-    const v = data[at + 3]! - 128;
-    const red = 1.596 * v;
-    const green = -0.392 * u - 0.813 * v;
-    const blue = 2.017 * u;
-    put(out, data[at]!, red, green, blue);
-    put(out + 4, data[at + 2]!, red, green, blue);
+    const u = data[at + 1]!;
+    const v = data[at + 3]!;
+    putBt601(rgba, out, data[at]!, u, v);
+    putBt601(rgba, out + 4, data[at + 2]!, u, v);
   }
   return rgba;
 }

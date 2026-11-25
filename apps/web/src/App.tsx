@@ -11,7 +11,7 @@ import {
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Icon, Viewer, type PhotoLibrary } from '@irvis/ui';
 import { openRecording, createReplayBackend } from '@irvis/backend-replay';
-import { liveBackend, listCameraModes, listLiveCameras, showsImageOnly } from './viewer-backend.ts';
+import { liveBackend, listCameraModes, listLiveCameras } from './viewer-backend.ts';
 import { videoModeOptions } from './video-modes.ts';
 import './viewer.css';
 import brandMark from './brand/mark.svg';
@@ -136,7 +136,7 @@ export function App({ profiles = cameraProfiles }: AppProps) {
     (deviceModes.id === current.id || deviceModes.choice === choice)
       ? deviceModes.modes
       : null;
-  const modeOptions = profile ? videoModeOptions(profile, modes, !!camera && showsImageOnly()) : [];
+  const modeOptions = profile ? videoModeOptions(profile, modes, !!camera) : [];
   const choosable = modeOptions.flatMap((o) => (o.mode ? [o.mode] : []));
   // The default is a mode with temperature data in the profile's order, not the
   // device's, so that modes arriving after a choice do not change a mode the device

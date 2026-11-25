@@ -59,7 +59,7 @@ describe('App', () => {
     ).toBe(true);
   });
 
-  it('offers Demo and every connected camera as the source, and the profile modes with image-only ones disabled', async () => {
+  it('offers Demo and every connected camera as the source, and the profile modes with image-only ones disabled for Demo', async () => {
     window.irvisDesktop = {
       start: vi.fn(() => Promise.resolve()),
       stop: () => Promise.resolve(),
@@ -82,6 +82,30 @@ describe('App', () => {
       ['yuyv-256x192', '256 × 192 · 25 fps · image only'],
     ]);
     expect(disabled('Video mode')).toEqual([false, true]);
+  });
+
+  it('lets a browser camera choose the profile modes, image-only ones too', async () => {
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      mediaDevices: {
+        enumerateDevices: () =>
+          Promise.resolve([
+            { kind: 'videoinput', deviceId: 'abc', label: 'USB Camera (0bda:5830)' },
+          ]),
+      },
+    });
+    try {
+      render(<App />);
+      await screen.findByText('USB Camera (0bda:5830)', { selector: 'option' });
+      fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'camera:abc' } });
+      await waitFor(() => expect(disabled('Video mode')).toEqual([false, false]));
+      expect(options('Video mode')).toEqual([
+        ['yuyv-256x384', '256 × 384 · 25 fps'],
+        ['yuyv-256x192', '256 × 192 · 25 fps · image only'],
+      ]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('lists the modes the chosen camera reports, defaults to one with temperature data and starts an image-only one', async () => {

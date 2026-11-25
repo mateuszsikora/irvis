@@ -40,7 +40,7 @@ it('stops the transferred track and cancels a blocked read before acknowledging'
   expect(reader.releaseLock).toHaveBeenCalled();
   expect(postMessage).not.toHaveBeenCalledWith({ type: 'ended' });
 });
-it('returns the copied buffer and reports reconstruction failures', async () => {
+it('returns the copied buffer and reports reconstruction failures, passing a frame without temperature data through', async () => {
   const smallMode = {
     ...mode,
     width: 2,
@@ -60,10 +60,20 @@ it('returns the copied buffer and reports reconstruction failures', async () => 
     frame.data.buffer,
   ]);
   send({ type: 'frame', frame, mode: { ...smallMode, layout: null }, info: {} });
+  expect(postMessage).toHaveBeenLastCalledWith(
+    { type: 'result', result: { info: {}, frame, reconstructionMs: null, statistics: null } },
+    [frame.data.buffer],
+  );
+  send({
+    type: 'frame',
+    frame,
+    mode: { ...smallMode, layout: { thermal: { firstRow: 0, rows: 4, packing: 'u16le' } } },
+    info: {},
+  });
   await vi.waitFor(() =>
     expect(postMessage).toHaveBeenLastCalledWith({
       type: 'error',
-      message: 'This mode has no thermal data.',
+      message: 'reconstruction rows must be positive, pair-aligned and inside the frame',
     }),
   );
 });

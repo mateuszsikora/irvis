@@ -34,10 +34,11 @@ export function metadata(frame: VideoFrame) {
 export type FrameMetadata = ReturnType<typeof metadata>;
 export function rejection(frame: FrameMetadata, mode: VideoMode): string | null {
   if (frame.codedWidth !== mode.width || frame.codedHeight !== mode.height)
-    return `Frame size mismatch: got ${frame.codedWidth}×${frame.codedHeight}, expected ${mode.width}×${mode.height}; reconstruction cannot start.`;
+    return `Frame size mismatch: got ${frame.codedWidth}×${frame.codedHeight}, expected ${mode.width}×${mode.height}; ${mode.layout ? 'reconstruction cannot start' : 'the image cannot be shown'}.`;
   if (frame.format !== 'I420' && frame.format !== 'NV12')
-    return `Unsupported frame format: got ${frame.format ?? 'null'}; only I420 and NV12 can be reconstructed. RGB data cannot be recovered.`;
-  if (!mode.layout) return 'This mode has no thermal data.';
+    return mode.layout
+      ? `Unsupported frame format: got ${frame.format ?? 'null'}; only I420 and NV12 can be reconstructed. RGB data cannot be recovered.`
+      : `Unsupported frame format: got ${frame.format ?? 'null'}; only I420 and NV12 can be shown.`;
   return null;
 }
 export async function copyFrame(frame: VideoFrame, mode: VideoMode): Promise<Yuv420Frame> {

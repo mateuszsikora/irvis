@@ -46,15 +46,6 @@ export async function listCameraModes(
   }
 }
 
-/**
- * Whether a live camera can show a mode without temperature data: in the
- * desktop app, which reads the camera's YUYV bytes; not in the browser, whose
- * capture Worker only reconstructs temperatures.
- */
-export function showsImageOnly(): boolean {
-  return desktopBridge() !== undefined;
-}
-
 /** Adapt the existing capture paths without adding privileged APIs to the UI. */
 export function liveBackend(onError: (message: string) => void): CameraBackend {
   const bridge = desktopBridge();
@@ -68,7 +59,7 @@ export function liveBackend(onError: (message: string) => void): CameraBackend {
     listDevices: listLiveCameras,
     async open({ deviceId, profile, modeId }) {
       const mode = findVideoMode(profile, modeId);
-      if (!mode || (!bridge && !mode.layout)) throw new Error('This mode has no thermal data.');
+      if (!mode) throw new Error(`Unknown video mode: ${modeId}`);
       onError('');
       const owner = Symbol('capture');
       let closed = false;

@@ -25,6 +25,7 @@ import {
   type VideoMode,
   type TemperatureRange,
   type PaletteId,
+  yuv420ToRgba,
   yuyvToRgba,
 } from '@irvis/core';
 
@@ -342,12 +343,12 @@ export class FrameRenderer {
    * as set, with no readings, alarm, photo or recording frame.
    */
   private drawImage(input: Exclude<RawFrame, { kind: 'thermal' }>, settings: ViewSettings) {
-    if (input.kind !== 'yuyv') throw new Error('Only a YUYV frame can be shown as an image.');
+    const rgba = input.kind === 'yuyv' ? yuyvToRgba(input) : yuv420ToRgba(input);
     this.source.width = input.width;
     this.source.height = input.height;
     this.source
       .getContext('2d')
-      ?.putImageData(new ImageData(yuyvToRgba(input), input.width, input.height), 0, 0);
+      ?.putImageData(new ImageData(rgba, input.width, input.height), 0, 0);
     this.present(input.width, input.height, settings);
     this.warning.textContent = '';
     this.bounds.textContent = 'No temperature data';

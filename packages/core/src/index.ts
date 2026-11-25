@@ -7,6 +7,7 @@ export * from './cameras/index.ts';
 export * from './analysis/index.ts';
 export * from './corrections/index.ts';
 export * from './yuyv.ts';
+export * from './yuv420.ts';
 export * from './video-modes.ts';
 export * from './irvis/index.ts';
 export * from './memory.ts';

@@ -175,14 +175,15 @@ async function boot() {
       profile && typeof options?.modeId === 'string' && findVideoMode(profile, options.modeId);
     if (!mode) throw new Error('Invalid capture selection');
     // The profile describes the camera's USB commands only for the modes it lists;
-    // another mode may belong to another camera, such as a built-in one.
-    const controlled = profile.videoModes.includes(mode);
+    // another mode may belong to another camera, such as a built-in one. The same
+    // fact chooses the advice when the camera lacks the mode.
+    const profileMode = profile.videoModes.includes(mode);
     const args = captureArgs(process.platform, options.device, mode);
     const executable = ffmpeg();
     await controlCleanup;
     if (generation !== token) return;
     // USB access can be unavailable while the OS owns UVC. Video remains usable.
-    if (controlled) {
+    if (profileMode) {
       try {
         const opened = await openControl(
           profile,
@@ -246,7 +247,7 @@ async function boot() {
       if (child === proc) read(chunk);
     });
     proc.on('error', (error) => sendError(error.message));
-    proc.on('close', (code) => sendError(captureEndedMessage(code, log, mode)));
+    proc.on('close', (code) => sendError(captureEndedMessage(code, log, mode, profileMode)));
   });
   ipcMain.handle('capture:stop', (event) => {
     authorize(event);

@@ -12,7 +12,7 @@ import {
   pixelFormatMessage,
 } from '../src/capture.js';
 import { openControl } from '../src/control.js';
-import { cameraProfiles } from '@irvis/core';
+import { cameraProfiles, findVideoMode } from '@irvis/core';
 import { CameraUsb } from '../../../tools/capture-cli/src/usb-protocol.ts';
 const usb = vi.hoisted(() => {
   const device = {
@@ -242,7 +242,7 @@ describe('desktop capture', () => {
       'Reading the camera modes timed out',
     );
   });
-  it('explains a camera without the thermal video mode instead of quoting ffmpeg', () => {
+  it('explains a camera without the chosen video mode instead of quoting ffmpeg, pointing to another camera only for a profile mode', () => {
     const log = [
       '[in#0 @ 0x7c5101c000] Selected video size (256x384) is not supported by the device.',
       '[in#0 @ 0x7c5101c000] Supported modes:',
@@ -255,8 +255,15 @@ describe('desktop capture', () => {
       'Error opening input files: Input/output error',
       '',
     ].join('\n');
-    expect(captureEndedMessage(251, log, mode)).toBe(
+    expect(captureEndedMessage(251, log, mode, true)).toBe(
       'This camera has no 256 × 384 video mode; it offers 1920 × 1080, 1280 × 720 and 640 × 480. It is probably not the thermal camera: choose another camera in Source.',
+    );
+    // The profile's own image-only mode is offered also when the modes could not be read.
+    expect(captureEndedMessage(251, log, findVideoMode(profile, 'yuyv-256x192'), true)).toBe(
+      'This camera has no 256 × 192 video mode; it offers 1920 × 1080, 1280 × 720 and 640 × 480. It is probably not the thermal camera: choose another camera in Source.',
+    );
+    expect(captureEndedMessage(251, log, findVideoMode(profile, 'image-800x600@30'), false)).toBe(
+      'This camera has no 800 × 600 video mode; it offers 1920 × 1080, 1280 × 720 and 640 × 480. Choose another video mode.',
     );
   });
   it('cuts stdout into whole frames across chunk boundaries, reusing one frame buffer', () => {
@@ -296,7 +303,7 @@ describe('desktop capture', () => {
       'Error opening input file 99:none.',
       'Error opening input files: Input/output error',
     ].join('\n');
-    expect(captureEndedMessage(251, log, mode)).toBe(
+    expect(captureEndedMessage(251, log, mode, true)).toBe(
       [
         'Capture ended (251).',
         'Video device not found',
