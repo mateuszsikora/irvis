@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   cameraProfiles,
   exportPng,
+  findVideoMode,
   type CameraBackend,
+  type VideoMode,
   type CameraSession,
   type RawFrame,
 } from '@irvis/core';
@@ -246,6 +248,82 @@ describe('Viewer', () => {
       profile.videoModes[0],
       expect.objectContaining({ palette: 'rainbow' }),
     );
+  });
+});
+
+describe('image-only view', () => {
+  function imageBackend(
+    mode: VideoMode,
+  ): CameraBackend & { emit: (frame: RawFrame) => void; subscribed: () => boolean } {
+    let listener: ((frame: RawFrame) => void) | undefined;
+    return {
+      ...backend(),
+      id: 'electron',
+      capabilities: { exactRaw: true, deviceControl: true, concurrentWith: [] },
+      emit: (frame) => listener?.(frame),
+      subscribed: () => listener !== undefined,
+      open: () =>
+        Promise.resolve({
+          device: { id: 'cam', label: 'Camera' },
+          profile,
+          mode,
+          frames: {
+            subscribe: (next) => {
+              listener = next;
+              return () => {};
+            },
+          },
+          command: () => Promise.resolve(),
+          close: async () => {},
+        }),
+    };
+  }
+  it('shows a mode without temperature data with orientation only, and no temperature tools', async () => {
+    const mode = findVideoMode(profile, 'image-1280x720@30')!;
+    const live = imageBackend(mode);
+    const { container } = render(
+      <Viewer device="cam" modeId={mode.id} profile={profile} backend={live} />,
+    );
+    const group = (name: string) => container.querySelector(`[aria-label="${name}"]`);
+    expect(container.querySelector('.preview-meta')?.textContent).toContain(
+      'IMAGE ONLY/1280 × 720',
+    );
+    expect(
+      screen.getByText(
+        'This video mode has no temperature data: Start shows the camera’s image only.',
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText('Image only', { selector: 'h3' })).toBeTruthy();
+    expect(group('Palette')).toBeNull();
+    expect(group('Range mode')).toBeNull();
+    expect(screen.queryByText('Camera commands')).toBeNull();
+    expect(group('Rotation')).not.toBeNull();
+    expect(group('Tracking shortcuts')).toBeNull();
+    expect(screen.queryByText('Uncertain pixels')).toBeNull();
+    expect(screen.queryByText('Alarm disabled')).toBeNull();
+    expect(group('Measurement readings')?.hasAttribute('hidden')).toBe(true);
+    expect(container.querySelector('.scale-strip')?.hasAttribute('hidden')).toBe(true);
+    fireEvent.click(screen.getByText('Start', { selector: 'button' }));
+    const frame: RawFrame = {
+      kind: 'yuyv',
+      width: 1280,
+      height: 720,
+      data: new Uint8Array(1280 * 720 * 2),
+      timestamp: 0,
+    };
+    // The viewer subscribes in an effect after the render that shows the session.
+    await waitFor(() => expect(live.subscribed()).toBe(true));
+    act(() => live.emit(frame));
+    await waitFor(() => expect(draw).toHaveBeenCalledWith(frame, profile, mode, expect.anything()));
+    expect(screen.getByText('Capture photo', { selector: 'button' }).hasAttribute('disabled')).toBe(
+      true,
+    );
+  });
+  it("keeps the camera commands for the profile's own image-only mode", () => {
+    const mode = profile.videoModes.find((m) => m.layout === null)!;
+    render(<Viewer device="cam" modeId={mode.id} profile={profile} backend={imageBackend(mode)} />);
+    expect(screen.getByText('Image only', { selector: 'h3' })).toBeTruthy();
+    expect(screen.getByText('Camera commands')).toBeTruthy();
   });
 });
 

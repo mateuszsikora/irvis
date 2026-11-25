@@ -1,11 +1,18 @@
-import { captureArgs, captureEndedMessage, listDevices, listModes } from './capture.js';
+import {
+  captureArgs,
+  captureEndedMessage,
+  frameReader,
+  listDevices,
+  listModes,
+  pixelFormatMessage,
+} from './capture.js';
 import { openControl } from './control.js';
 import { installRecordingStorage } from './recordings.js';
 import { app, BrowserWindow, ipcMain, protocol, net, session } from 'electron';
 import { spawn } from 'node:child_process';
 import { resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { cameraProfiles } from '@irvis/core';
+import { cameraProfiles, findVideoMode } from '@irvis/core';
 import { parseInputPixelFormat, run } from '../../../tools/capture-cli/src/ffmpeg.ts';
 import { bundledFfmpeg, locateFfmpeg } from './ffmpeg.js';
 
@@ -163,42 +170,48 @@ async function boot() {
     stopModesRead();
     const token = generation;
     const profile = cameraProfiles.find((p) => p.id === options?.profileId);
-    const mode = profile?.videoModes.find((m) => m.id === options?.modeId);
-    if (!mode?.layout) throw new Error('Invalid capture selection');
+    // A profile mode, or an image-only mode of any size the device offers.
+    const mode =
+      profile && typeof options?.modeId === 'string' && findVideoMode(profile, options.modeId);
+    if (!mode) throw new Error('Invalid capture selection');
+    // The profile describes the camera's USB commands only for the modes it lists;
+    // another mode may belong to another camera, such as a built-in one.
+    const controlled = profile.videoModes.includes(mode);
     const args = captureArgs(process.platform, options.device, mode);
     const executable = ffmpeg();
     await controlCleanup;
     if (generation !== token) return;
     // USB access can be unavailable while the OS owns UVC. Video remains usable.
-    try {
-      const opened = await openControl(
-        profile,
-        process.platform === 'darwin'
-          ? resolve(resources ?? __dirname, 'iokit-request')
-          : undefined,
-      );
-      if (generation !== token) {
-        opened.close();
-        return;
+    if (controlled) {
+      try {
+        const opened = await openControl(
+          profile,
+          process.platform === 'darwin'
+            ? resolve(resources ?? __dirname, 'iokit-request')
+            : undefined,
+        );
+        if (generation !== token) {
+          opened.close();
+          return;
+        }
+        control = opened;
+        await opened.read();
+        if (mode.enableCommand) await opened.command(mode.enableCommand);
+      } catch (error) {
+        if (generation !== token) return;
+        control?.close();
+        control = undefined;
+        if (mode.enableCommand) throw error;
+        // Video goes on without control; the reason is only logged.
+        console.warn('Camera control is unavailable: ' + error.message);
       }
-      control = opened;
-      await opened.read();
-      if (mode.enableCommand) await opened.command(mode.enableCommand);
-    } catch (error) {
-      if (generation !== token) return;
-      control?.close();
-      control = undefined;
-      if (mode.enableCommand) throw error;
-      // Video goes on without control; the reason is only logged.
-      console.warn('Camera control is unavailable: ' + error.message);
     }
     if (generation !== token) return;
     // Also a read that started while the camera control was opening.
     stopModesRead();
     const proc = spawn(executable, ['-y', ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
     child = proc;
-    let buffer = Buffer.alloc(0),
-      log = '',
+    let log = '',
       format = null;
     const size = mode.width * mode.height * 2;
     const sendError = (message) => {
@@ -213,28 +226,24 @@ async function boot() {
       // suffix in log, but only let complete lines establish the input format.
       const complete = log.lastIndexOf('\n') + 1;
       format = parseInputPixelFormat(log.slice(0, complete)) ?? format;
-      if (format && format !== 'yuyv422')
-        sendError('Exact reference requires native yuyv422; received ' + format);
+      if (format && format !== 'yuyv422') sendError(pixelFormatMessage(format, mode));
+    });
+    const read = frameReader(size, (data) => {
+      if (pending || control?.busy || format !== 'yuyv422') return;
+      pending = true;
+      window.webContents.send('capture:frame', {
+        kind: 'yuyv',
+        cameraState: control?.snapshot,
+        width: mode.width,
+        height: mode.height,
+        timestamp: performance.now(),
+        receivedAt: Date.now(),
+        // A copy: the reader fills the same buffer with the next frame.
+        data: new Uint8Array(data),
+      });
     });
     proc.stdout.on('data', (chunk) => {
-      if (child !== proc) return;
-      buffer = Buffer.concat([buffer, chunk]);
-      while (buffer.length >= size) {
-        const data = buffer.subarray(0, size);
-        buffer = buffer.subarray(size);
-        if (!pending && !control?.busy && format === 'yuyv422') {
-          pending = true;
-          window.webContents.send('capture:frame', {
-            kind: 'yuyv',
-            cameraState: control?.snapshot,
-            width: mode.width,
-            height: mode.height,
-            timestamp: performance.now(),
-            receivedAt: Date.now(),
-            data: Uint8Array.from(data),
-          });
-        }
-      }
+      if (child === proc) read(chunk);
     });
     proc.on('error', (error) => sendError(error.message));
     proc.on('close', (code) => sendError(captureEndedMessage(code, log, mode)));

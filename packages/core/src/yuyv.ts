@@ -119,3 +119,33 @@ export function decodeThermalFrame(
     uncertain: null,
   };
 }
+
+/**
+ * A whole YUYV frame as colours to look at, 4 bytes per pixel, row-major, as
+ * `ImageData`: BT.601 with limited range (Y 16 to 235), which UVC cameras
+ * send, and alpha 255. The colours approximate the picture; no reading comes
+ * from them.
+ */
+export function yuyvToRgba(frame: YuyvFrame): Uint8ClampedArray<ArrayBuffer> {
+  checkYuyvFrame(frame);
+  const { data } = frame;
+  const rgba = new Uint8ClampedArray(new ArrayBuffer(frame.width * frame.height * 4));
+  const put = (out: number, y: number, red: number, green: number, blue: number) => {
+    const luma = 1.164 * (y - 16);
+    rgba[out] = luma + red;
+    rgba[out + 1] = luma + green;
+    rgba[out + 2] = luma + blue;
+    rgba[out + 3] = 255;
+  };
+  // checkYuyvFrame guarantees whole [Y0 U Y1 V] groups, so every index below exists.
+  for (let at = 0, out = 0; at < data.length; at += 4, out += 8) {
+    const u = data[at + 1]! - 128;
+    const v = data[at + 3]! - 128;
+    const red = 1.596 * v;
+    const green = -0.392 * u - 0.813 * v;
+    const blue = 2.017 * u;
+    put(out, data[at]!, red, green, blue);
+    put(out + 4, data[at + 2]!, red, green, blue);
+  }
+  return rgba;
+}

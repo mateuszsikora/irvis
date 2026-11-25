@@ -326,9 +326,19 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
   - `apps/web/src/App.test.tsx::App::does not take another camera that moves into the position of a disconnected one`
   - `apps/web/src/App.test.tsx::App::follows the chosen camera to its new position and starts it there`
   - `apps/web/src/App.test.tsx::App::keeps following a camera found under a new id when its old id is taken by a namesake`
-- **82.** Only a mode of the camera profile with temperature data, and when the device's modes are known one that the device offers in size and frame rate, can be selected in Video mode; every other mode is listed as image only and disabled. A camera whose known modes include none of them shows that it is probably not the thermal camera, with Start disabled.
-  - `apps/web/src/App.test.tsx::App::lists the modes the chosen camera reports, with temperature data only where the profile has it`
-  - `apps/web/src/App.test.tsx::App::says before Start that a camera without a temperature mode is not the thermal camera`
+- **82.** A mode of the camera profile with temperature data can be chosen in Video mode, when the device's modes are known only one that the device offers in size and frame rate, and is the default. A mode without temperature data is listed as image only; it can be chosen only with a live camera in the desktop app, a device mode only when the device reports its frame rate, and it is the default only when no mode with temperature data can be chosen. A camera whose known modes include no mode with temperature data shows that it is probably not the thermal camera; Start is disabled only when no mode can be chosen.
+  - `apps/web/src/App.test.tsx::App::lists the modes the chosen camera reports, defaults to one with temperature data and starts an image-only one`
+  - `apps/web/src/App.test.tsx::App::says before Start that a camera without a temperature mode is not the thermal camera, and starts its image only`
+  - `apps/web/src/App.test.tsx::App::says that a camera has no mode to choose when it reports no frame rates and none of the profile`
   - `apps/web/src/video-modes.test.ts::videoModeOptions::matches a device mode to the profile mode by size and a frame-rate range that holds its rate`
+  - `apps/web/src/video-modes.test.ts::videoModeOptions::lists the profile's modes while the device's are unknown, image-only ones chosen only where they can be shown`
+  - `apps/web/src/video-modes.test.ts::videoModeOptions::cannot choose a device mode without a frame rate, nor one that is not packed YUYV, and labels it by its size`
+  - `apps/web/src/viewer-backend.test.ts::image-only modes::opens one through the desktop bridge, which reads YUYV bytes, but not in the browser`
 - **83.** Choosing a camera in Source selects the camera profile only when exactly one profile matches the camera's USB IDs (or its label pattern); with none or several, the profile chosen before stays.
   - `apps/web/src/App.test.tsx::App::chooses the profile that lists the camera USB IDs or, without them, matches its name, and keeps the choice when none or several do`
+- **84.** A mode without temperature data shows the camera's picture with no readings, palette, temperature range, alarm, photo or recording frame, and the profile's camera commands only for a mode the profile lists. A mode id names a profile mode or, only in its one spelling `image-<width>x<height>@<fps>`, an image-only mode of an even width and a height, each up to 8192, and a rate above 0 and up to 1000.
+  - `packages/ui/test/render.test.ts::FrameRenderer::shows a mode without temperature data as the camera's colours, oriented, with no readings`
+  - `packages/ui/test/viewer.test.tsx::image-only view::shows a mode without temperature data with orientation only, and no temperature tools`
+  - `packages/ui/test/viewer.test.tsx::image-only view::keeps the camera commands for the profile's own image-only mode`
+  - `packages/core/src/video-modes.test.ts::imageOnlyMode::refuses sizes and rates ffmpeg should not be asked for`
+  - `packages/core/src/video-modes.test.ts::findVideoMode::finds nothing for any other id, including another spelling of an image-only id`

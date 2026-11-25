@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { CameraStateSnapshot, VideoMode } from './cameras/profile.ts';
 import type { YuyvFrame } from './frames.ts';
-import { checkYuyvFrame, decodeThermalFrame, decodeYuyvImage, decodeYuyvRaw } from './yuyv.ts';
+import {
+  checkYuyvFrame,
+  decodeThermalFrame,
+  decodeYuyvImage,
+  decodeYuyvRaw,
+  yuyvToRgba,
+} from './yuyv.ts';
 
 function frame(width: number, height: number, fill: (i: number) => number): YuyvFrame {
   const data = new Uint8Array(width * height * 2);
@@ -132,5 +138,36 @@ describe('decodeThermalFrame', () => {
     expect(() => decodeThermalFrame(f, mode, conversion, state)).toThrow(
       "frame is 4×2, video mode 'yuyv-4x4' is 4×4",
     );
+  });
+});
+
+describe('yuyvToRgba', () => {
+  it('converts limited-range BT.601 to opaque RGBA, two pixels per U and V pair', () => {
+    // Black, then white, both grey (U = V = 128); then pure red's Y, U and V.
+    const f: YuyvFrame = {
+      kind: 'yuyv',
+      width: 4,
+      height: 1,
+      data: Uint8Array.from([16, 128, 235, 128, 81, 90, 81, 240]),
+      timestamp: 0,
+    };
+    const rgba = Array.from(yuyvToRgba(f));
+    expect(rgba.slice(0, 8)).toEqual([0, 0, 0, 255, 255, 255, 255, 255]);
+    const red = rgba.slice(8, 12);
+    expect(red[0]).toBeGreaterThan(250);
+    expect(red[1]).toBeLessThan(5);
+    expect(red[2]).toBeLessThan(5);
+    expect(rgba.slice(12, 16)).toEqual(red);
+  });
+
+  it('throws on a frame that is not packed YUYV', () => {
+    const f: YuyvFrame = {
+      kind: 'yuyv',
+      width: 2,
+      height: 1,
+      data: new Uint8Array(3),
+      timestamp: 0,
+    };
+    expect(() => yuyvToRgba(f)).toThrow('YUYV frame has 3 bytes, expected 4 for 2×1');
   });
 });

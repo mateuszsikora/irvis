@@ -84,7 +84,7 @@ describe('App', () => {
     expect(disabled('Video mode')).toEqual([false, true]);
   });
 
-  it('lists the modes the chosen camera reports, with temperature data only where the profile has it', async () => {
+  it('lists the modes the chosen camera reports, defaults to one with temperature data and starts an image-only one', async () => {
     const start = vi.fn(() => Promise.resolve());
     const listModes = vi.fn(() => Promise.resolve(T7_MODES));
     window.irvisDesktop = {
@@ -97,23 +97,32 @@ describe('App', () => {
     render(<App />);
     await screen.findByText('USB Camera', { selector: 'option' });
     fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'camera:0' } });
-    await screen.findByText('256 × 192 · 25 fps · image only', { selector: 'option' });
+    // The device lists 256 × 192 first; the profile, before the read, 256 × 384.
+    await waitFor(() => expect(options('Video mode')[0]?.[0]).toBe('yuyv-256x192'));
     expect(listModes).toHaveBeenCalledWith('0');
     expect(options('Video mode')).toEqual([
-      ['device-256x192-25-25', '256 × 192 · 25 fps · image only'],
+      ['yuyv-256x192', '256 × 192 · 25 fps · image only'],
       ['yuyv-256x384', '256 × 384 · 25 fps'],
     ]);
-    expect(disabled('Video mode')).toEqual([true, false]);
+    expect(disabled('Video mode')).toEqual([false, false]);
     expect(screen.getByLabelText<HTMLSelectElement>('Video mode').value).toBe('yuyv-256x384');
     fireEvent.click(screen.getByRole('button', { name: 'Start' }));
     await waitFor(() =>
       expect(start).toHaveBeenCalledWith(expect.objectContaining({ modeId: 'yuyv-256x384' })),
     );
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
+    fireEvent.change(screen.getByLabelText('Video mode'), { target: { value: 'yuyv-256x192' } });
+    expect(await screen.findByText('Image only', { selector: 'h3' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    await waitFor(() =>
+      expect(start).toHaveBeenLastCalledWith(expect.objectContaining({ modeId: 'yuyv-256x192' })),
+    );
   });
 
-  it('says before Start that a camera without a temperature mode is not the thermal camera', async () => {
+  it('says before Start that a camera without a temperature mode is not the thermal camera, and starts its image only', async () => {
+    const start = vi.fn(() => Promise.resolve());
     window.irvisDesktop = {
-      start: () => Promise.resolve(),
+      start,
       stop: () => Promise.resolve(),
       subscribe: () => () => {},
       listDevices: () => Promise.resolve([{ id: '1', label: 'FaceTime HD Camera' }]),
@@ -124,16 +133,44 @@ describe('App', () => {
     fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'camera:1' } });
     expect(
       await screen.findByText(
-        'FaceTime HD Camera has no video mode with temperature data in the InfiRay P2 Pro profile. It is probably not the thermal camera: choose another camera in Source.',
+        'FaceTime HD Camera has no video mode with temperature data in the InfiRay P2 Pro profile, so it shows the image only. It is probably not the thermal camera: for temperatures, choose another camera in Source.',
       ),
     ).toBeTruthy();
-    expect(screen.getByLabelText<HTMLSelectElement>('Video mode').value).toBe('');
+    expect(screen.getByLabelText<HTMLSelectElement>('Video mode').value).toBe('image-1920x1080@30');
     expect(options('Video mode')).toEqual([
-      ['', 'No mode with temperature data'],
-      ['device-1920x1080-15-30', '1920 × 1080 · 15–30 fps · image only'],
-      ['device-640x480-15-30', '640 × 480 · 15–30 fps · image only'],
+      ['image-1920x1080@30', '1920 × 1080 · 30 fps · image only'],
+      ['image-640x480@30', '640 × 480 · 30 fps · image only'],
     ]);
-    expect(disabled('Video mode')).toEqual([true, true, true]);
+    expect(disabled('Video mode')).toEqual([false, false]);
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    await waitFor(() =>
+      expect(start).toHaveBeenCalledWith(
+        expect.objectContaining({ device: '1', modeId: 'image-1920x1080@30' }),
+      ),
+    );
+  });
+
+  it('says that a camera has no mode to choose when it reports no frame rates and none of the profile', async () => {
+    window.irvisDesktop = {
+      start: () => Promise.resolve(),
+      stop: () => Promise.resolve(),
+      subscribe: () => () => {},
+      listDevices: () => Promise.resolve([{ id: '/dev/video0', label: 'Integrated Camera' }]),
+      listModes: () => Promise.resolve([{ width: 640, height: 480 }]),
+    };
+    render(<App />);
+    await screen.findByText('Integrated Camera', { selector: 'option' });
+    fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'camera:/dev/video0' } });
+    expect(
+      await screen.findByText(
+        'Integrated Camera has no video mode with temperature data in the InfiRay P2 Pro profile. It is probably not the thermal camera: choose another camera in Source.',
+      ),
+    ).toBeTruthy();
+    expect(options('Video mode')).toEqual([
+      ['', 'No video mode to choose'],
+      ['device-640x480-undefined-undefined', '640 × 480 · image only'],
+    ]);
+    expect(disabled('Video mode')).toEqual([true, true]);
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Start' }).disabled).toBe(true);
   });
 
@@ -280,7 +317,7 @@ describe('App', () => {
     fireEvent.change(source, { target: { value: 'camera:0' } });
     await waitFor(() => expect(pending['0']).toBeDefined());
     pending['0']!(T7_MODES);
-    await screen.findByText('256 × 192 · 25 fps · image only', { selector: 'option' });
+    await waitFor(() => expect(options('Video mode')[0]?.[0]).toBe('yuyv-256x192'));
     pending['1']!(FACETIME_MODES);
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(options('Video mode')[1]).toEqual(['yuyv-256x384', '256 × 384 · 25 fps']);
@@ -319,16 +356,14 @@ describe('App', () => {
     await screen.findByText('USB Camera', { selector: 'option' });
     const source = screen.getByLabelText<HTMLSelectElement>('Source');
     fireEvent.change(source, { target: { value: 'camera:1' } });
-    await screen.findByText('256 × 192 · 25 fps · image only', { selector: 'option' });
+    // The device lists 256 × 192 first; the profile, before the read, 256 × 384.
+    await waitFor(() => expect(options('Video mode')[0]?.[0]).toBe('yuyv-256x192'));
     devices = [{ id: '0', label: 'USB Camera' }];
     fireEvent.click(screen.getByRole('button', { name: 'Refresh cameras' }));
     await waitFor(() => expect(source.value).toBe('camera:0'));
     // The read for the new id starts in a passive effect, after the render that shows it.
     await waitFor(() => expect(listModes).toHaveBeenLastCalledWith('0'));
-    expect(options('Video mode')[0]).toEqual([
-      'device-256x192-25-25',
-      '256 × 192 · 25 fps · image only',
-    ]);
+    expect(options('Video mode')[0]).toEqual(['yuyv-256x192', '256 × 192 · 25 fps · image only']);
     listModes.mockImplementation(() => Promise.reject(new Error('Device busy')));
     devices = [
       { id: '0', label: 'FaceTime HD Camera' },
@@ -338,10 +373,7 @@ describe('App', () => {
     await waitFor(() => expect(source.value).toBe('camera:1'));
     await waitFor(() => expect(listModes).toHaveBeenLastCalledWith('1'));
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(options('Video mode')[0]).toEqual([
-      'device-256x192-25-25',
-      '256 × 192 · 25 fps · image only',
-    ]);
+    expect(options('Video mode')[0]).toEqual(['yuyv-256x192', '256 × 192 · 25 fps · image only']);
   });
 
   it('starts the camera and mode chosen in the header', async () => {
