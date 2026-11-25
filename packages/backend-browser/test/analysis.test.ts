@@ -36,10 +36,16 @@ describe('browser analysis', () => {
       centerRaw: 19201,
       uncertainFraction: 0,
     });
-    expect(result.statistics.highByteHistogram[75]).toBe(4);
-    expect(result.statistics.highByteHistogram.reduce((a, b) => a + b, 0)).toBe(4);
+    expect(result.statistics!.highByteHistogram[75]).toBe(4);
+    expect(result.statistics!.highByteHistogram.reduce((a, b) => a + b, 0)).toBe(4);
     expect(result.frame.data).toBe(frame.data);
     expect(result.frame.reconstructed?.raw).toEqual(new Uint16Array(4).fill(19201));
     expect(result.reconstructionMs).toBeGreaterThanOrEqual(0);
+  });
+  it('passes a frame of a mode without temperature data through, with no reconstruction', () => {
+    const { frame, info } = fixture();
+    const result = analyse(frame, { ...mode, layout: null }, info);
+    expect(result).toEqual({ info, frame, reconstructionMs: null, statistics: null });
+    expect(result.frame).toBe(frame);
   });
 });

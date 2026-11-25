@@ -641,7 +641,11 @@ The jobs that set the version and create the draft run on `ubuntu-24.04`, not on
 
 ## The desktop app shows a mode without temperature data as the camera's image only
 
-Status: decided
+Status: superseded (#65)
+
+Implemented in #64.
+
+The browser shows such modes too since its capture Worker passes their 4:2:0 frames through; see [the replacement decision](#a-live-camera-shows-a-mode-without-temperature-data-as-its-image-only).
 
 irvis is a thermal studio, but a camera mode without temperature data can still be watched: the TOOLTOP T7's own 256 × 192 mode, or a camera that turns out not to be the thermal one, such as a Mac's built-in FaceTime camera. Such a mode in Video mode can be chosen in the desktop app, which already reads the camera's YUYV bytes through ffmpeg, and the viewer then shows the frame's colours (BT.601, limited range) with orientation, scale and smoothing only. Measurements, palettes, temperature ranges, alarms, photos and recordings stay off in that view, because each of them is defined on temperatures and an image-only photo or recording would be a second file format. A mode with temperature data stays the default; an image-only mode is the default only for a camera that offers none.
 
@@ -650,3 +654,17 @@ A mode the device offers but the profile does not list travels as the id `image-
 **Rejected:** a separate image-only app or tab, because choosing a camera and mode is already in the header; an image-only photo or recording, for the file format it would need.
 
 **Postponed:** image-only modes in the browser, whose capture Worker reconstructs temperatures from 4:2:0 frames and would need a path of its own that draws the frames; they stay greyed out there.
+
+## A live camera shows a mode without temperature data as its image only
+
+Status: decided (#65)
+
+irvis is a thermal studio, but a camera mode without temperature data can still be watched: the TOOLTOP T7's own 256 × 192 mode, or a camera that turns out not to be the thermal one, such as a Mac's built-in FaceTime camera. Such a mode in Video mode can be chosen for any live camera, in the desktop app and in the browser, and the viewer then shows the frame's colours (BT.601, limited range) with orientation, scale and smoothing only. The desktop app reads the camera's YUYV bytes through ffmpeg; the browser's capture Worker passes a 4:2:0 frame (I420 or NV12) of such a mode through without reconstructing temperatures, and the renderer converts it the same way. Measurements, palettes, temperature ranges, alarms, photos and recordings stay off in that view, because each of them is defined on temperatures and an image-only photo or recording would be a second file format. A mode with temperature data stays the default; an image-only mode is the default only for a camera that offers none. Demo stays without image-only modes: its recording holds temperatures only.
+
+A mode the device offers but the profile does not list travels as the id `image-<width>x<height>@<fps>` (`findVideoMode()` in `@irvis/core`), so the open request, the viewer and the IPC `capture:start` keep a mode id and the main process validates the size and rate it parses instead of taking arbitrary numbers. Only the desktop app reads the modes a device offers; the browser cannot without opening the camera, so there the image-only modes are the profile's own, such as the InfiRay P2 Pro profile's `yuyv-256x192` (the TOOLTOP T7's 256 × 192), and a camera without that size fails to start as it does for a thermal mode. The profile's camera commands are used only with the profile's own modes: an image-only mode of another size may belong to another camera than the one the profile's USB IDs open. A V4L2 mode, which ffmpeg lists without a frame rate, cannot be chosen, because the AVFoundation and DirectShow inputs need a rate the camera offers and a guessed one would fail.
+
+The browser converts with BT.601 whatever colour space the `VideoFrame` reports: the view is for finding the scene, no reading comes from its colours, and one conversion keeps the desktop and browser pictures of the same camera alike.
+
+**Rejected:** a separate image-only app or tab, because choosing a camera and mode is already in the header; an image-only photo or recording, for the file format it would need; drawing the browser's `VideoFrame` on the canvas directly, because the viewer takes frames from every backend as a `RawFrame` and the Worker already copies the planes.
+
+**Postponed:** the browser's own list of a camera's modes (`MediaStreamTrack.getCapabilities()` after it is opened), which would offer image-only modes of other sizes there.

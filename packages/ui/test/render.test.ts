@@ -4,6 +4,7 @@ import {
   findVideoMode,
   IrvisReader,
   memoryByteSource,
+  simulateYUYVtoI420,
   type ThermalFrame,
 } from '@irvis/core';
 import { initialAnalysis } from '../src/measurements.ts';
@@ -137,6 +138,41 @@ describe('FrameRenderer', () => {
       expect(alarm).toHaveBeenLastCalledWith(false);
       expect(renderer.recordingFrame()).toBeNull();
       expect(() => renderer.capturePhoto()).toThrow('No rendered thermal frame is available.');
+      // The browser's 4:2:0 frame: white, then black, in both rows.
+      const row = [235, 128, 235, 128, 16, 128, 16, 128];
+      const yuyv = { kind: 'yuyv' as const, width: 4, height: 2, timestamp: 0 };
+      renderer.draw(
+        simulateYUYVtoI420({ ...yuyv, data: Uint8Array.from([...row, ...row]) }),
+        profile,
+        mode,
+        {
+          palette: 'iron',
+          range: null,
+          locked: false,
+          rotation: 0,
+          mirrorX: false,
+          mirrorY: false,
+          smooth: false,
+          uncertain: false,
+          gain: 'high',
+          analysis: initialAnalysis,
+        },
+      );
+      const planar = Array.from((putImageData.mock.calls[1]![0] as ImageData).data);
+      const white = [255, 255, 255, 255];
+      const black = [0, 0, 0, 255];
+      expect(planar).toEqual([
+        ...white,
+        ...white,
+        ...black,
+        ...black,
+        ...white,
+        ...white,
+        ...black,
+        ...black,
+      ]);
+      expect([canvas.width, canvas.height]).toEqual([4, 2]);
+      expect(bounds.textContent).toBe('No temperature data');
     } finally {
       context.mockRestore();
       vi.unstubAllGlobals();

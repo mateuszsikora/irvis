@@ -52,6 +52,17 @@ describe('browser capture', () => {
     }
     expect(rejection(info, mode)).toBeNull();
   });
+  it('copies a frame of a mode without temperature data, which only has to be shown', async () => {
+    const image = { ...cameraProfiles[0]!.videoModes.find((m) => !m.layout)!, width: 4, height: 4 };
+    const { frame } = fakeFrame({ codedWidth: 4, codedHeight: 4 });
+    expect((await copyFrame(frame, image)).layout).toBe('nv12');
+    expect(rejection({ ...info, codedWidth: 4, codedHeight: 4, format: 'RGBA' }, image)).toBe(
+      'Unsupported frame format: got RGBA; only I420 and NV12 can be shown.',
+    );
+    expect(rejection(info, image)).toBe(
+      `Frame size mismatch: got ${mode.width}×${mode.height}, expected 4×4; the image cannot be shown.`,
+    );
+  });
   it('copies the full coded rectangle without requesting format conversion', async () => {
     const { frame, mock } = fakeFrame();
     const result = await copyFrame(frame, mode);

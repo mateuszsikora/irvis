@@ -19,6 +19,7 @@ The panel shows format, coded dimensions, visible rectangle, colour space, proce
 - `Reconstruction is experimental; accuracy is not verified.` means supported planar bytes were processed. It does not prove that the browser preserved the camera's range or chroma.
 - `Frame size mismatch: got 256×192, expected 256×384; reconstruction cannot start.` is an example of a rejected size; the message includes actual and expected dimensions.
 - `Unsupported frame format: got RGBA; only I420 and NV12 can be reconstructed. RGB data cannot be recovered.` is an example of a rejected format. The reported format can also be `null` for opaque frames.
+- In the viewer, a mode marked `· image only` shows the camera's picture without temperatures (see [the viewer](ui-user.md#watch-a-mode-without-temperature-data)). Its frames are checked the same way, and the messages end differently: `Frame size mismatch: got 640×480, expected 256×192; the image cannot be shown.` and `Unsupported frame format: got RGBA; only I420 and NV12 can be shown.`
 - `use Chrome, Edge or Safari` means no supported track processor was found, including Firefox without that API.
 - `No thermal profile mode is available.` disables Start when no thermal mode is registered.
 - `OverconstrainedError (constraint: width)` identifies a failed exact constraint (the name varies, for example `height`, `resizeMode` or `deviceId`); a browser explanation follows when available.

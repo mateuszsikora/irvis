@@ -43,9 +43,10 @@ export function outputArgs() {
 }
 /**
  * What the viewer shows when ffmpeg exits: a plain explanation when the camera
- * lacks the mode (AVFoundation's wording), otherwise ffmpeg's last lines.
+ * lacks the mode (AVFoundation's wording), with advice that depends on whether
+ * the mode is one of the profile's (`profileMode`), otherwise ffmpeg's last lines.
  */
-export function captureEndedMessage(code, log, mode) {
+export function captureEndedMessage(code, log, mode, profileMode) {
   const lines = log
     .split(/\r?\n/)
     .map((line) => stripLogPrefix(line).trim())
@@ -57,7 +58,13 @@ export function captureEndedMessage(code, log, mode) {
     return (
       `This camera has no ${mode.width} × ${mode.height} video mode` +
       (list ? `; it offers ${list}` : '') +
-      '. It is probably not the thermal camera: choose another camera in Source.'
+      // A profile mode, with temperature data or not, is offered also when the
+      // camera's modes could not be read, so a camera without it is probably the
+      // wrong camera; any other mode came from this camera's own list, so only
+      // the mode is wrong.
+      (profileMode
+        ? '. It is probably not the thermal camera: choose another camera in Source.'
+        : '. Choose another video mode.')
     );
   }
   return [`Capture ended (${code}).`, ...lines.slice(-4)].join('\n');

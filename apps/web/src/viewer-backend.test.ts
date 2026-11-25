@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cameraProfiles } from '@irvis/core';
-import { listCameraModes, listLiveCameras, liveBackend, showsImageOnly } from './viewer-backend.ts';
+import { listCameraModes, listLiveCameras, liveBackend } from './viewer-backend.ts';
 import { startDiagnostics } from '@irvis/backend-browser';
 vi.mock('@irvis/backend-browser', () => ({ startDiagnostics: vi.fn() }));
 afterEach(() => {
@@ -147,20 +147,22 @@ describe('viewer backend', () => {
   });
 });
 describe('image-only modes', () => {
-  it('opens one through the desktop bridge, which reads YUYV bytes, but not in the browser', async () => {
+  it('opens one in the browser, which shows its 4:2:0 frames, and through the desktop bridge', async () => {
     const profile = cameraProfiles[0]!;
-    expect(showsImageOnly()).toBe(false);
-    await expect(
-      liveBackend(vi.fn()).open({ deviceId: 'default', profile, modeId: 'yuyv-256x192' }),
-    ).rejects.toThrow('This mode has no thermal data.');
-    expect(startDiagnostics).not.toHaveBeenCalled();
+    const browser = await liveBackend(vi.fn()).open({
+      deviceId: 'default',
+      profile,
+      modeId: 'yuyv-256x192',
+    });
+    expect(browser.mode).toBe(profile.videoModes.find((m) => m.id === 'yuyv-256x192'));
+    expect(startDiagnostics).toHaveBeenCalledWith(browser.mode, '', expect.anything());
+    await browser.close();
     const start = vi.fn(() => Promise.resolve());
     window.irvisDesktop = {
       start,
       stop: () => Promise.resolve(),
       subscribe: () => () => {},
     };
-    expect(showsImageOnly()).toBe(true);
     const backend = liveBackend(vi.fn());
     const session = await backend.open({ deviceId: '1', profile, modeId: 'image-1280x720@30' });
     expect(session.mode).toMatchObject({ width: 1280, height: 720, fps: 30, layout: null });
@@ -172,6 +174,6 @@ describe('image-only modes', () => {
     await session.close();
     await expect(
       backend.open({ deviceId: '1', profile, modeId: 'image-1280x720@30.0' }),
-    ).rejects.toThrow('This mode has no thermal data.');
+    ).rejects.toThrow('Unknown video mode: image-1280x720@30.0');
   });
 });
