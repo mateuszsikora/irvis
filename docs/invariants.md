@@ -326,14 +326,16 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
   - `apps/web/src/App.test.tsx::App::does not take another camera that moves into the position of a disconnected one`
   - `apps/web/src/App.test.tsx::App::follows the chosen camera to its new position and starts it there`
   - `apps/web/src/App.test.tsx::App::keeps following a camera found under a new id when its old id is taken by a namesake`
-- **82.** A mode of the camera profile with temperature data can be chosen in Video mode, when the device's modes are known only one that the device offers in size and frame rate, and is the default. A mode without temperature data is listed as image only; it can be chosen only with a live camera, in the desktop app or the browser, a device mode only when the device reports its frame rate, and it is the default only when no mode with temperature data can be chosen. A camera whose known modes include no mode with temperature data shows that it is probably not the thermal camera; Start is disabled only when no mode can be chosen.
+- **82.** A mode of the camera profile with temperature data can be chosen in Video mode, when the device's modes are known only one that the device offers in size and frame rate, and is the default. A mode without temperature data is listed as image only; it can be chosen only with a live camera, in the desktop app or the browser, a device mode at the highest rate the device reports or, without one (V4L2), at a rate the driver picks, and it is the default only when no mode with temperature data can be chosen. A camera whose known modes include no mode with temperature data shows that it is probably not the thermal camera; Start is disabled only when no mode can be chosen.
   - `apps/web/src/App.test.tsx::App::lists the modes the chosen camera reports, defaults to one with temperature data and starts an image-only one`
   - `apps/web/src/App.test.tsx::App::says before Start that a camera without a temperature mode is not the thermal camera, and starts its image only`
-  - `apps/web/src/App.test.tsx::App::says that a camera has no mode to choose when it reports no frame rates and none of the profile`
+  - `apps/web/src/App.test.tsx::App::says that a camera has no mode to choose when none of its modes is the profile’s or packed YUYV`
+  - `apps/web/src/App.test.tsx::App::lets a Linux camera start a mode without a frame rate, at the rate its driver picks`
   - `apps/web/src/App.test.tsx::App::lets a browser camera choose the profile modes, image-only ones too`
   - `apps/web/src/video-modes.test.ts::videoModeOptions::matches a device mode to the profile mode by size and a frame-rate range that holds its rate`
   - `apps/web/src/video-modes.test.ts::videoModeOptions::lists the profile's modes while the device's are unknown, image-only ones chosen only where they can be shown`
-  - `apps/web/src/video-modes.test.ts::videoModeOptions::cannot choose a device mode without a frame rate, nor one that is not packed YUYV, and labels it by its size`
+  - `apps/web/src/video-modes.test.ts::videoModeOptions::chooses a device mode without a frame rate at a rate the driver picks, labelled without one`
+  - `apps/web/src/video-modes.test.ts::videoModeOptions::cannot choose a device mode that is not packed YUYV, and labels it by its size`
   - `apps/web/src/viewer-backend.test.ts::image-only modes::opens one in the browser, which shows its 4:2:0 frames, and through the desktop bridge`
 - **83.** Choosing a camera in Source selects the camera profile only when exactly one profile matches the camera's USB IDs (or its label pattern); with none or several, the profile chosen before stays.
   - `apps/web/src/App.test.tsx::App::chooses the profile that lists the camera USB IDs or, without them, matches its name, and keeps the choice when none or several do`
@@ -348,3 +350,9 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
   - `packages/backend-browser/test/analysis.test.ts::browser analysis::passes a frame of a mode without temperature data through, with no reconstruction`
   - `packages/backend-browser/test/worker.test.ts::returns the copied buffer and reports reconstruction failures, passing a frame without temperature data through`
   - `packages/backend-browser/test/frame.test.ts::browser capture::copies a frame of a mode without temperature data, which only has to be shown`
+- **85.** A read of a camera's modes that a capture start stopped reads them again once every capture that paused the reads has released its pause, so its request still answers with the camera's modes, and a read replaced by a newer one answers with none. A capture releases its pause when ffmpeg has opened the device (macOS, Linux) or when its process ends (every platform; on Windows only then). On Linux the modes and their frame rates come from `v4l2-ctl` when it lists YUYV sizes, one mode for each discrete rate, otherwise the sizes come from ffmpeg without rates.
+  - `apps/desktop/test/capture.test.js::desktop capture::reads the modes again when a capture start stopped the read, unless a newer read replaced it`
+  - `apps/desktop/test/capture.test.js::desktop capture::holds the mode reads until every capture has released its pause, each pause once`
+  - `apps/desktop/test/capture.test.js::desktop capture::lets a capture release its pause once it has the device on macOS and Linux, and on Windows only when it ends`
+  - `apps/desktop/test/capture.test.js::desktop capture::asks v4l2-ctl for the modes on Linux, and ffmpeg without it`
+  - `apps/desktop/test/capture.test.js::desktop capture::reads a mode for each YUYV size and frame rate that v4l2-ctl lists, leaving out ranges of sizes`

@@ -1,9 +1,11 @@
 import {
   captureArgs,
   captureEndedMessage,
+  captureReadPause,
   frameReader,
   listDevices,
   listModes,
+  modesReader,
   pixelFormatMessage,
 } from './capture.js';
 import { openControl } from './control.js';
@@ -39,12 +41,14 @@ let pending = false;
 let control;
 let controlCleanup = Promise.resolve();
 let generation = 0;
-/** The mode read in progress; a new read or a capture start stops it. */
-let modesRead;
-function stopModesRead() {
-  modesRead?.abort();
-  modesRead = undefined;
-}
+/**
+ * Reads of a device's modes, one at a time. A capture start pauses them: the
+ * probe must not hold the device while ffmpeg opens it, and DirectShow may not
+ * let a second process open a device that is capturing at all.
+ */
+const modes = modesReader((device, signal) =>
+  listModes(process.platform, device, ffmpeg, run, signal),
+);
 const trusted = (url) => url.startsWith('app://irvis/');
 function stop() {
   generation++;
@@ -142,21 +146,8 @@ async function boot() {
   });
   ipcMain.handle('capture:modes', (event, device) => {
     authorize(event);
-    stopModesRead();
-    // DirectShow may not let a second process open a device that is capturing;
-    // an empty list leaves the modes unknown instead of risking the capture.
-    if (process.platform === 'win32' && child) return [];
-    const read = new AbortController();
-    modesRead = read;
-    // A stopped read answers with no modes (unknown) instead of an IPC error.
-    return listModes(process.platform, device, ffmpeg, run, read.signal)
-      .catch((error) => {
-        if (read.signal.aborted) return [];
-        throw error;
-      })
-      .finally(() => {
-        if (modesRead === read) modesRead = undefined;
-      });
+    // A read replaced by a newer one answers with no modes (unknown).
+    return modes.read(device);
   });
   ipcMain.handle('capture:command', async (event, id, value) => {
     authorize(event);
@@ -166,9 +157,17 @@ async function boot() {
   ipcMain.handle('capture:start', async (event, options) => {
     authorize(event);
     stop();
-    // The capture must not share the device with a mode read (DirectShow may refuse it).
-    stopModesRead();
     const token = generation;
+    // Released by the capture once it has the device, or here when none starts.
+    const release = modes.pause();
+    let started = false;
+    try {
+      started = await startCapture(options, token, release);
+    } finally {
+      if (!started) release();
+    }
+  });
+  async function startCapture(options, token, release) {
     const profile = cameraProfiles.find((p) => p.id === options?.profileId);
     // A profile mode, or an image-only mode of any size the device offers.
     const mode =
@@ -208,10 +207,9 @@ async function boot() {
       }
     }
     if (generation !== token) return;
-    // Also a read that started while the camera control was opening.
-    stopModesRead();
     const proc = spawn(executable, ['-y', ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
     child = proc;
+    const readPause = captureReadPause(process.platform, release);
     let log = '',
       format = null;
     const size = mode.width * mode.height * 2;
@@ -227,6 +225,7 @@ async function boot() {
       // suffix in log, but only let complete lines establish the input format.
       const complete = log.lastIndexOf('\n') + 1;
       format = parseInputPixelFormat(log.slice(0, complete)) ?? format;
+      if (format) readPause.opened();
       if (format && format !== 'yuyv422') sendError(pixelFormatMessage(format, mode));
     });
     const read = frameReader(size, (data) => {
@@ -246,9 +245,16 @@ async function boot() {
     proc.stdout.on('data', (chunk) => {
       if (child === proc) read(chunk);
     });
-    proc.on('error', (error) => sendError(error.message));
-    proc.on('close', (code) => sendError(captureEndedMessage(code, log, mode, profileMode)));
-  });
+    proc.on('error', (error) => {
+      readPause.ended();
+      sendError(error.message);
+    });
+    proc.on('close', (code) => {
+      readPause.ended();
+      sendError(captureEndedMessage(code, log, mode, profileMode));
+    });
+    return true;
+  }
   ipcMain.handle('capture:stop', (event) => {
     authorize(event);
     stop();
