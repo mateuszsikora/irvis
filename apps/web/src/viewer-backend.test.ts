@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cameraProfiles } from '@irvis/core';
-import { listCameraModes, listLiveCameras, liveBackend } from './viewer-backend.ts';
+import { listCameraModes, listLiveCameras, liveBackend, showsImageOnly } from './viewer-backend.ts';
 import { startDiagnostics } from '@irvis/backend-browser';
 vi.mock('@irvis/backend-browser', () => ({ startDiagnostics: vi.fn() }));
 afterEach(() => {
@@ -144,5 +144,34 @@ describe('viewer backend', () => {
     expect(await listCameraModes('0')).toBeNull();
     listModes.mockRejectedValueOnce(new Error('Reading the camera modes timed out'));
     expect(await listCameraModes('0')).toBeNull();
+  });
+});
+describe('image-only modes', () => {
+  it('opens one through the desktop bridge, which reads YUYV bytes, but not in the browser', async () => {
+    const profile = cameraProfiles[0]!;
+    expect(showsImageOnly()).toBe(false);
+    await expect(
+      liveBackend(vi.fn()).open({ deviceId: 'default', profile, modeId: 'yuyv-256x192' }),
+    ).rejects.toThrow('This mode has no thermal data.');
+    expect(startDiagnostics).not.toHaveBeenCalled();
+    const start = vi.fn(() => Promise.resolve());
+    window.irvisDesktop = {
+      start,
+      stop: () => Promise.resolve(),
+      subscribe: () => () => {},
+    };
+    expect(showsImageOnly()).toBe(true);
+    const backend = liveBackend(vi.fn());
+    const session = await backend.open({ deviceId: '1', profile, modeId: 'image-1280x720@30' });
+    expect(session.mode).toMatchObject({ width: 1280, height: 720, fps: 30, layout: null });
+    expect(start).toHaveBeenCalledWith({
+      profileId: profile.id,
+      modeId: 'image-1280x720@30',
+      device: '1',
+    });
+    await session.close();
+    await expect(
+      backend.open({ deviceId: '1', profile, modeId: 'image-1280x720@30.0' }),
+    ).rejects.toThrow('This mode has no thermal data.');
   });
 });

@@ -116,6 +116,10 @@ h3 {
   width: 115.5px;
   height: 44px;
 }
+/* `hidden` must win over a class's `display`, as on .scale-strip or the recording list. */
+[hidden] {
+  display: none !important;
+}
 .visually-hidden {
   position: absolute;
   width: 1px;

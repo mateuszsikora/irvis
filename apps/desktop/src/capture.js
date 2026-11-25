@@ -62,6 +62,33 @@ export function captureEndedMessage(code, log, mode) {
   }
   return [`Capture ended (${code}).`, ...lines.slice(-4)].join('\n');
 }
+/**
+ * Cuts ffmpeg's stdout into frames of `size` bytes. Each chunk is copied once
+ * into one reused frame buffer, so a large image-only frame is not rebuilt with
+ * every pipe chunk. `onFrame` gets that buffer and must copy what it keeps
+ * before it returns.
+ */
+export function frameReader(size, onFrame) {
+  const frame = Buffer.allocUnsafe(size);
+  let filled = 0;
+  return (chunk) => {
+    for (let at = 0; at < chunk.length;) {
+      // Copies only as much as the frame has room for.
+      const copied = chunk.copy(frame, filled, at);
+      at += copied;
+      filled += copied;
+      if (filled < size) return;
+      filled = 0;
+      onFrame(frame);
+    }
+  };
+}
+/** What the viewer shows when ffmpeg delivers another pixel format than yuyv422. */
+export function pixelFormatMessage(format, mode) {
+  return mode.layout
+    ? 'Exact reference requires native yuyv422; received ' + format
+    : `This camera sends ${format}, not YUYV, in this video mode; choose another video mode.`;
+}
 export function captureArgs(platform, device, mode) {
   return ['-hide_banner', '-nostdin', ...inputArgs(platform, device, mode), ...outputArgs()];
 }

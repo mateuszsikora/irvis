@@ -25,6 +25,7 @@ import {
   type VideoMode,
   type TemperatureRange,
   type PaletteId,
+  yuyvToRgba,
 } from '@irvis/core';
 
 export interface ViewSettings {
@@ -99,6 +100,10 @@ export class FrameRenderer {
     if (settings.alarmGeneration !== this.alarmGeneration) {
       this.alarmState = null;
       this.alarmGeneration = settings.alarmGeneration;
+    }
+    if (input.kind !== 'thermal' && !mode.layout) {
+      this.drawImage(input, settings);
+      return;
     }
     const selectedConversion = profile.conversions.find(
       (c) =>
@@ -260,18 +265,7 @@ export class FrameRenderer {
         );
       }
     }
-    const quarter = settings.rotation % 180 !== 0;
-    this.canvas.width = quarter ? decoded.height : decoded.width;
-    this.canvas.height = quarter ? decoded.width : decoded.height;
-    const ctx = this.canvas.getContext('2d');
-    if (ctx) {
-      ctx.imageSmoothingEnabled = settings.smooth;
-      ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
-      ctx.rotate((settings.rotation * Math.PI) / 180);
-      ctx.scale(settings.mirrorX ? -1 : 1, settings.mirrorY ? -1 : 1);
-      ctx.drawImage(this.source, -decoded.width / 2, -decoded.height / 2);
-    }
-    this.canvas.style.imageRendering = settings.smooth ? 'auto' : 'pixelated';
+    this.present(decoded.width, decoded.height, settings);
     this.scale.width = 256;
     this.scale.height = 1;
     const values = Float64Array.from(
@@ -342,6 +336,39 @@ export class FrameRenderer {
       },
     };
     this.bounds.textContent = `${formatTemperature(this.range.minCelsius, analysis?.unit ?? 'C')} — ${formatTemperature(this.range.maxCelsius, analysis?.unit ?? 'C')}`;
+  }
+  /**
+   * A frame of a mode without temperature data: the camera's picture, oriented
+   * as set, with no readings, alarm, photo or recording frame.
+   */
+  private drawImage(input: Exclude<RawFrame, { kind: 'thermal' }>, settings: ViewSettings) {
+    if (input.kind !== 'yuyv') throw new Error('Only a YUYV frame can be shown as an image.');
+    this.source.width = input.width;
+    this.source.height = input.height;
+    this.source
+      .getContext('2d')
+      ?.putImageData(new ImageData(yuyvToRgba(input), input.width, input.height), 0, 0);
+    this.present(input.width, input.height, settings);
+    this.warning.textContent = '';
+    this.bounds.textContent = 'No temperature data';
+    if (this.readouts) this.readouts.textContent = '';
+    this.alarmState = null;
+    this.onAlarm?.(false);
+  }
+  /** Draws the source canvas onto the visible one, rotated, mirrored and smoothed as set. */
+  private present(width: number, height: number, settings: ViewSettings) {
+    const quarter = settings.rotation % 180 !== 0;
+    this.canvas.width = quarter ? height : width;
+    this.canvas.height = quarter ? width : height;
+    const ctx = this.canvas.getContext('2d');
+    if (ctx) {
+      ctx.imageSmoothingEnabled = settings.smooth;
+      ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
+      ctx.rotate((settings.rotation * Math.PI) / 180);
+      ctx.scale(settings.mirrorX ? -1 : 1, settings.mirrorY ? -1 : 1);
+      ctx.drawImage(this.source, -width / 2, -height / 2);
+    }
+    this.canvas.style.imageRendering = settings.smooth ? 'auto' : 'pixelated';
   }
   recordingFrame() {
     return this.recorded;

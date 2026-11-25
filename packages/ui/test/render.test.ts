@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { cameraProfiles, IrvisReader, memoryByteSource, type ThermalFrame } from '@irvis/core';
+import {
+  cameraProfiles,
+  findVideoMode,
+  IrvisReader,
+  memoryByteSource,
+  type ThermalFrame,
+} from '@irvis/core';
 import { initialAnalysis } from '../src/measurements.ts';
 import { CAMERA_CORRECTION_UNKNOWN, FrameRenderer, type ViewSettings } from '../src/render.ts';
 describe('FrameRenderer', () => {
@@ -70,6 +76,70 @@ describe('FrameRenderer', () => {
       }
     } finally {
       context.mockRestore();
+    }
+  });
+  it("shows a mode without temperature data as the camera's colours, oriented, with no readings", () => {
+    const putImageData = vi.fn();
+    const drawImage = vi.fn();
+    const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      putImageData,
+      drawImage,
+      translate: vi.fn(),
+      rotate: vi.fn(),
+      scale: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    vi.stubGlobal('ImageData', function (data: Uint8ClampedArray, width: number, height: number) {
+      return { data, width, height };
+    });
+    try {
+      const canvas = document.createElement('canvas');
+      const bounds = document.createElement('output');
+      const warning = document.createElement('p');
+      const readouts = document.createElement('output');
+      const alarm = vi.fn();
+      const renderer = new FrameRenderer(
+        canvas,
+        document.createElement('canvas'),
+        bounds,
+        warning,
+        readouts,
+        alarm,
+      );
+      warning.textContent = 'old';
+      readouts.textContent = 'old';
+      const profile = cameraProfiles[0]!;
+      const mode = findVideoMode(profile, 'image-4x2@30')!;
+      // White, then black, both grey (U = V = 128).
+      const data = Uint8Array.from(
+        [235, 128, 235, 128, 16, 128, 16, 128].concat(new Array(8).fill(16)),
+      );
+      renderer.draw({ kind: 'yuyv', width: 4, height: 2, timestamp: 0, data }, profile, mode, {
+        palette: 'iron',
+        range: null,
+        locked: false,
+        rotation: 90,
+        mirrorX: false,
+        mirrorY: false,
+        smooth: false,
+        uncertain: false,
+        gain: 'high',
+        analysis: { ...initialAnalysis, alarm: true, threshold: -100 },
+      });
+      const image = putImageData.mock.calls[0]![0] as ImageData;
+      expect([image.width, image.height]).toEqual([4, 2]);
+      expect(Array.from(image.data.slice(0, 4))).toEqual([255, 255, 255, 255]);
+      expect(Array.from(image.data.slice(8, 12))).toEqual([0, 0, 0, 255]);
+      expect([canvas.width, canvas.height]).toEqual([2, 4]);
+      expect(drawImage).toHaveBeenCalledOnce();
+      expect(bounds.textContent).toBe('No temperature data');
+      expect(warning.textContent).toBe('');
+      expect(readouts.textContent).toBe('');
+      expect(alarm).toHaveBeenLastCalledWith(false);
+      expect(renderer.recordingFrame()).toBeNull();
+      expect(() => renderer.capturePhoto()).toThrow('No rendered thermal frame is available.');
+    } finally {
+      context.mockRestore();
+      vi.unstubAllGlobals();
     }
   });
   it('refuses a camera-reported gain without a conversion despite the host assumption', () => {

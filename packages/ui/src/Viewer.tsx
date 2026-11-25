@@ -15,6 +15,7 @@ import {
   memoryByteSource,
   unitSymbol,
   rangeProblems,
+  findVideoMode,
   type CameraBackend,
   type CameraProfile,
   type CameraStateSnapshot,
@@ -328,6 +329,11 @@ export function Viewer({
   const range = { minCelsius: Number(lower), maxCelsius: Number(upper) };
   const invalid = lower.trim() === '' || upper.trim() === '' || rangeProblems(range).length > 0;
   const update = (patch: Partial<ViewSettings>) => setSettings((s) => ({ ...s, ...patch }));
+  const viewMode = session?.mode ?? findVideoMode(profile, modeId);
+  // The camera's picture without temperatures; a photo or recording opened over it has them.
+  const imageView = viewMode?.layout === null && !photoName;
+  // The profile's camera commands are for its own modes; another may be another camera's.
+  const controls = !imageView || !viewMode || profile.videoModes.includes(viewMode);
   const gains = profile.state.find((f) => f.id === 'gain');
   const gainOptions = gains?.kind === 'enum' ? gains.values : ['high', 'low'];
   return (
@@ -385,9 +391,11 @@ export function Viewer({
           <div className="preview-card">
             <div className="preview-meta">
               <span>
-                {backend.id === 'replay' ? 'DEMO' : 'THERMAL'}
+                {backend.id === 'replay' ? 'DEMO' : imageView ? 'IMAGE ONLY' : 'THERMAL'}
                 <span className="meta-divider">/</span>
-                {profile.sensor.width} × {profile.sensor.height}
+                {imageView && viewMode
+                  ? `${viewMode.width} × ${viewMode.height}`
+                  : `${profile.sensor.width} × ${profile.sensor.height}`}
               </span>
               <span>
                 {settings.smooth ? 'Smooth' : 'Clear'} · {settings.rotation}°
@@ -414,13 +422,16 @@ export function Viewer({
                   <p>
                     {backend.id === 'replay'
                       ? 'Explore the thermal viewer with a synthetic scene.'
-                      : 'Connect your camera and start a thermal view.'}
+                      : imageView
+                        ? 'This video mode has no temperature data: Start shows the camera’s image only.'
+                        : 'Connect your camera and start a thermal view.'}
                   </p>
                   <span>{busy || session ? 'Capture is starting…' : 'Press Start to begin'}</span>
                 </div>
               )}
             </div>
-            <div className="scale-strip">
+            {/* Hidden, not removed: the renderer holds these elements from its mount. */}
+            <div className="scale-strip" hidden={imageView}>
               <canvas ref={scale} aria-label="Temperature scale" className="temperature-scale" />
               <div className="scale-caption">
                 <output ref={bounds} aria-label="Colour bounds">
@@ -473,48 +484,55 @@ export function Viewer({
                 </button>
               ))}
             </div>
-            <label className="switch-label">
-              <input
-                type="checkbox"
-                checked={settings.uncertain}
-                onChange={(e) => update({ uncertain: e.target.checked })}
-              />
-              <span>Uncertain pixels</span>
-            </label>
+            {!imageView && (
+              <label className="switch-label">
+                <input
+                  type="checkbox"
+                  checked={settings.uncertain}
+                  onChange={(e) => update({ uncertain: e.target.checked })}
+                />
+                <span>Uncertain pixels</span>
+              </label>
+            )}
           </div>
-          <div className="preview-toolbar" aria-label="Tracking shortcuts">
-            {(['min', 'max', 'centre'] as const).map((key) => (
-              <button
-                key={key}
-                aria-pressed={settings.analysis!.tracking[key]}
-                onClick={() =>
-                  update({
-                    analysis: {
-                      ...settings.analysis!,
-                      tracking: {
-                        ...settings.analysis!.tracking,
-                        [key]: !settings.analysis!.tracking[key],
+          {!imageView && (
+            <div className="preview-toolbar" aria-label="Tracking shortcuts">
+              {(['min', 'max', 'centre'] as const).map((key) => (
+                <button
+                  key={key}
+                  aria-pressed={settings.analysis!.tracking[key]}
+                  onClick={() =>
+                    update({
+                      analysis: {
+                        ...settings.analysis!,
+                        tracking: {
+                          ...settings.analysis!.tracking,
+                          [key]: !settings.analysis!.tracking[key],
+                        },
                       },
-                    },
-                  })
-                }
-              >
-                Track {key}
-              </button>
-            ))}
-          </div>
+                    })
+                  }
+                >
+                  Track {key}
+                </button>
+              ))}
+            </div>
+          )}
           <output
             ref={readouts}
             aria-label="Measurement readings"
             style={{ whiteSpace: 'pre-line' }}
+            hidden={imageView}
           />
-          <p role="status">
-            {!settings.analysis!.alarm
-              ? 'Alarm disabled'
-              : triggered
-                ? 'Alarm triggered'
-                : 'Alarm enabled — below threshold'}
-          </p>
+          {!imageView && (
+            <p role="status">
+              {!settings.analysis!.alarm
+                ? 'Alarm disabled'
+                : triggered
+                  ? 'Alarm triggered'
+                  : 'Alarm enabled — below threshold'}
+            </p>
+          )}
           <label>
             Open thermal photo
             <input
@@ -535,7 +553,7 @@ export function Viewer({
           )}
           <nav className="tool-dock" aria-label="Tools">
             <button
-              disabled={!photoLibrary || !hasFrame || !!failure || savingPhoto}
+              disabled={!photoLibrary || !hasFrame || !!failure || savingPhoto || imageView}
               onClick={() => void capturePhoto()}
             >
               <Icon name="photo" />
@@ -569,7 +587,7 @@ export function Viewer({
             showFiles={galleryFilter !== 'photos'}
             {...(recordingStorage ? { storage: recordingStorage } : {})}
             profile={profile}
-            live={!!session && hasFrame}
+            live={!!session && hasFrame && !imageView}
             failure={failure}
             frame={() => rendererRef.current?.recordingFrame() ?? null}
             onExport={async (file, factor, smooth, recorded) => {
@@ -681,106 +699,132 @@ export function Viewer({
           )}
         </div>
         <aside className="settings-panel" aria-label="View settings">
-          <AnalysisControls
-            key={analysisRevision}
-            value={settings.analysis!}
-            onChange={(analysis) => {
-              if (playbackRef.current && analysis.correction !== settings.analysis!.correction)
-                playbackCorrectionOverride.current = true;
-              if (
-                analysis.alarm &&
-                !settings.analysis!.alarm &&
-                typeof AudioContext !== 'undefined'
-              ) {
-                audio.current ??= new AudioContext();
-                void audio.current.resume().catch(() => {});
-              }
-              if (
-                analysis.alarm !== settings.analysis!.alarm ||
-                analysis.threshold !== settings.analysis!.threshold
-              )
-                setTriggered(false);
-              update({ analysis });
-            }}
-          />
+          {imageView && (
+            <section className="settings-section">
+              <h3>Image only</h3>
+              <p className="setting-help">
+                This video mode carries no temperature data, so measurements, palettes, temperature
+                ranges, photos and recordings are unavailable. Choose a mode without “image only” in
+                Video mode to see temperatures.
+              </p>
+            </section>
+          )}
+          {!imageView && (
+            <AnalysisControls
+              key={analysisRevision}
+              value={settings.analysis!}
+              onChange={(analysis) => {
+                if (playbackRef.current && analysis.correction !== settings.analysis!.correction)
+                  playbackCorrectionOverride.current = true;
+                if (
+                  analysis.alarm &&
+                  !settings.analysis!.alarm &&
+                  typeof AudioContext !== 'undefined'
+                ) {
+                  audio.current ??= new AudioContext();
+                  void audio.current.resume().catch(() => {});
+                }
+                if (
+                  analysis.alarm !== settings.analysis!.alarm ||
+                  analysis.threshold !== settings.analysis!.threshold
+                )
+                  setTriggered(false);
+                update({ analysis });
+              }}
+            />
+          )}
 
-          <section className="settings-section">
-            <div className="section-heading">
-              <h3>Palette</h3>
-              <span>{PALETTES.find((p) => p.id === settings.palette)?.name}</span>
-            </div>
-            <div className="palette-grid" role="group" aria-label="Palette">
-              {PALETTES.map((p) => (
-                <button
-                  className="palette-choice"
-                  key={p.id}
-                  aria-pressed={settings.palette === p.id}
-                  onClick={() => update({ palette: p.id })}
-                >
-                  <span
-                    className="palette-swatch"
-                    style={{
-                      background: `linear-gradient(90deg, ${p.stops.map((s) => `rgb(${s.color.join(' ')}) ${(s.index / 255) * 100}%`).join(', ')})`,
-                    }}
-                  />
-                  <span>{p.name}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-          <section className="settings-section">
-            <div className="section-heading">
-              <h3>Temperature range</h3>
-              <span>°C</span>
-            </div>
-            <div className="segmented full-width" role="group" aria-label="Range mode">
-              {['auto', 'manual'].map((value) => (
-                <button
-                  key={value}
-                  aria-pressed={rangeMode === value}
-                  onClick={() => {
-                    setRangeMode(value);
-                    if (value === 'auto') update({ range: null });
-                    else if (!invalid) update({ range });
-                  }}
-                >
-                  {value === 'auto' ? 'Automatic' : 'Manual'}
-                </button>
-              ))}
-            </div>
-            {rangeMode === 'manual' ? (
-              <div className="manual-range">
-                <label>
-                  Lower bound (°C)
-                  <input type="number" value={lower} onChange={(e) => setLower(e.target.value)} />
-                </label>
-                <label>
-                  Upper bound (°C)
-                  <input type="number" value={upper} onChange={(e) => setUpper(e.target.value)} />
-                </label>
-                <button
-                  className="apply-button"
-                  disabled={invalid}
-                  onClick={() => update({ range })}
-                >
-                  Apply bounds
-                </button>
-                {invalid && (
-                  <p role="alert">Lower bound must be below upper bound; both must be finite.</p>
+          {!imageView && (
+            <>
+              <section className="settings-section">
+                <div className="section-heading">
+                  <h3>Palette</h3>
+                  <span>{PALETTES.find((p) => p.id === settings.palette)?.name}</span>
+                </div>
+                <div className="palette-grid" role="group" aria-label="Palette">
+                  {PALETTES.map((p) => (
+                    <button
+                      className="palette-choice"
+                      key={p.id}
+                      aria-pressed={settings.palette === p.id}
+                      onClick={() => update({ palette: p.id })}
+                    >
+                      <span
+                        className="palette-swatch"
+                        style={{
+                          background: `linear-gradient(90deg, ${p.stops.map((s) => `rgb(${s.color.join(' ')}) ${(s.index / 255) * 100}%`).join(', ')})`,
+                        }}
+                      />
+                      <span>{p.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+              <section className="settings-section">
+                <div className="section-heading">
+                  <h3>Temperature range</h3>
+                  <span>°C</span>
+                </div>
+                <div className="segmented full-width" role="group" aria-label="Range mode">
+                  {['auto', 'manual'].map((value) => (
+                    <button
+                      key={value}
+                      aria-pressed={rangeMode === value}
+                      onClick={() => {
+                        setRangeMode(value);
+                        if (value === 'auto') update({ range: null });
+                        else if (!invalid) update({ range });
+                      }}
+                    >
+                      {value === 'auto' ? 'Automatic' : 'Manual'}
+                    </button>
+                  ))}
+                </div>
+                {rangeMode === 'manual' ? (
+                  <div className="manual-range">
+                    <label>
+                      Lower bound (°C)
+                      <input
+                        type="number"
+                        value={lower}
+                        onChange={(e) => setLower(e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Upper bound (°C)
+                      <input
+                        type="number"
+                        value={upper}
+                        onChange={(e) => setUpper(e.target.value)}
+                      />
+                    </label>
+                    <button
+                      className="apply-button"
+                      disabled={invalid}
+                      onClick={() => update({ range })}
+                    >
+                      Apply bounds
+                    </button>
+                    {invalid && (
+                      <p role="alert">
+                        Lower bound must be below upper bound; both must be finite.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="setting-help">Colours follow the scene’s temperature range.</p>
                 )}
-              </div>
-            ) : (
-              <p className="setting-help">Colours follow the scene’s temperature range.</p>
-            )}
-            <label className="switch-label">
-              <input
-                type="checkbox"
-                checked={settings.locked}
-                onChange={(e) => update({ locked: e.target.checked })}
-              />
-              <span>Lock scale</span>
-            </label>
-          </section>
+                <label className="switch-label">
+                  <input
+                    type="checkbox"
+                    checked={settings.locked}
+                    onChange={(e) => update({ locked: e.target.checked })}
+                  />
+                  <span>Lock scale</span>
+                </label>
+              </section>
+            </>
+          )}
           <section className="settings-section">
             <div className="section-heading">
               <h3>Orientation</h3>
@@ -819,7 +863,7 @@ export function Viewer({
               </label>
             </div>
           </section>
-          {backend.id === 'browser' && (
+          {backend.id === 'browser' && !imageView && (
             <section className="settings-section camera-state">
               <h3>Camera state</h3>
               <p className="setting-help">
@@ -850,23 +894,25 @@ export function Viewer({
               </button>
             </section>
           )}
-          <CameraControls
-            key={backend.id + profile.id + commandSession}
-            profile={profile}
-            browser={backend.id === 'browser'}
-            cameraState={cameraState}
-            frames={session?.frames}
-            mode={session?.mode}
-            resetHostCorrection={() => {
-              setSettings((s) => ({ ...s, analysis: { ...s.analysis!, correction: null } }));
-              setAnalysisRevision((value) => value + 1);
-            }}
-            command={
-              session && backend.capabilities.deviceControl
-                ? (command ?? session.command)
-                : undefined
-            }
-          />
+          {controls && (
+            <CameraControls
+              key={backend.id + profile.id + commandSession}
+              profile={profile}
+              browser={backend.id === 'browser'}
+              cameraState={cameraState}
+              frames={session?.frames}
+              mode={session?.mode}
+              resetHostCorrection={() => {
+                setSettings((s) => ({ ...s, analysis: { ...s.analysis!, correction: null } }));
+                setAnalysisRevision((value) => value + 1);
+              }}
+              command={
+                session && backend.capabilities.deviceControl
+                  ? (command ?? session.command)
+                  : undefined
+              }
+            />
+          )}
         </aside>
       </div>
     </section>

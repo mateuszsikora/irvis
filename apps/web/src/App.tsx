@@ -11,7 +11,7 @@ import {
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Icon, Viewer, type PhotoLibrary } from '@irvis/ui';
 import { openRecording, createReplayBackend } from '@irvis/backend-replay';
-import { liveBackend, listCameraModes, listLiveCameras } from './viewer-backend.ts';
+import { liveBackend, listCameraModes, listLiveCameras, showsImageOnly } from './viewer-backend.ts';
 import { videoModeOptions } from './video-modes.ts';
 import './viewer.css';
 import brandMark from './brand/mark.svg';
@@ -136,13 +136,15 @@ export function App({ profiles = cameraProfiles }: AppProps) {
     (deviceModes.id === current.id || deviceModes.choice === choice)
       ? deviceModes.modes
       : null;
-  const modeOptions = profile ? videoModeOptions(profile, modes) : [];
-  // The default follows the profile's order, not the device's, so that modes
-  // arriving after a choice do not change a mode the device offers and remount a
-  // running viewer. A mode the device turns out not to offer does change.
-  const thermalModes =
-    profile?.videoModes.filter((m) => modeOptions.some((o) => o.mode === m)) ?? [];
-  const mode = thermalModes.find((m) => m.id === modeId) ?? thermalModes[0];
+  const modeOptions = profile ? videoModeOptions(profile, modes, !!camera && showsImageOnly()) : [];
+  const choosable = modeOptions.flatMap((o) => (o.mode ? [o.mode] : []));
+  // The default is a mode with temperature data in the profile's order, not the
+  // device's, so that modes arriving after a choice do not change a mode the device
+  // offers and remount a running viewer; a mode it turns out not to offer does
+  // change. An image-only mode is the default only when there is no such mode.
+  const thermalModes = profile?.videoModes.filter((m) => m.layout && choosable.includes(m)) ?? [];
+  const selectable = [...thermalModes, ...choosable.filter((m) => !m.layout)];
+  const mode = selectable.find((m) => m.id === modeId) ?? selectable[0];
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -206,7 +208,7 @@ export function App({ profiles = cameraProfiles }: AppProps) {
             >
               {!mode && (
                 <option value="" disabled hidden>
-                  No mode with temperature data
+                  No video mode to choose
                 </option>
               )}
               {modeOptions.map((o) => (
@@ -223,11 +225,12 @@ export function App({ profiles = cameraProfiles }: AppProps) {
           Cameras unavailable: {cameraError}
         </p>
       )}
-      {current && profile && modes && !mode && (
+      {current && profile && modes && thermalModes.length === 0 && (
         <p className="notice" role="status">
           {current.label || current.id} has no video mode with temperature data in the{' '}
-          {profile.name} profile. It is probably not the thermal camera: choose another camera in
-          Source.
+          {profile.name} profile
+          {mode ? ', so it shows the image only' : ''}. It is probably not the thermal camera:
+          {mode ? ' for temperatures,' : ''} choose another camera in Source.
         </p>
       )}
       {profiles.length === 0 && <p>No camera is supported yet.</p>}

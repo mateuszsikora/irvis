@@ -3,11 +3,13 @@ import {
   inputArgs,
   captureArgs,
   captureEndedMessage,
+  frameReader,
   listDevices,
   listModes,
   modesArgs,
   parseCameraData,
   parseDeviceModes,
+  pixelFormatMessage,
 } from '../src/capture.js';
 import { openControl } from '../src/control.js';
 import { cameraProfiles } from '@irvis/core';
@@ -255,6 +257,35 @@ describe('desktop capture', () => {
     ].join('\n');
     expect(captureEndedMessage(251, log, mode)).toBe(
       'This camera has no 256 × 384 video mode; it offers 1920 × 1080, 1280 × 720 and 640 × 480. It is probably not the thermal camera: choose another camera in Source.',
+    );
+  });
+  it('cuts stdout into whole frames across chunk boundaries, reusing one frame buffer', () => {
+    const frames = [];
+    const buffers = new Set();
+    const read = frameReader(4, (frame) => {
+      buffers.add(frame);
+      frames.push(Array.from(frame));
+    });
+    read(Buffer.from([1, 2, 3]));
+    expect(frames).toEqual([]);
+    read(Buffer.from([4, 5, 6, 7, 8, 9, 10]));
+    read(Buffer.alloc(0));
+    read(Buffer.from([11, 12, 13, 14, 15, 16, 17]));
+    expect(frames).toEqual([
+      [1, 2, 3, 4],
+      [5, 6, 7, 8],
+      [9, 10, 11, 12],
+      [13, 14, 15, 16],
+    ]);
+    expect(buffers.size).toBe(1);
+  });
+  it('says what to do when a mode without temperature data does not arrive as YUYV', () => {
+    const image = cameraProfiles[0].videoModes.find((m) => m.layout === null);
+    expect(pixelFormatMessage('nv12', image)).toBe(
+      'This camera sends nv12, not YUYV, in this video mode; choose another video mode.',
+    );
+    expect(pixelFormatMessage('nv12', mode)).toBe(
+      'Exact reference requires native yuyv422; received nv12',
     );
   });
   it('ends other capture failures with the exit code and the last ffmpeg lines without their context', () => {
