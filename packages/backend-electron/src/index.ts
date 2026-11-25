@@ -1,6 +1,7 @@
 import {
   compareFrames,
   type CameraDevice,
+  type DeviceVideoMode,
   type BackendId,
   reconstructPlanar,
   simulateYUYVtoI420,
@@ -14,6 +15,8 @@ export interface ReferenceFrame extends YuyvFrame {
 export interface DesktopBridge {
   readonly concurrentWith?: readonly BackendId[];
   listDevices?: () => Promise<readonly CameraDevice[]>;
+  /** The video modes a device reports, by CameraDevice.id. */
+  listModes?: (device: string) => Promise<readonly DeviceVideoMode[]>;
   command?: (id: string, value?: number) => Promise<void>;
   recordingStorage?: (
     op: string,

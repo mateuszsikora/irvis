@@ -1,4 +1,4 @@
-import { captureArgs, captureEndedMessage, listDevices } from './capture.js';
+import { captureArgs, captureEndedMessage, listDevices, listModes } from './capture.js';
 import { openControl } from './control.js';
 import { installRecordingStorage } from './recordings.js';
 import { app, BrowserWindow, ipcMain, protocol, net, session } from 'electron';
@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process';
 import { resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { cameraProfiles } from '@irvis/core';
-import { parseInputPixelFormat } from '../../../tools/capture-cli/src/ffmpeg.ts';
+import { parseInputPixelFormat, run } from '../../../tools/capture-cli/src/ffmpeg.ts';
 import { bundledFfmpeg, locateFfmpeg } from './ffmpeg.js';
 
 protocol.registerSchemesAsPrivileged([
@@ -32,6 +32,12 @@ let pending = false;
 let control;
 let controlCleanup = Promise.resolve();
 let generation = 0;
+/** The mode read in progress; a new read or a capture start stops it. */
+let modesRead;
+function stopModesRead() {
+  modesRead?.abort();
+  modesRead = undefined;
+}
 const trusted = (url) => url.startsWith('app://irvis/');
 function stop() {
   generation++;
@@ -127,6 +133,24 @@ async function boot() {
     authorize(event);
     return listDevices(process.platform, ffmpeg);
   });
+  ipcMain.handle('capture:modes', (event, device) => {
+    authorize(event);
+    stopModesRead();
+    // DirectShow may not let a second process open a device that is capturing;
+    // an empty list leaves the modes unknown instead of risking the capture.
+    if (process.platform === 'win32' && child) return [];
+    const read = new AbortController();
+    modesRead = read;
+    // A stopped read answers with no modes (unknown) instead of an IPC error.
+    return listModes(process.platform, device, ffmpeg, run, read.signal)
+      .catch((error) => {
+        if (read.signal.aborted) return [];
+        throw error;
+      })
+      .finally(() => {
+        if (modesRead === read) modesRead = undefined;
+      });
+  });
   ipcMain.handle('capture:command', async (event, id, value) => {
     authorize(event);
     if (!control) throw new Error('Camera control is unavailable');
@@ -135,6 +159,8 @@ async function boot() {
   ipcMain.handle('capture:start', async (event, options) => {
     authorize(event);
     stop();
+    // The capture must not share the device with a mode read (DirectShow may refuse it).
+    stopModesRead();
     const token = generation;
     const profile = cameraProfiles.find((p) => p.id === options?.profileId);
     const mode = profile?.videoModes.find((m) => m.id === options?.modeId);
@@ -167,6 +193,8 @@ async function boot() {
       console.warn('Camera control is unavailable: ' + error.message);
     }
     if (generation !== token) return;
+    // Also a read that started while the camera control was opening.
+    stopModesRead();
     const proc = spawn(executable, ['-y', ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
     child = proc;
     let buffer = Buffer.alloc(0),

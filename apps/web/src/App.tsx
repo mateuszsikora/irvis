@@ -1,11 +1,18 @@
 import { desktopBridge, createDesktopRecordingStorage } from '@irvis/backend-electron';
 import { createBrowserRecordingStorage, type RecordingStorage } from '@irvis/media';
 import { createPhotoLibrary } from './photo-library.ts';
-import { cameraProfiles, type CameraDevice, type CameraProfile } from '@irvis/core';
+import {
+  cameraProfiles,
+  matchProfiles,
+  type CameraDevice,
+  type CameraProfile,
+  type DeviceVideoMode,
+} from '@irvis/core';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Icon, Viewer, type PhotoLibrary } from '@irvis/ui';
 import { openRecording, createReplayBackend } from '@irvis/backend-replay';
-import { liveBackend, listLiveCameras } from './viewer-backend.ts';
+import { liveBackend, listCameraModes, listLiveCameras } from './viewer-backend.ts';
+import { videoModeOptions } from './video-modes.ts';
 import './viewer.css';
 import brandMark from './brand/mark.svg';
 import brandWordmark from './brand/wordmark.svg';
@@ -53,9 +60,14 @@ export function App({ profiles = cameraProfiles }: AppProps) {
   const [cameraRefresh, setCameraRefresh] = useState(0);
   const [profileId, setProfileId] = useState(profiles[0]?.id ?? '');
   const [modeId, setModeId] = useState('');
+  /** The modes of the device read for a Source choice; null modes when they are unknown. */
+  const [deviceModes, setDeviceModes] = useState<{
+    readonly choice: number;
+    readonly id: string;
+    readonly label: string;
+    readonly modes: readonly DeviceVideoMode[] | null;
+  } | null>(null);
   const profile = profiles.find((p) => p.id === profileId);
-  const thermalModes = profile?.videoModes.filter((m) => m.layout) ?? [];
-  const mode = thermalModes.find((m) => m.id === modeId) ?? thermalModes[0];
   useEffect(() => {
     let alive = true;
     setListing(true);
@@ -97,6 +109,40 @@ export function App({ profiles = cameraProfiles }: AppProps) {
   );
   const current = camera && findCamera(cameras, camera);
   const source = current ? CAMERA + current.id : camera ? MISSING : DEMO;
+  const probedId = current?.id;
+  const probedLabel = current?.label;
+  useEffect(() => {
+    if (probedId === undefined || probedLabel === undefined) return;
+    let alive = true;
+    void listCameraModes(probedId).then((modes) => {
+      if (!alive) return;
+      // A failed read of a camera followed to a new id keeps the modes it had, so the
+      // mode in use does not change and close a running capture.
+      setDeviceModes((known) =>
+        modes === null && known?.choice === choice && known.label === probedLabel
+          ? { ...known, id: probedId }
+          : { choice, id: probedId, label: probedLabel, modes },
+      );
+    });
+    return () => {
+      alive = false;
+    };
+  }, [choice, probedId, probedLabel]);
+  // The modes belong to the camera: they stay while a refresh follows it to a new
+  // id, but not for another device that took its id, nor after another Source choice.
+  const modes =
+    current &&
+    deviceModes?.label === current.label &&
+    (deviceModes.id === current.id || deviceModes.choice === choice)
+      ? deviceModes.modes
+      : null;
+  const modeOptions = profile ? videoModeOptions(profile, modes) : [];
+  // The default follows the profile's order, not the device's, so that modes
+  // arriving after a choice do not change a mode the device offers and remount a
+  // running viewer. A mode the device turns out not to offer does change.
+  const thermalModes =
+    profile?.videoModes.filter((m) => modeOptions.some((o) => o.mode === m)) ?? [];
+  const mode = thermalModes.find((m) => m.id === modeId) ?? thermalModes[0];
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -119,8 +165,12 @@ export function App({ profiles = cameraProfiles }: AppProps) {
               onChange={(e) => {
                 const value = e.target.value;
                 if (value === MISSING) return;
-                setCamera(cameras.find((c) => CAMERA + c.id === value) ?? null);
+                const chosen = cameras.find((c) => CAMERA + c.id === value) ?? null;
+                setCamera(chosen);
                 setChoice((count) => count + 1);
+                // The profile follows the camera's USB IDs when exactly one profile lists them.
+                const [match, ...others] = chosen ? matchProfiles(chosen, profiles) : [];
+                if (match && others.length === 0) setProfileId(match.id);
               }}
             >
               <option value={DEMO}>Demo</option>
@@ -154,9 +204,14 @@ export function App({ profiles = cameraProfiles }: AppProps) {
                 setModeId(e.target.value);
               }}
             >
-              {thermalModes.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.width} × {m.height} · {m.fps} fps
+              {!mode && (
+                <option value="" disabled hidden>
+                  No mode with temperature data
+                </option>
+              )}
+              {modeOptions.map((o) => (
+                <option key={o.key} value={o.mode?.id ?? o.key} disabled={!o.mode}>
+                  {o.label}
                 </option>
               ))}
             </select>
@@ -166,6 +221,13 @@ export function App({ profiles = cameraProfiles }: AppProps) {
       {cameraError && (
         <p className="notice error-notice" role="status">
           Cameras unavailable: {cameraError}
+        </p>
+      )}
+      {current && profile && modes && !mode && (
+        <p className="notice" role="status">
+          {current.label || current.id} has no video mode with temperature data in the{' '}
+          {profile.name} profile. It is probably not the thermal camera: choose another camera in
+          Source.
         </p>
       )}
       {profiles.length === 0 && <p>No camera is supported yet.</p>}
