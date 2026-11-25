@@ -278,9 +278,151 @@ export function modesArgs(platform, device) {
     ];
   throw new Error('Invalid capture selection');
 }
-/** The device's video modes; an empty list when ffmpeg printed none it could read. */
+/**
+ * The YUYV modes of `v4l2-ctl --list-formats-ext` (v4l-utils), which also
+ * reports the rates that ffmpeg's V4L2 input does not: one mode for each
+ * discrete rate of a size, as AVFoundation lists them, and one with the range
+ * of a stepwise or continuous rate. A size whose rates are missing or not all
+ * readable is one mode without a rate. A size given as a range (`Stepwise`,
+ * `Continuous`) is left out, as with ffmpeg. Both the current format lines
+ * (`[0]: 'YUYV'`) and the older ones (`Pixel Format: 'YUYV'`) are read.
+ */
+export function parseV4l2CtlModes(output) {
+  const modes = [];
+  let yuyv = false;
+  let size;
+  const close = () => {
+    if (!size) return;
+    const { width, height, rates } = size;
+    if (rates.length && rates.every(([min, max]) => Number.isFinite(min) && Number.isFinite(max)))
+      for (const [minFps, maxFps] of rates) modes.push({ width, height, minFps, maxFps });
+    else modes.push({ width, height });
+    size = undefined;
+  };
+  for (const line of output.split(/\r?\n/)) {
+    const format = /^\s*(?:\[\d+\]:|Pixel Format:)\s*'([^']*)'/.exec(line);
+    if (format) {
+      close();
+      yuyv = format[1] === 'YUYV';
+      continue;
+    }
+    if (!yuyv) continue;
+    if (/^\s*Size:/.test(line)) {
+      close();
+      const discrete = /^\s*Size: Discrete (\d+)x(\d+)\s*$/.exec(line);
+      if (discrete) size = { width: Number(discrete[1]), height: Number(discrete[2]), rates: [] };
+      continue;
+    }
+    if (!size || !/^\s*Interval:/.test(line)) continue;
+    const range = /\(([\d.]+)-([\d.]+) fps\)/.exec(line);
+    const rate = /\(([\d.]+) fps\)/.exec(line);
+    if (range) size.rates.push([Number(range[1]), Number(range[2])]);
+    else size.rates.push(rate ? [Number(rate[1]), Number(rate[1])] : [NaN, NaN]);
+  }
+  close();
+  const seen = new Set();
+  return modes.filter((m) => {
+    const key = `${m.width}x${m.height}@${m.minFps}-${m.maxFps}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+/**
+ * The device's video modes; an empty list when ffmpeg printed none it could read.
+ * On Linux `v4l2-ctl` is asked first, for the frame rates; without it, or when
+ * it fails or lists no YUYV size, ffmpeg's sizes come without rates.
+ */
 export async function listModes(platform, device, ffmpeg = findFfmpeg, exec = run, signal) {
+  if (platform === 'linux' && isV4l2Device(device)) {
+    // v4l2-ctl answers within a fraction of a second; ffmpeg still has its 10 s.
+    const result = await exec('v4l2-ctl', ['--list-formats-ext', '-d', device], 3000, signal).catch(
+      (error) => {
+        if (signal?.aborted) throw error;
+        return undefined;
+      },
+    );
+    const modes = result?.code === 0 ? parseV4l2CtlModes(result.stdout) : [];
+    if (modes.length) return modes;
+  }
   const result = await exec(ffmpeg(), modesArgs(platform, device), 10000, signal);
   if (result.timedOut) throw new Error('Reading the camera modes timed out');
   return parseDeviceModes(platform, result.stderr);
+}
+/**
+ * One read of a device's modes at a time, kept away from a capture that opens
+ * the device. A new read stops the one before, which answers with no modes.
+ * `pause()` stops the read in progress and holds new ones until every pause is
+ * released by the function it returns (each one once); then they read (again),
+ * so a read stopped by Start still delivers the camera's modes, and the end of
+ * an old capture does not release the pause of a newer one.
+ */
+export function modesReader(list) {
+  let current;
+  const pauses = new Set();
+  let gate;
+  const deferred = () => {
+    let resolve;
+    const promise = new Promise((r) => {
+      resolve = r;
+    });
+    return { promise, resolve };
+  };
+  return {
+    async read(device) {
+      current?.cancel();
+      const cancelled = deferred();
+      const request = { attempt: undefined, cancelled: false };
+      request.cancel = () => {
+        request.cancelled = true;
+        request.attempt?.abort();
+        cancelled.resolve();
+      };
+      current = request;
+      try {
+        for (;;) {
+          while (gate && !request.cancelled) await Promise.race([gate.promise, cancelled.promise]);
+          if (request.cancelled) return [];
+          const attempt = new AbortController();
+          request.attempt = attempt;
+          try {
+            const modes = await list(device, attempt.signal);
+            if (!attempt.signal.aborted) return modes;
+          } catch (error) {
+            if (!attempt.signal.aborted) throw error;
+          }
+          if (request.cancelled) return [];
+        }
+      } finally {
+        if (current === request) current = undefined;
+      }
+    },
+    pause() {
+      const pause = Symbol('pause');
+      pauses.add(pause);
+      gate ??= deferred();
+      current?.attempt?.abort();
+      return () => {
+        if (!pauses.delete(pause) || pauses.size) return;
+        gate?.resolve();
+        gate = undefined;
+      };
+    },
+  };
+}
+/**
+ * When a started capture releases its pause of the mode reads (`release`, from
+ * `modesReader().pause()`): on macOS and Linux once ffmpeg reports the input's
+ * pixel format, so it has opened the device, as AVFoundation and V4L2 let a
+ * capturing device's modes be listed; on Windows, where DirectShow may not let a
+ * second process open a capturing device, only when the ffmpeg process has
+ * closed. Every platform releases it when the process closes or fails to start.
+ */
+export function captureReadPause(platform, release) {
+  return {
+    opened: () => {
+      if (platform !== 'win32') release();
+    },
+    ended: release,
+  };
 }

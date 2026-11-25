@@ -33,14 +33,20 @@ const offers = (device: DeviceVideoMode, mode: VideoMode) =>
     (device.minFps - FPS_TOLERANCE < mode.fps && mode.fps < device.maxFps + FPS_TOLERANCE));
 const label = (mode: VideoMode) =>
   `${size(mode)} · ${mode.fps} fps${mode.layout ? '' : ' · image only'}`;
+/**
+ * The rate asked for a device mode without one. Only V4L2 lists modes without
+ * rates, and it changes a rate the camera does not offer to the nearest one it
+ * does, so the option shows no rate.
+ */
+const DRIVER_RATE = 30;
 
 /**
  * The Video mode options: without the device's modes, the profile's modes;
  * with them, the device's modes in its order, each the profile's mode it
  * offers, with temperature data first, or a mode of its own that shows the
  * image only. An image-only option can be chosen only where `imageOnly` is
- * true, and a device mode only when the device reports its frame rate, which
- * it then opens at the highest.
+ * true. A device mode opens at the highest rate the device reports, or, without
+ * one, at a rate the driver chooses.
  */
 export function videoModeOptions(
   profile: CameraProfile,
@@ -57,13 +63,11 @@ export function videoModeOptions(
     const own =
       profile.videoModes.find((m) => m.layout && offers(device, m)) ??
       profile.videoModes.find((m) => offers(device, m));
-    const image =
-      own ??
-      (device.maxFps === undefined
-        ? undefined
-        : imageOnlyMode(device.width, device.height, device.maxFps));
+    const image = own ?? imageOnlyMode(device.width, device.height, device.maxFps ?? DRIVER_RATE);
     const next = image
-      ? option(image)
+      ? own || device.maxFps !== undefined
+        ? option(image)
+        : { ...option(image), label: `${size(device)} · image only` }
       : {
           key: `device-${device.width}x${device.height}-${device.minFps}-${device.maxFps}`,
           label: `${size(device)}${rate(device)} · image only`,

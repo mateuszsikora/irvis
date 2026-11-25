@@ -174,13 +174,13 @@ describe('App', () => {
     );
   });
 
-  it('says that a camera has no mode to choose when it reports no frame rates and none of the profile', async () => {
+  it('says that a camera has no mode to choose when none of its modes is the profile’s or packed YUYV', async () => {
     window.irvisDesktop = {
       start: () => Promise.resolve(),
       stop: () => Promise.resolve(),
       subscribe: () => () => {},
       listDevices: () => Promise.resolve([{ id: '/dev/video0', label: 'Integrated Camera' }]),
-      listModes: () => Promise.resolve([{ width: 640, height: 480 }]),
+      listModes: () => Promise.resolve([{ width: 641, height: 480 }]),
     };
     render(<App />);
     await screen.findByText('Integrated Camera', { selector: 'option' });
@@ -192,10 +192,34 @@ describe('App', () => {
     ).toBeTruthy();
     expect(options('Video mode')).toEqual([
       ['', 'No video mode to choose'],
-      ['device-640x480-undefined-undefined', '640 × 480 · image only'],
+      ['device-641x480-undefined-undefined', '641 × 480 · image only'],
     ]);
     expect(disabled('Video mode')).toEqual([true, true]);
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Start' }).disabled).toBe(true);
+  });
+
+  it('lets a Linux camera start a mode without a frame rate, at the rate its driver picks', async () => {
+    const start = vi.fn(() => Promise.resolve());
+    window.irvisDesktop = {
+      start,
+      stop: () => Promise.resolve(),
+      subscribe: () => () => {},
+      listDevices: () => Promise.resolve([{ id: '/dev/video0', label: 'Integrated Camera' }]),
+      listModes: () => Promise.resolve([{ width: 640, height: 480 }]),
+    };
+    render(<App />);
+    await screen.findByText('Integrated Camera', { selector: 'option' });
+    fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'camera:/dev/video0' } });
+    expect(
+      await screen.findByText(
+        'Integrated Camera has no video mode with temperature data in the InfiRay P2 Pro profile, so it shows the image only. It is probably not the thermal camera: for temperatures, choose another camera in Source.',
+      ),
+    ).toBeTruthy();
+    expect(options('Video mode')).toEqual([['image-640x480@30', '640 × 480 · image only']]);
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    await waitFor(() =>
+      expect(start).toHaveBeenCalledWith(expect.objectContaining({ modeId: 'image-640x480@30' })),
+    );
   });
 
   it('falls back to the profile modes when the camera modes cannot be read', async () => {

@@ -74,18 +74,24 @@ describe('videoModeOptions', () => {
     ).toBeNull();
   });
 
-  it('cannot choose a device mode without a frame rate, nor one that is not packed YUYV, and labels it by its size', () => {
+  it('chooses a device mode without a frame rate at a rate the driver picks, labelled without one', () => {
+    expect(options(profile, [{ width: 640, height: 480 }], true)).toEqual([
+      ['image-640x480@30', '640 × 480 · image only', 'image-640x480@30'],
+    ]);
+  });
+
+  it('cannot choose a device mode that is not packed YUYV, and labels it by its size', () => {
     expect(
       videoModeOptions(
         profile,
         [
-          { width: 640, height: 480 },
+          { width: 641, height: 480 },
           { width: 641, height: 480, minFps: 30, maxFps: 30 },
         ],
         true,
       ),
     ).toEqual([
-      { key: 'device-640x480-undefined-undefined', label: '640 × 480 · image only' },
+      { key: 'device-641x480-undefined-undefined', label: '641 × 480 · image only' },
       { key: 'device-641x480-30-30', label: '641 × 480 · 30 fps · image only' },
     ]);
   });

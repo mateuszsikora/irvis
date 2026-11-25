@@ -3,12 +3,15 @@ import {
   inputArgs,
   captureArgs,
   captureEndedMessage,
+  captureReadPause,
   frameReader,
   listDevices,
   listModes,
   modesArgs,
+  modesReader,
   parseCameraData,
   parseDeviceModes,
+  parseV4l2CtlModes,
   pixelFormatMessage,
 } from '../src/capture.js';
 import { openControl } from '../src/control.js';
@@ -241,6 +244,142 @@ describe('desktop capture', () => {
     await expect(listModes('darwin', '0', () => 'ffmpeg', exec)).rejects.toThrow(
       'Reading the camera modes timed out',
     );
+  });
+  it('reads a mode for each YUYV size and frame rate that v4l2-ctl lists, leaving out ranges of sizes', () => {
+    const output = [
+      'ioctl: VIDIOC_ENUM_FMT',
+      '\tType: Video Capture',
+      '',
+      "\t[0]: 'YUYV' (YUYV 4:2:2)",
+      '\t\tSize: Discrete 640x480',
+      '\t\t\tInterval: Discrete 0.033s (30.000 fps)',
+      '\t\t\tInterval: Discrete 0.067s (15.000 fps)',
+      '\t\tSize: Discrete 1280x720',
+      '\t\t\tInterval: Continuous 0.100s - 1.000s (1.000-10.000 fps)',
+      '\t\tSize: Discrete 256x192',
+      '\t\tSize: Stepwise 16x16 - 1920x1080 with step 16/16',
+      '\t\t\tInterval: Discrete 0.033s (30.000 fps)',
+      "\t[1]: 'MJPG' (Motion-JPEG, compressed)",
+      '\t\tSize: Discrete 1920x1080',
+      '\t\t\tInterval: Discrete 0.033s (30.000 fps)',
+    ].join('\n');
+    expect(parseV4l2CtlModes(output)).toEqual([
+      { width: 640, height: 480, minFps: 30, maxFps: 30 },
+      { width: 640, height: 480, minFps: 15, maxFps: 15 },
+      { width: 1280, height: 720, minFps: 1, maxFps: 10 },
+      { width: 256, height: 192 },
+    ]);
+    // Older v4l-utils name the format on a line of its own.
+    const older = [
+      '\tIndex       : 0',
+      '\tType        : Video Capture',
+      "\tPixel Format: 'YUYV'",
+      '\tName        : YUYV 4:2:2',
+      '\t\tSize: Discrete 256x384',
+      '\t\t\tInterval: Discrete 0.040s (25.000 fps)',
+      '',
+      '\tIndex       : 1',
+      "\tPixel Format: 'MJPG' (compressed)",
+      '\t\tSize: Discrete 1280x720',
+      '\t\t\tInterval: Discrete 0.033s (30.000 fps)',
+    ].join('\n');
+    expect(parseV4l2CtlModes(older)).toEqual([{ width: 256, height: 384, minFps: 25, maxFps: 25 }]);
+  });
+  it('asks v4l2-ctl for the modes on Linux, and ffmpeg without it', async () => {
+    const ctl =
+      "\t[0]: 'YUYV' (YUYV 4:2:2)\n\t\tSize: Discrete 256x384\n\t\t\tInterval: Discrete 0.040s (25.000 fps)\n";
+    const ffmpegLog =
+      '[video4linux2,v4l2 @ 0x1] Raw       :     yuyv422 :           YUYV 4:2:2 : 256x384 256x192';
+    const signal = new AbortController().signal;
+    const exec = vi.fn((program) =>
+      program === 'v4l2-ctl'
+        ? Promise.resolve({ code: 0, stdout: ctl, stderr: '', timedOut: false })
+        : Promise.resolve({ code: 0, stdout: '', stderr: ffmpegLog, timedOut: false }),
+    );
+    expect(await listModes('linux', '/dev/video2', () => 'ffmpeg', exec, signal)).toEqual([
+      { width: 256, height: 384, minFps: 25, maxFps: 25 },
+    ]);
+    expect(exec).toHaveBeenCalledWith(
+      'v4l2-ctl',
+      ['--list-formats-ext', '-d', '/dev/video2'],
+      3000,
+      signal,
+    );
+    expect(exec).toHaveBeenCalledTimes(1);
+    exec.mockImplementationOnce(() =>
+      Promise.reject(Object.assign(new Error('spawn v4l2-ctl ENOENT'), { code: 'ENOENT' })),
+    );
+    expect(await listModes('linux', '/dev/video2', () => 'ffmpeg', exec)).toEqual([
+      { width: 256, height: 384 },
+      { width: 256, height: 192 },
+    ]);
+    exec.mockImplementationOnce(() =>
+      Promise.resolve({ code: 1, stdout: '', stderr: 'Device or resource busy', timedOut: false }),
+    );
+    expect(await listModes('linux', '/dev/video2', () => 'ffmpeg', exec)).toHaveLength(2);
+    const stopped = new AbortController();
+    stopped.abort();
+    exec.mockImplementationOnce(() => Promise.reject(new Error('The operation was aborted')));
+    await expect(
+      listModes('linux', '/dev/video2', () => 'ffmpeg', exec, stopped.signal),
+    ).rejects.toThrow('The operation was aborted');
+  });
+  it('reads the modes again when a capture start stopped the read, unless a newer read replaced it', async () => {
+    const calls = [];
+    const list = vi.fn(
+      (device, signal) =>
+        new Promise((resolve, reject) => {
+          calls.push({ device, resolve, signal });
+          signal.addEventListener('abort', () => reject(new Error('aborted')));
+        }),
+    );
+    const reader = modesReader(list);
+    const stopped = reader.read('0');
+    const release = reader.pause();
+    expect(calls[0].signal.aborted).toBe(true);
+    const held = reader.read('0');
+    expect(await stopped).toEqual([]);
+    await Promise.resolve();
+    expect(list).toHaveBeenCalledTimes(1);
+    release();
+    await vi.waitFor(() => expect(list).toHaveBeenCalledTimes(2));
+    calls[1].resolve([{ width: 256, height: 384 }]);
+    expect(await held).toEqual([{ width: 256, height: 384 }]);
+    // Stopped by Start and read again once released, with no newer read.
+    const again = reader.read('1');
+    reader.pause()();
+    await vi.waitFor(() => expect(list).toHaveBeenCalledTimes(4));
+    expect(calls[3].device).toBe('1');
+    calls[3].resolve([{ width: 640, height: 480 }]);
+    expect(await again).toEqual([{ width: 640, height: 480 }]);
+  });
+  it('holds the mode reads until every capture has released its pause, each pause once', async () => {
+    const list = vi.fn(() => Promise.resolve([{ width: 256, height: 384 }]));
+    const reader = modesReader(list);
+    const old = reader.pause();
+    const newer = reader.pause();
+    const read = reader.read('0');
+    // The old capture ends, twice (error, then close), while the newer one opens the device.
+    old();
+    old();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(list).not.toHaveBeenCalled();
+    newer();
+    expect(await read).toEqual([{ width: 256, height: 384 }]);
+  });
+  it('lets a capture release its pause once it has the device on macOS and Linux, and on Windows only when it ends', () => {
+    for (const [platform, onOpen] of [
+      ['darwin', 1],
+      ['linux', 1],
+      ['win32', 0],
+    ]) {
+      const release = vi.fn();
+      const pause = captureReadPause(platform, release);
+      pause.opened();
+      expect(release).toHaveBeenCalledTimes(onOpen);
+      pause.ended();
+      expect(release).toHaveBeenCalledTimes(onOpen + 1);
+    }
   });
   it('explains a camera without the chosen video mode instead of quoting ffmpeg, pointing to another camera only for a profile mode', () => {
     const log = [

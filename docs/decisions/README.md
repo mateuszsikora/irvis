@@ -96,3 +96,4 @@ Read this index before deciding anything: it tells you cheaply whether the quest
 | [A release is a draft GitHub Release built from a version commit on main](architecture.md#a-release-is-a-draft-github-release-built-from-a-version-commit-on-main) | [architecture.md](architecture.md) | decided (#24) |
 | [The desktop app shows a mode without temperature data as the camera's image only](architecture.md#the-desktop-app-shows-a-mode-without-temperature-data-as-the-cameras-image-only) | [architecture.md](architecture.md) | superseded (#65) |
 | [A live camera shows a mode without temperature data as its image only](architecture.md#a-live-camera-shows-a-mode-without-temperature-data-as-its-image-only) | [architecture.md](architecture.md) | decided (#65) |
+| [On Linux a mode's frame rate comes from v4l2-ctl or from the driver](architecture.md#on-linux-a-modes-frame-rate-comes-from-v4l2-ctl-or-from-the-driver) | [architecture.md](architecture.md) | decided (#66) |
