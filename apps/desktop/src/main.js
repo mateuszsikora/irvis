@@ -1,16 +1,20 @@
 import {
+  cameraAccess,
+  cameraAccessMessage,
   captureArgs,
   captureEndedMessage,
   captureReadPause,
+  firstFrameTimeout,
   frameReader,
   listDevices,
   listModes,
   modesReader,
+  noFramesMessage,
   pixelFormatMessage,
 } from './capture.js';
 import { openControl } from './control.js';
 import { installRecordingStorage } from './recordings.js';
-import { app, BrowserWindow, ipcMain, protocol, net, session } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol, net, session, systemPreferences } from 'electron';
 import { spawn } from 'node:child_process';
 import { resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -181,6 +185,16 @@ async function boot() {
     const executable = ffmpeg();
     await controlCleanup;
     if (generation !== token) return;
+    const denied = cameraAccessMessage(
+      cameraAccess(process.platform, systemPreferences),
+      app.isPackaged,
+    );
+    if (denied) {
+      // Sent rather than thrown: the viewer shows a thrown message after
+      // Electron's `Error invoking remote method 'capture:start': Error:` prefix.
+      window.webContents.send('capture:error', denied);
+      return;
+    }
     // USB access can be unavailable while the OS owns UVC. Video remains usable.
     if (profileMode) {
       try {
@@ -213,7 +227,21 @@ async function boot() {
     let log = '',
       format = null;
     const size = mode.width * mode.height * 2;
+    // A camera the system does not let the app use can open without an error
+    // and send nothing; without this the viewer would wait for ever.
+    const noFrames = setTimeout(
+      () =>
+        sendError(
+          noFramesMessage(
+            process.platform,
+            cameraAccess(process.platform, systemPreferences),
+            app.isPackaged,
+          ),
+        ),
+      firstFrameTimeout,
+    );
     const sendError = (message) => {
+      clearTimeout(noFrames);
       if (child === proc) {
         window.webContents.send('capture:error', message);
         stop();
@@ -229,6 +257,7 @@ async function boot() {
       if (format && format !== 'yuyv422') sendError(pixelFormatMessage(format, mode));
     });
     const read = frameReader(size, (data) => {
+      clearTimeout(noFrames);
       if (pending || control?.busy || format !== 'yuyv422') return;
       pending = true;
       window.webContents.send('capture:frame', {
