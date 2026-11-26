@@ -680,93 +680,144 @@ export function Viewer({
               </label>
             )}
           </div>
-          {!imageView && (
-            <div className="preview-toolbar" aria-label="Tracking shortcuts">
-              {(['min', 'max', 'centre'] as const).map((key) => (
-                <button
-                  key={key}
-                  aria-pressed={settings.analysis!.tracking[key]}
-                  onClick={() =>
-                    update({
-                      analysis: {
-                        ...settings.analysis!,
-                        tracking: {
-                          ...settings.analysis!.tracking,
-                          [key]: !settings.analysis!.tracking[key],
-                        },
-                      },
-                    })
-                  }
+          {/* Hidden, not removed: the renderer holds the readings output from its mount. */}
+          <section className="panel-card" aria-label="Readings" hidden={imageView}>
+            <div className="panel-heading">
+              <h3>Readings</h3>
+              {!imageView && (
+                <div className="chip-group" role="group" aria-label="Tracking shortcuts">
+                  {(['min', 'max', 'centre'] as const).map((key) => (
+                    <button
+                      key={key}
+                      className="chip"
+                      aria-pressed={settings.analysis!.tracking[key]}
+                      onClick={() =>
+                        update({
+                          analysis: {
+                            ...settings.analysis!,
+                            tracking: {
+                              ...settings.analysis!.tracking,
+                              [key]: !settings.analysis!.tracking[key],
+                            },
+                          },
+                        })
+                      }
+                    >
+                      Track {key}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {!imageView && (
+                <p
+                  role="status"
+                  className={`status-pill ${
+                    !settings.analysis!.alarm ? '' : triggered ? 'is-alert' : 'is-armed'
+                  }`}
                 >
-                  Track {key}
-                </button>
-              ))}
+                  {!settings.analysis!.alarm
+                    ? 'Alarm disabled'
+                    : triggered
+                      ? 'Alarm triggered'
+                      : 'Alarm enabled — below threshold'}
+                </p>
+              )}
             </div>
-          )}
-          <output
-            ref={readouts}
-            aria-label="Measurement readings"
-            style={{ whiteSpace: 'pre-line' }}
-            hidden={imageView}
-          />
-          {!imageView && (
-            <p role="status">
-              {!settings.analysis!.alarm
-                ? 'Alarm disabled'
-                : triggered
-                  ? 'Alarm triggered'
-                  : 'Alarm enabled — below threshold'}
-            </p>
-          )}
-          <label>
-            Open thermal photo
-            <input
-              type="file"
-              accept=".png,.irvis"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void openPhoto(file);
-                e.target.value = '';
-              }}
+            <output
+              ref={readouts}
+              className="readings"
+              aria-label="Measurement readings"
+              hidden={imageView}
             />
-          </label>
-          {photoName && (
-            <p>
-              {photoName} · New measurements use stored temperatures. Captured overlays are not
-              editable objects.
-            </p>
-          )}
-          <nav className="tool-dock" aria-label="Tools">
-            <button
-              disabled={!photoLibrary || !hasFrame || !!failure || savingPhoto || imageView}
-              onClick={() => void capturePhoto()}
-            >
-              <Icon name="photo" />
-              {savingPhoto ? 'Saving photo…' : 'Capture photo'}
-            </button>
-            <button
-              disabled={!photoLibrary}
-              aria-expanded={galleryOpen}
-              onClick={() => setGalleryOpen((value) => !value)}
-            >
-              <Icon name="gallery" />
-              Gallery
-            </button>
-          </nav>
-          <label>
-            Gallery filter
-            <select
-              value={galleryFilter}
-              onChange={(e) => {
-                setGalleryFilter(e.target.value);
-                setGalleryOpen(true);
-              }}
-            >
-              <option value="all">All</option>
-              <option value="photos">Photos</option>
-              <option value="videos">Videos</option>
-            </select>
-          </label>
+            {!imageView &&
+              !Object.values(settings.analysis!.tracking).some(Boolean) &&
+              settings.analysis!.objects.length === 0 && (
+                <p className="panel-help">
+                  Turn on a tracking shortcut or add a measurement to see readings.
+                </p>
+              )}
+          </section>
+          <section className="panel-card" aria-label="Photos">
+            <div className="panel-heading">
+              <h3>Photos</h3>
+              <div className="segmented" role="group" aria-label="Gallery filter">
+                {(
+                  [
+                    ['all', 'All'],
+                    ['photos', 'Photos'],
+                    ['videos', 'Videos'],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    aria-pressed={galleryFilter === value}
+                    onClick={() => {
+                      setGalleryFilter(value);
+                      setGalleryOpen(true);
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="action-row" role="group" aria-label="Tools">
+              <button
+                disabled={!photoLibrary || !hasFrame || !!failure || savingPhoto || imageView}
+                onClick={() => void capturePhoto()}
+              >
+                <Icon name="photo" />
+                {savingPhoto ? 'Saving photo…' : 'Capture photo'}
+              </button>
+              <label className="file-button">
+                <input
+                  type="file"
+                  accept=".png,.irvis"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void openPhoto(file);
+                    e.target.value = '';
+                  }}
+                />
+                <Icon name="open" />
+                Open thermal photo
+              </label>
+              <button
+                disabled={!photoLibrary}
+                aria-expanded={galleryOpen}
+                onClick={() => setGalleryOpen((value) => !value)}
+              >
+                <Icon name="gallery" />
+                Gallery
+              </button>
+            </div>
+            {photoName && (
+              <p className="panel-help">
+                {photoName} · New measurements use stored temperatures. Captured overlays are not
+                editable objects.
+              </p>
+            )}
+            {!photoLibrary && (
+              <p className="panel-help">Photo storage is unavailable in this host.</p>
+            )}
+            {photoStatus && (
+              <p className="panel-help" role="status">
+                {photoStatus}
+              </p>
+            )}
+            {galleryOpen && galleryFilter !== 'videos' && photoLibrary && (
+              <PhotoGallery
+                library={photoLibrary}
+                revision={galleryRevision}
+                onOpen={(photo) =>
+                  void openPhoto({
+                    name: photo.name,
+                    arrayBuffer: () => Promise.resolve(photo.bytes.slice().buffer),
+                  })
+                }
+              />
+            )}
+          </section>
           <RecordingControls
             {...(openRecording ? { openRecording } : {})}
             showFiles={galleryFilter !== 'photos'}
@@ -868,20 +919,6 @@ export function Viewer({
               });
             }}
           />
-          {!photoLibrary && <p>Photo storage is unavailable in this host.</p>}
-          {photoStatus && <p role="status">{photoStatus}</p>}
-          {galleryOpen && galleryFilter !== 'videos' && photoLibrary && (
-            <PhotoGallery
-              library={photoLibrary}
-              revision={galleryRevision}
-              onOpen={(photo) =>
-                void openPhoto({
-                  name: photo.name,
-                  arrayBuffer: () => Promise.resolve(photo.bytes.slice().buffer),
-                })
-              }
-            />
-          )}
         </div>
         <aside className="settings-panel" aria-label="View settings">
           {imageView && (

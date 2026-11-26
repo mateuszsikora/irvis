@@ -1,5 +1,6 @@
 import { RecordingThumbnail } from './RecordingThumbnail.tsx';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { Icon } from './Icon.tsx';
 import {
   createRecorder,
   startMicrophone,
@@ -40,6 +41,7 @@ export function RecordingControls({
   onPlayback,
   onExport,
 }: RecordingControlsProps) {
+  const id = useId();
   const microphone = useRef<MicrophoneRecording | null>(null);
   const [autoExport, setAutoExport] = useState(false);
   const currentName = useRef('');
@@ -242,89 +244,124 @@ export function RecordingControls({
     Number.isInteger(Number(threshold)) &&
     Number(threshold) >= 0 &&
     Number(threshold) <= 65535;
+  const exportFile = (file: RecordingFile) => {
+    setBusy(true);
+    void onExport(file, exportScale, smooth, recorded)
+      .catch((e) => setError(String(e)))
+      .finally(() => setBusy(false));
+  };
   return (
-    <section aria-label="Recordings">
-      <h3>Recordings</h3>
-      <label>
-        <input
-          type="checkbox"
-          checked={audioEnabled}
-          disabled={recording || busy}
-          onChange={(e) => setAudioEnabled(e.target.checked)}
-        />
-        Microphone (Off by default)
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={autoExport}
-          disabled={recording || busy}
-          onChange={(e) => setAutoExport(e.target.checked)}
-        />
-        Export MP4 after recording
-      </label>
-      <label>
-        Recording threshold (0 = lossless)
-        <input
-          type="number"
-          min="0"
-          max="65535"
-          value={threshold}
-          disabled={recording || busy}
-          onChange={(e) => setThreshold(e.target.value)}
-        />
-      </label>
-      {!prepared && (
+    <section aria-label="Recordings" className="panel-card">
+      <div className="panel-heading">
+        <h3>Recordings</h3>
+        {recording && (
+          <output className="status-pill is-recording">Recording · {elapsed.toFixed(1)} s</output>
+        )}
+      </div>
+      <div className="action-row">
+        {!prepared && (
+          <button
+            disabled={!storage || busy}
+            onClick={() => {
+              void storage
+                ?.prepare(
+                  profile.sensor.width *
+                    profile.sensor.height *
+                    2 *
+                    (profile.videoModes[0]?.fps ?? 25),
+                )
+                .then((message) => {
+                  setNotice(message);
+                  setPrepared(true);
+                })
+                .catch((e) => setError(String(e)));
+            }}
+          >
+            Check recording storage
+          </button>
+        )}
         <button
-          disabled={!storage || busy}
-          onClick={() => {
-            void storage
-              ?.prepare(
-                profile.sensor.width *
-                  profile.sensor.height *
-                  2 *
-                  (profile.videoModes[0]?.fps ?? 25),
-              )
-              .then((message) => {
-                setNotice(message);
-                setPrepared(true);
-              })
-              .catch((e) => setError(String(e)));
-          }}
+          className="record-button"
+          disabled={!live || !storage || !prepared || !valid || busy || recording}
+          onClick={() => void start()}
         >
-          Check recording storage
+          <Icon name="record" />
+          Record .irvis
         </button>
+        <button disabled={!recording} onClick={() => void stop()}>
+          <Icon name="stop" />
+          Stop recording
+        </button>
+        <label className={`file-button ${recording || busy ? 'is-disabled' : ''}`}>
+          <input
+            type="file"
+            accept=".irvis"
+            disabled={recording || busy}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void open({ name: file.name, source: fileByteSource(file) });
+              e.target.value = '';
+            }}
+          />
+          <Icon name="open" />
+          Open recording
+        </label>
+      </div>
+      {!prepared && (
+        <p className="panel-help">Check recording storage once before the first recording.</p>
       )}
-      {notice && <p role="status">{notice}</p>}
-      <button
-        disabled={!live || !storage || !prepared || !valid || busy || recording}
-        onClick={() => void start()}
-      >
-        Record .irvis
-      </button>
-      <button disabled={!recording} onClick={() => void stop()}>
-        Stop recording
-      </button>
-      {recording && <output>Recording · {elapsed.toFixed(1)} s</output>}
-      <label>
-        Open recording
-        <input
-          type="file"
-          accept=".irvis"
-          disabled={recording || busy}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) void open({ name: file.name, source: fileByteSource(file) });
-            e.target.value = '';
-          }}
-        />
-      </label>
+      {notice && (
+        <p className="notice" role="status">
+          {notice}
+        </p>
+      )}
+      <div className="option-grid">
+        <label className="switch-label">
+          <input
+            type="checkbox"
+            checked={audioEnabled}
+            disabled={recording || busy}
+            onChange={(e) => setAudioEnabled(e.target.checked)}
+          />
+          <span>Record microphone</span>
+        </label>
+        <label className="switch-label">
+          <input
+            type="checkbox"
+            checked={autoExport}
+            disabled={recording || busy}
+            onChange={(e) => setAutoExport(e.target.checked)}
+          />
+          <span>Export MP4 after recording</span>
+        </label>
+        <div className="inline-field">
+          <label htmlFor={`${id}-threshold`}>Recording threshold</label>
+          <input
+            id={`${id}-threshold`}
+            type="number"
+            min="0"
+            max="65535"
+            value={threshold}
+            aria-describedby={`${id}-threshold-help`}
+            aria-invalid={!valid}
+            disabled={recording || busy}
+            onChange={(e) => setThreshold(e.target.value)}
+          />
+          <small id={`${id}-threshold-help`}>0 = lossless</small>
+        </div>
+      </div>
       {playback && (
-        <div aria-label="Playback controls">
-          <button onClick={() => player.current?.play()}>Play recording</button>
-          <button onClick={() => player.current?.pause()}>Pause recording</button>
-          <label>
-            Position
+        <div className="playback-bar" aria-label="Playback controls">
+          <button onClick={() => player.current?.play()}>
+            <Icon name="play" />
+            Play recording
+          </button>
+          <button onClick={() => player.current?.pause()}>
+            <Icon name="pause" />
+            Pause recording
+          </button>
+          <label className="playback-position">
+            <span className="visually-hidden">Position</span>
             <input
               type="range"
               min="0"
@@ -336,8 +373,8 @@ export function RecordingControls({
           <output>
             {(playback.position / 1000).toFixed(1)} / {(playback.duration / 1000).toFixed(1)} s
           </output>
-          <label>
-            Playback speed
+          <label className="playback-speed">
+            <span className="visually-hidden">Playback speed</span>
             <select
               value={playback.rate}
               onChange={(e) => player.current?.setRate(Number(e.target.value))}
@@ -349,114 +386,116 @@ export function RecordingControls({
               ))}
             </select>
           </label>
+          {openedFile && (
+            <button disabled={busy || recording} onClick={() => exportFile(openedFile)}>
+              Export opened recording
+            </button>
+          )}
         </div>
       )}
-      {openedFile && (
-        <button
-          disabled={busy || recording}
-          onClick={() => {
-            setBusy(true);
-            void onExport(openedFile, exportScale, smooth, recorded)
-              .catch((e) => setError(String(e)))
-              .finally(() => setBusy(false));
-          }}
-        >
-          Export opened recording
-        </button>
+      {!playback && openedFile && (
+        <div className="action-row">
+          <button disabled={busy || recording} onClick={() => exportFile(openedFile)}>
+            Export opened recording
+          </button>
+        </div>
       )}
-      <fieldset>
+      <fieldset className="export-options">
         <legend>MP4 export</legend>
-        <p>Uses the current palette, range, units and overlays when recorded appearance is off.</p>
-        <label>
-          <input
-            type="checkbox"
-            checked={recorded}
-            onChange={(e) => setRecorded(e.target.checked)}
-          />
-          Recorded appearance
-        </label>
-        <label>
-          Upscale
-          <select value={exportScale} onChange={(e) => setExportScale(Number(e.target.value))}>
-            {[1, 2, 4].map((n) => (
-              <option key={n} value={n}>
-                {n}×
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <input type="checkbox" checked={smooth} onChange={(e) => setSmooth(e.target.checked)} />
-          Smooth export
-        </label>
+        <div className="option-grid">
+          <label className="switch-label">
+            <input
+              type="checkbox"
+              checked={recorded}
+              onChange={(e) => setRecorded(e.target.checked)}
+            />
+            <span>Recorded appearance</span>
+          </label>
+          <label className="switch-label">
+            <input type="checkbox" checked={smooth} onChange={(e) => setSmooth(e.target.checked)} />
+            <span>Smooth export</span>
+          </label>
+          <div className="inline-field">
+            <span id={`${id}-upscale`}>Upscale</span>
+            <div className="segmented" role="group" aria-labelledby={`${id}-upscale`}>
+              {[1, 2, 4].map((n) => (
+                <button key={n} aria-pressed={exportScale === n} onClick={() => setExportScale(n)}>
+                  {n}×
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <p className="panel-help">
+          Uses the current palette, range, units and overlays when recorded appearance is off.
+        </p>
       </fieldset>
-      <ul hidden={!showFiles}>
+      <ul className="recording-list" hidden={!showFiles || files.length === 0}>
         {files.map((file) => (
           <li key={file.name}>
-            <label>
+            <RecordingThumbnail source={file.source} />
+            <label className="recording-name">
               <input
                 type="radio"
                 name="selected-recording"
                 checked={selected === file.name}
                 onChange={() => setSelected(file.name)}
               />
-              {file.name}
+              <span>{file.name}</span>
             </label>
-            <RecordingThumbnail source={file.source} />
-            <button disabled={recording || busy} onClick={() => void open(file)}>
-              Open
-            </button>
-            <button
-              disabled={busy || recording}
-              onClick={() => {
-                setBusy(true);
-                void onExport(file, exportScale, smooth, recorded)
-                  .catch((e) => setError(String(e)))
-                  .finally(() => setBusy(false));
-              }}
-            >
-              Export MP4
-            </button>
-            <button
-              onClick={() => {
-                void storage
-                  ?.list()
-                  .then(async (items) => {
-                    const audio = items.find((f) =>
+            <div className="recording-actions">
+              <button disabled={recording || busy} onClick={() => void open(file)}>
+                Open
+              </button>
+              <button disabled={busy || recording} onClick={() => exportFile(file)}>
+                Export MP4
+              </button>
+              <button
+                onClick={() => {
+                  void storage
+                    ?.list()
+                    .then(async (items) => {
+                      const audio = items.find((f) =>
+                        ['.audio-v2.pcm', '.audio-v1.webm'].some(
+                          (suffix) => f.name === file.name.replace(/\.irvis$/, suffix),
+                        ),
+                      );
+                      if (!audio) throw new Error('This recording has no microphone sidecar.');
+                      await download(audio);
+                    })
+                    .catch((e) => setError(String(e)));
+                }}
+              >
+                Download audio sidecar
+              </button>
+              <button onClick={() => void download(file)}>Download .irvis</button>
+              <button
+                className="danger-button"
+                disabled={recording || busy}
+                onClick={() => {
+                  void (async () => {
+                    await storage?.remove(file.name);
+                    const audio = (await storage?.list())?.find((item) =>
                       ['.audio-v2.pcm', '.audio-v1.webm'].some(
-                        (suffix) => f.name === file.name.replace(/\.irvis$/, suffix),
+                        (suffix) => item.name === file.name.replace(/\.irvis$/, suffix),
                       ),
                     );
-                    if (!audio) throw new Error('This recording has no microphone sidecar.');
-                    await download(audio);
-                  })
-                  .catch((e) => setError(String(e)));
-              }}
-            >
-              Download audio sidecar
-            </button>
-            <button onClick={() => void download(file)}>Download .irvis</button>
-            <button
-              disabled={recording || busy}
-              onClick={() => {
-                void (async () => {
-                  await storage?.remove(file.name);
-                  const audio = (await storage?.list())?.find((item) =>
-                    ['.audio-v2.pcm', '.audio-v1.webm'].some(
-                      (suffix) => item.name === file.name.replace(/\.irvis$/, suffix),
-                    ),
-                  );
-                  if (audio) await storage?.remove(audio.name);
-                  await refresh();
-                })().catch((e) => setError(String(e)));
-              }}
-            >
-              Delete recording
-            </button>
+                    if (audio) await storage?.remove(audio.name);
+                    await refresh();
+                  })().catch((e) => setError(String(e)));
+                }}
+              >
+                Delete recording
+              </button>
+            </div>
           </li>
         ))}
       </ul>
-      {error && <p role="alert">Recording error: {error}</p>}
+      {error && (
+        <p className="notice error-notice" role="alert">
+          Recording error: {error}
+        </p>
+      )}
     </section>
   );
 }

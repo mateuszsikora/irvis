@@ -38,7 +38,7 @@ export function RecordingThumbnail({ source }: { source: ByteSource }) {
   }, [source]);
   return (
     <>
-      <canvas ref={canvas} aria-label="Recording preview" style={{ width: 128 }} />
+      <canvas ref={canvas} aria-label="Recording preview" className="recording-thumbnail" />
       {error && <span>Preview unavailable: {error}. Try opening the recording.</span>}
     </>
   );
