@@ -8,7 +8,14 @@ import {
   type ThermalFrame,
 } from '@irvis/core';
 import { initialAnalysis } from '../src/measurements.ts';
-import { CAMERA_CORRECTION_UNKNOWN, FrameRenderer, type ViewSettings } from '../src/render.ts';
+import {
+  CAMERA_CORRECTION_UNKNOWN,
+  FrameRenderer,
+  crossRect,
+  placeLabel,
+  type Rect,
+  type ViewSettings,
+} from '../src/render.ts';
 describe('FrameRenderer', () => {
   it('retains exact raw bytes but excludes out-of-range readings in live and replay', () => {
     const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
@@ -458,7 +465,10 @@ describe('FrameRenderer', () => {
       lineTo: vi.fn(),
       stroke: vi.fn(),
       strokeRect: vi.fn(),
-      fillText: vi.fn(),
+      fillText: vi.fn<(text: string, x: number, y: number) => void>(),
+      strokeText: vi.fn(),
+      setTransform: vi.fn(),
+      measureText: vi.fn((text: string) => ({ width: text.length * 4.5 })),
     };
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
       context as unknown as CanvasRenderingContext2D,
@@ -560,6 +570,8 @@ describe('FrameRenderer', () => {
       correctedSettings,
     );
     expect(readouts.textContent).toBe('min: 86.0 °F\nmax: 122.0 °F');
+    // The overlay labels each marker with its temperature, not its name.
+    expect(context.fillText.mock.calls.map(([label]) => label)).toEqual(['86.0 °F', '122.0 °F']);
     expect(alarm).toHaveBeenLastCalledWith(true);
     expect(context.putImageData.mock.calls[0]![0].data.slice(4, 8)).toEqual(
       new Uint8ClampedArray([255, 0, 0, 255]),
@@ -584,5 +596,25 @@ describe('FrameRenderer', () => {
     expect(reader.header.path).toBe('reconstructed');
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+  });
+});
+describe('marker labels', () => {
+  it('go right of the cross, then left, below or above, clear of crosses and labels', () => {
+    const canvas = { width: 100, height: 50 };
+    const taken: Rect[] = [];
+    expect(placeLabel({ x: 40, y: 20 }, 35, canvas, taken)).toEqual({ x: 45, y: 23 });
+    // A marker beside it takes the left side, the next one goes below.
+    expect(placeLabel({ x: 41, y: 21 }, 35, canvas, taken)).toEqual({ x: 1, y: 24 });
+    expect(placeLabel({ x: 40, y: 20 }, 35, canvas, taken)).toEqual({ x: 45, y: 34 });
+    // Another marker's cross on the right sends the label left.
+    expect(placeLabel({ x: 40, y: 20 }, 35, canvas, [crossRect({ x: 52, y: 20 })])).toEqual({
+      x: 0,
+      y: 23,
+    });
+    // At the right edge it starts on the left; at the top it goes below.
+    expect(placeLabel({ x: 90, y: 40 }, 35, canvas, [])).toEqual({ x: 50, y: 43 });
+    expect(placeLabel({ x: 0, y: 0 }, 35, canvas, [])).toEqual({ x: 5, y: 14 });
+    // Too small for the label: it is pushed against the edge.
+    expect(placeLabel({ x: 2, y: 2 }, 35, { width: 20, height: 5 }, [])).toEqual({ x: 0, y: 4 });
   });
 });

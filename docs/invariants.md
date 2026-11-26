@@ -356,3 +356,9 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
   - `apps/desktop/test/capture.test.js::desktop capture::lets a capture release its pause once it has the device on macOS and Linux, and on Windows only when it ends`
   - `apps/desktop/test/capture.test.js::desktop capture::asks v4l2-ctl for the modes on Linux, and ffmpeg without it`
   - `apps/desktop/test/capture.test.js::desktop capture::reads a mode for each YUYV size and frame rate that v4l2-ctl lists, leaving out ranges of sizes`
+- **86.** A position picked on the image, under any rotation and mirroring, is stored as a percentage that maps back to the same pixel of the unrotated image; a press outside the picture adds nothing, and a click that does not move the pointer moves no handle.
+  - `packages/ui/test/pointer.test.ts::pointer placement::maps a position on the contained, oriented canvas to the unrotated pixel`
+  - `packages/ui/test/pointer.test.ts::pointer placement::finds every pixel again under each rotation and mirroring`
+  - `packages/ui/test/pointer.test.ts::pointer placement::stores percentages that geometry turns back into the same pixel`
+  - `packages/ui/test/viewer.test.tsx::measurement controls::adds a point where the image is clicked and drags points and area corners`
+  - `packages/ui/test/viewer.test.tsx::measurement controls::keeps a grabbed handle where it was until the pointer really moves`

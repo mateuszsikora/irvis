@@ -7,8 +7,23 @@ import type { ByteSource, RecordingPlayer } from '@irvis/core';
 import { PhotoGallery } from './PhotoGallery.tsx';
 import { photoCorrection, type PhotoLibrary } from './photos.ts';
 import { AnalysisControls } from './AnalysisControls.tsx';
-import { initialAnalysis } from './measurements.ts';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { initialAnalysis, type Measurement } from './measurements.ts';
+import {
+  DRAG_PIXELS,
+  findHandle,
+  handlePixel,
+  imagePixel,
+  moveHandle,
+  toPercent,
+  type Handle,
+} from './pointer.ts';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react';
 import {
   PALETTES,
   IrvisReader,
@@ -89,6 +104,36 @@ export function Viewer({
   const [photoStatus, setPhotoStatus] = useState('');
   const [saveError, setSaveError] = useState('');
   const [analysisRevision, setAnalysisRevision] = useState(0);
+  // One counter for objects added with the buttons and on the image; a new source starts at 1.
+  const nextObjectId = useRef(1);
+  useEffect(() => {
+    nextObjectId.current = 1;
+  }, [analysisRevision]);
+  function newObjectId(objects: Measurement[]) {
+    const id = Math.max(nextObjectId.current, ...objects.map((o) => o.id + 1));
+    nextObjectId.current = id + 1;
+    return id;
+  }
+  /**
+   * The one pointer measuring on the image: dragging a handle (from `start`,
+   * keeping the `offset` between the handle and the pointer), or a finger or
+   * pen that adds a point if it lifts without moving.
+   */
+  const gesture = useRef<
+    | {
+        kind: 'drag';
+        pointerId: number;
+        start: { x: number; y: number };
+        moving: boolean;
+        handle: Handle;
+        image: { width: number; height: number };
+        offset: { x: number; y: number };
+      }
+    | { kind: 'tap'; pointerId: number; start: { x: number; y: number } }
+    | null
+  >(null);
+  // The object whose handle the mouse is over; the cursor falls back once it is deleted.
+  const [overHandle, setOverHandle] = useState<number | null>(null);
   async function capturePhoto() {
     if (!photoLibrary || !rendererRef.current) return;
     setSavingPhoto(true);
@@ -334,6 +379,131 @@ export function Viewer({
   const imageView = viewMode?.layout === null && !photoName;
   // The profile's camera commands are for its own modes; another may be another camera's.
   const controls = !imageView || !viewMode || profile.videoModes.includes(viewMode);
+  /** The unrotated image pixel at a client position, when the canvas shows temperatures. */
+  function pointedPixel(x: number, y: number, clamp: boolean) {
+    const image = rendererRef.current?.recordingFrame()?.frame;
+    const element = canvas.current;
+    if (imageView || !image || !element) return null;
+    const at = imagePixel({ x, y }, element.getBoundingClientRect(), image, settings, clamp);
+    return at && { at, image: { width: image.width, height: image.height } };
+  }
+  function handleAt(pointed: NonNullable<ReturnType<typeof pointedPixel>>) {
+    const analysis = settings.analysis!;
+    // About ten screen pixels around a handle grab it, at any zoom.
+    const radius = Math.max(1.5, 10 / pointed.at.scale);
+    return findHandle(analysis.objects, analysis.selected, pointed.image, pointed.at, radius);
+  }
+  function addPoint(pointed: NonNullable<ReturnType<typeof pointedPixel>>) {
+    const id = newObjectId(settings.analysis!.objects);
+    const x = toPercent(pointed.at.x, pointed.image.width),
+      y = toPercent(pointed.at.y, pointed.image.height);
+    const point: Measurement = { id, kind: 'Point', x, y, x2: x, y2: y };
+    setSettings((s) => ({
+      ...s,
+      analysis: { ...s.analysis!, objects: [...s.analysis!.objects, point], selected: id },
+    }));
+    return id;
+  }
+  // A finger on a handle must drag it rather than scroll the page. Only a
+  // non-passive touchstart can decide that per touch; React's is passive.
+  const grabsHandle = useRef<(x: number, y: number) => boolean>(() => false);
+  useEffect(() => {
+    grabsHandle.current = (x, y) => {
+      const pointed = pointedPixel(x, y, false);
+      return !!pointed && !!handleAt(pointed);
+    };
+  });
+  useEffect(() => {
+    const element = canvas.current;
+    if (!element) return;
+    const touchStart = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      if (event.touches.length === 1 && touch && grabsHandle.current(touch.clientX, touch.clientY))
+        event.preventDefault();
+    };
+    element.addEventListener('touchstart', touchStart, { passive: false });
+    return () => element.removeEventListener('touchstart', touchStart);
+  }, []);
+  function pointerDown(event: ReactPointerEvent<HTMLCanvasElement>) {
+    // One pointer at a time; a second finger is left to the browser. The same
+    // pointer pressed again means its release was lost: start afresh.
+    if (gesture.current && gesture.current.pointerId !== event.pointerId) return;
+    gesture.current = null;
+    if (event.button !== 0) return;
+    const pointed = pointedPixel(event.clientX, event.clientY, false);
+    if (!pointed) return;
+    const start = { x: event.clientX, y: event.clientY };
+    let handle = handleAt(pointed);
+    if (!handle && (event.pointerType === 'touch' || event.pointerType === 'pen')) {
+      // A finger or pen may be starting to scroll: add the point when it lifts.
+      gesture.current = { kind: 'tap', pointerId: event.pointerId, start };
+      return;
+    }
+    event.preventDefault();
+    let offset = { x: 0, y: 0 };
+    if (handle) {
+      const id = handle.id;
+      const object = settings.analysis!.objects.find((o) => o.id === id)!;
+      const spot = handlePixel(object, handle, pointed.image);
+      offset = { x: spot.x - pointed.at.x, y: spot.y - pointed.at.y };
+      setSettings((s) => ({ ...s, analysis: { ...s.analysis!, selected: id } }));
+    } else handle = { id: addPoint(pointed), keys: ['x', 'y'] };
+    gesture.current = {
+      kind: 'drag',
+      pointerId: event.pointerId,
+      start,
+      moving: false,
+      handle,
+      image: pointed.image,
+      offset,
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }
+  function pointerMove(event: ReactPointerEvent<HTMLCanvasElement>) {
+    const current = gesture.current;
+    if (!current) {
+      if (event.pointerType === 'touch') return;
+      const pointed = pointedPixel(event.clientX, event.clientY, false);
+      const over = (pointed && handleAt(pointed)?.id) ?? null;
+      if (over !== overHandle) setOverHandle(over);
+      return;
+    }
+    if (event.pointerId !== current.pointerId) return;
+    // Below a few screen pixels a press is a click, which must not nudge anything.
+    const moved =
+      Math.hypot(event.clientX - current.start.x, event.clientY - current.start.y) >= DRAG_PIXELS;
+    if (current.kind === 'tap') {
+      if (moved) gesture.current = null;
+      return;
+    }
+    if (!current.moving && !moved) return;
+    current.moving = true;
+    const pointed = pointedPixel(event.clientX, event.clientY, true);
+    if (!pointed) return;
+    const { image, offset } = current;
+    const at = {
+      x: Math.min(image.width - 1, Math.max(0, pointed.at.x + offset.x)),
+      y: Math.min(image.height - 1, Math.max(0, pointed.at.y + offset.y)),
+    };
+    setSettings((s) => ({
+      ...s,
+      analysis: {
+        ...s.analysis!,
+        objects: moveHandle(s.analysis!.objects, current.handle, image, at),
+      },
+    }));
+  }
+  function pointerEnd(event: ReactPointerEvent<HTMLCanvasElement>) {
+    const current = gesture.current;
+    if (!current || event.pointerId !== current.pointerId) return;
+    gesture.current = null;
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    if (current.kind === 'tap' && event.type === 'pointerup') {
+      const pointed = pointedPixel(event.clientX, event.clientY, false);
+      if (pointed) addPoint(pointed);
+    }
+  }
   const gains = profile.state.find((f) => f.id === 'gain');
   const gainOptions = gains?.kind === 'enum' ? gains.values : ['high', 'low'];
   return (
@@ -405,10 +575,25 @@ export function Viewer({
               <canvas
                 ref={canvas}
                 aria-label="Thermal image"
+                onPointerDown={pointerDown}
+                onPointerMove={pointerMove}
+                onPointerUp={pointerEnd}
+                onPointerCancel={pointerEnd}
+                onLostPointerCapture={pointerEnd}
+                onPointerLeave={() => setOverHandle(null)}
                 style={{
                   width: `${Number(zoom) * 100}%`,
                   height: `${Number(zoom) * 100}%`,
                   maxWidth: Number(zoom) > 1 ? 'none' : '100%',
+                  ...(imageView || !hasFrame
+                    ? {}
+                    : {
+                        cursor: settings.analysis!.objects.some((o) => o.id === overHandle)
+                          ? 'move'
+                          : 'crosshair',
+                        // Scrolling and pinch zoom stay; a double tap adds points, not zoom.
+                        touchAction: 'manipulation',
+                      }),
                 }}
               />
               {!hasFrame && (
@@ -713,6 +898,7 @@ export function Viewer({
             <AnalysisControls
               key={analysisRevision}
               value={settings.analysis!}
+              newId={newObjectId}
               onChange={(analysis) => {
                 if (playbackRef.current && analysis.correction !== settings.analysis!.correction)
                   playbackCorrectionOverride.current = true;

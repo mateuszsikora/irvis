@@ -11,6 +11,9 @@ import {
 } from '@irvis/core';
 import { Viewer } from '../src/index.ts';
 const draw = vi.hoisted(() => vi.fn());
+const recordingFrame = vi.hoisted(() =>
+  vi.fn((): { frame: { width: number; height: number } } | null => null),
+);
 const alarmCallback = vi.hoisted(() => ({
   current: (_active: boolean) => {
     void _active;
@@ -19,6 +22,7 @@ const alarmCallback = vi.hoisted(() => ({
 vi.mock('../src/render.ts', () => ({
   FrameRenderer: class {
     draw = draw;
+    recordingFrame = recordingFrame;
     constructor(
       _canvas: unknown,
       _scale: unknown,
@@ -35,6 +39,8 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   draw.mockClear();
+  recordingFrame.mockReset();
+  recordingFrame.mockReturnValue(null);
   vi.unstubAllGlobals();
 });
 const profile = cameraProfiles[0]!;
@@ -344,6 +350,160 @@ describe('measurement controls', () => {
     fireEvent.click(screen.getByText('Clear measurements'));
     expect(selector.options).toHaveLength(1);
     expect(screen.getByText('Track min').getAttribute('aria-pressed')).toBe('true');
+  });
+  it('adds a point where the image is clicked and drags points and area corners', () => {
+    // A 256 × 192 frame drawn 512 × 384 px: two screen pixels per image pixel.
+    recordingFrame.mockReturnValue({ frame: { width: 256, height: 192 } });
+    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={backend()} />);
+    const image = screen.getByLabelText('Thermal image');
+    image.getBoundingClientRect = () => ({ left: 0, top: 0, width: 512, height: 384 }) as DOMRect;
+    const selector = screen.getByLabelText<HTMLSelectElement>('Selected object');
+    const value = (label: string) => screen.getByLabelText<HTMLInputElement>(label).value;
+    fireEvent.pointerDown(image, { button: 0, pointerId: 1, clientX: 201, clientY: 101 });
+    expect(selector.options).toHaveLength(2);
+    expect(selector.value).toBe('1');
+    // Pixel (100, 50) of 256 × 192.
+    expect([value('x (%)'), value('y (%)')]).toEqual(['39.22', '26.18']);
+    fireEvent.pointerMove(image, { pointerId: 1, clientX: 21, clientY: 21 });
+    fireEvent.pointerUp(image, { pointerId: 1, clientX: 21, clientY: 21 });
+    expect([value('x (%)'), value('y (%)')]).toEqual(['3.92', '5.24']);
+    // Pressing near the point grabs it instead of adding another.
+    fireEvent.pointerDown(image, { button: 0, pointerId: 1, clientX: 25, clientY: 25 });
+    fireEvent.pointerUp(image, { pointerId: 1, clientX: 25, clientY: 25 });
+    expect(selector.options).toHaveLength(2);
+    // Outside the picture nothing happens.
+    fireEvent.pointerDown(image, { button: 0, pointerId: 1, clientX: 600, clientY: 10 });
+    expect(selector.options).toHaveLength(2);
+    // Area 2 spans 25–75 %; drag its top-right corner, pixel (191, 48), to (200, 10).
+    fireEvent.click(screen.getByText('Add area'));
+    fireEvent.pointerDown(image, { button: 0, pointerId: 1, clientX: 383, clientY: 97 });
+    fireEvent.pointerMove(image, { pointerId: 1, clientX: 401, clientY: 21 });
+    fireEvent.pointerUp(image, { pointerId: 1, clientX: 401, clientY: 21 });
+    expect(selector.value).toBe('2');
+    expect([value('x (%)'), value('y (%)'), value('x2 (%)'), value('y2 (%)')]).toEqual([
+      '25',
+      '5.24',
+      '78.43',
+      '75',
+    ]);
+    // Buttons and clicks share one id counter.
+    fireEvent.pointerDown(image, { button: 0, pointerId: 1, clientX: 301, clientY: 301 });
+    expect(selector.value).toBe('3');
+  });
+  it('keeps a grabbed handle where it was until the pointer really moves', () => {
+    recordingFrame.mockReturnValue({ frame: { width: 256, height: 192 } });
+    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={backend()} />);
+    const image = screen.getByLabelText('Thermal image');
+    image.getBoundingClientRect = () => ({ left: 0, top: 0, width: 512, height: 384 }) as DOMRect;
+    const selector = screen.getByLabelText<HTMLSelectElement>('Selected object');
+    const value = (label: string) => screen.getByLabelText<HTMLInputElement>(label).value;
+    fireEvent.pointerDown(image, { button: 0, pointerId: 1, clientX: 201, clientY: 101 });
+    fireEvent.pointerUp(image, { pointerId: 1, clientX: 201, clientY: 101 });
+    fireEvent.click(screen.getByText('Add point'));
+    // Grab point 1 four image pixels off its centre and jiggle by 2 screen pixels: a click.
+    fireEvent.pointerDown(image, { button: 0, pointerId: 1, clientX: 209, clientY: 101 });
+    fireEvent.pointerMove(image, { pointerId: 1, clientX: 211, clientY: 101 });
+    fireEvent.pointerUp(image, { pointerId: 1, clientX: 211, clientY: 101 });
+    expect(selector.value).toBe('1');
+    expect([value('x (%)'), value('y (%)')]).toEqual(['39.22', '26.18']);
+    // A real drag moves it by the pointer's travel, not onto the pointer.
+    fireEvent.pointerDown(image, { button: 0, pointerId: 1, clientX: 209, clientY: 101 });
+    fireEvent.pointerMove(image, { pointerId: 1, clientX: 229, clientY: 101 });
+    // A second pointer neither takes over nor ends the drag.
+    fireEvent.pointerDown(image, { button: 0, pointerId: 2, clientX: 400, clientY: 300 });
+    fireEvent.pointerUp(image, { pointerId: 2, clientX: 400, clientY: 300 });
+    fireEvent.pointerMove(image, { pointerId: 1, clientX: 249, clientY: 101 });
+    fireEvent.pointerUp(image, { pointerId: 1, clientX: 249, clientY: 101 });
+    // Pixel 100 + 20 = 120 of 256.
+    expect([value('x (%)'), value('y (%)')]).toEqual(['47.06', '26.18']);
+    expect(selector.options).toHaveLength(3);
+    // Other buttons do nothing.
+    fireEvent.pointerDown(image, { button: 2, pointerId: 1, clientX: 50, clientY: 50 });
+    expect(selector.options).toHaveLength(3);
+  });
+  it('recovers when a drag never sees its pointer released', () => {
+    recordingFrame.mockReturnValue({ frame: { width: 256, height: 192 } });
+    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={backend()} />);
+    const image = screen.getByLabelText('Thermal image');
+    image.getBoundingClientRect = () => ({ left: 0, top: 0, width: 512, height: 384 }) as DOMRect;
+    const selector = screen.getByLabelText<HTMLSelectElement>('Selected object');
+    // The mouse's pointerup is lost; its next press still adds a point.
+    fireEvent.pointerDown(image, { button: 0, pointerId: 1, clientX: 101, clientY: 101 });
+    fireEvent.pointerDown(image, { button: 0, pointerId: 1, clientX: 301, clientY: 101 });
+    expect(selector.options).toHaveLength(3);
+    // Losing the pointer capture ends the drag, so another pointer can start one.
+    fireEvent.lostPointerCapture(image, { pointerId: 1 });
+    fireEvent.pointerDown(image, { button: 0, pointerId: 2, clientX: 301, clientY: 301 });
+    expect(selector.options).toHaveLength(4);
+  });
+  it('shows a move cursor only over a handle of an object that still exists', async () => {
+    const bytes = await exportPng(
+      {
+        width: 2,
+        height: 2,
+        timestamp: 0,
+        raw: new Uint16Array([20, 30, 40, 50]),
+        conversion: { kind: 'linear', scale: 1, offset: 0 },
+        cameraState: { origin: 'assumed', values: {} },
+        uncertain: null,
+      },
+      {
+        profile: { id: profile.id, version: profile.version, name: profile.name },
+        fps: 1,
+        path: 'exact',
+      },
+    );
+    recordingFrame.mockReturnValue({ frame: { width: 256, height: 192 } });
+    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={backend()} />);
+    // The cursor appears once a frame is shown; a photo shows one.
+    fireEvent.change(screen.getByLabelText('Open thermal photo'), {
+      target: { files: [{ name: 'scene.png', arrayBuffer: () => Promise.resolve(bytes.buffer) }] },
+    });
+    await screen.findByText(/scene.png/);
+    const image = screen.getByLabelText('Thermal image');
+    image.getBoundingClientRect = () => ({ left: 0, top: 0, width: 512, height: 384 }) as DOMRect;
+    expect(image.style.cursor).toBe('crosshair');
+    expect(image.style.touchAction).toBe('manipulation');
+    fireEvent.pointerDown(image, { button: 0, pointerId: 1, clientX: 101, clientY: 101 });
+    fireEvent.pointerUp(image, { pointerId: 1, clientX: 101, clientY: 101 });
+    const mouse = { pointerId: 1, pointerType: 'mouse' };
+    fireEvent.pointerMove(image, { ...mouse, clientX: 103, clientY: 101 });
+    expect(image.style.cursor).toBe('move');
+    fireEvent.pointerMove(image, { ...mouse, clientX: 301, clientY: 301 });
+    expect(image.style.cursor).toBe('crosshair');
+    fireEvent.pointerMove(image, { ...mouse, clientX: 103, clientY: 101 });
+    fireEvent.click(screen.getByText('Delete selected'));
+    expect(image.style.cursor).toBe('crosshair');
+    fireEvent.click(screen.getByText('Add point'));
+    fireEvent.pointerDown(image, { button: 0, pointerId: 1, clientX: 101, clientY: 101 });
+    fireEvent.pointerUp(image, { pointerId: 1, clientX: 101, clientY: 101 });
+    fireEvent.pointerMove(image, { ...mouse, clientX: 103, clientY: 101 });
+    expect(image.style.cursor).toBe('move');
+    fireEvent.pointerLeave(image, mouse);
+    expect(image.style.cursor).toBe('crosshair');
+  });
+  it('adds a point for a finger only when it lifts without scrolling', () => {
+    recordingFrame.mockReturnValue({ frame: { width: 256, height: 192 } });
+    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={backend()} />);
+    const image = screen.getByLabelText('Thermal image');
+    image.getBoundingClientRect = () => ({ left: 0, top: 0, width: 512, height: 384 }) as DOMRect;
+    const selector = screen.getByLabelText<HTMLSelectElement>('Selected object');
+    const touch = { button: 0, pointerId: 5, pointerType: 'touch' };
+    fireEvent.pointerDown(image, { ...touch, clientX: 101, clientY: 101 });
+    expect(selector.options).toHaveLength(1);
+    fireEvent.pointerUp(image, { ...touch, clientX: 102, clientY: 101 });
+    expect(selector.options).toHaveLength(2);
+    // A swipe and a gesture the browser takes over add nothing.
+    fireEvent.pointerDown(image, { ...touch, clientX: 301, clientY: 101 });
+    fireEvent.pointerMove(image, { ...touch, clientX: 301, clientY: 141 });
+    fireEvent.pointerUp(image, { ...touch, clientX: 301, clientY: 141 });
+    fireEvent.pointerDown(image, { ...touch, clientX: 301, clientY: 101 });
+    fireEvent.pointerCancel(image, { ...touch, clientX: 301, clientY: 101 });
+    expect(selector.options).toHaveLength(2);
+    // Only a touch that starts on a handle keeps the page from scrolling.
+    const onHandle = fireEvent.touchStart(image, { touches: [{ clientX: 101, clientY: 101 }] });
+    const elsewhere = fireEvent.touchStart(image, { touches: [{ clientX: 401, clientY: 301 }] });
+    expect([onHandle, elsewhere]).toEqual([false, true]);
   });
   it('converts committed thresholds between units and validates correction edits', () => {
     render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={backend()} />);
