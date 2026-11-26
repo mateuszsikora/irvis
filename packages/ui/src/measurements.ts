@@ -59,23 +59,25 @@ export function geometry(object: Measurement, image: { width: number; height: nu
     },
   };
 }
+/** A cross on the image; `label` is its temperature, `object` the measurement it belongs to. */
+export type Marker = PixelPoint & { label: string; object?: number };
 export function analyze(image: CelsiusImage, settings: AnalysisSettings) {
   const text: string[] = [];
-  const markers: (PixelPoint & { label: string })[] = [];
+  const markers: Marker[] = [];
   const format = (v: number) => formatTemperature(v, settings.unit);
   const stats = measureFrame(image);
   for (const key of ['min', 'max'] as const) {
     const reading = stats[key];
     if (settings.tracking[key]) {
       text.push(`${key}: ${format(reading?.celsius ?? NaN)}`);
-      if (reading) markers.push({ ...reading, label: key });
+      if (reading) markers.push({ ...reading, label: format(reading.celsius) });
     }
   }
   if (settings.tracking.centre) {
     const point = { x: Math.floor(image.width / 2), y: Math.floor(image.height / 2) };
     const reading = measurePoint(image, point);
     text.push(`centre: ${format(reading.centreCounted ? reading.mean : NaN)}`);
-    if (reading.centreCounted) markers.push({ ...point, label: 'centre' });
+    if (reading.centreCounted) markers.push({ ...point, label: format(reading.mean) });
   }
   for (const object of settings.objects) {
     const { from, to, area } = geometry(object, image);
@@ -83,15 +85,17 @@ export function analyze(image: CelsiusImage, settings: AnalysisSettings) {
     if (object.kind === 'Point') {
       const reading = measurePoint(image, from);
       text.push(`${label}: ${format(reading.centreCounted ? reading.mean : NaN)}`);
-      if (reading.centreCounted) markers.push({ ...from, label });
+      if (reading.centreCounted)
+        markers.push({ ...from, label: format(reading.mean), object: object.id });
     } else {
       const reading =
         object.kind === 'Line' ? measureLine(image, from, to).stats : measureArea(image, area);
       text.push(
         `${label}: min ${format(reading.min?.celsius ?? NaN)}, max ${format(reading.max?.celsius ?? NaN)}`,
       );
-      if (reading.min) markers.push({ ...reading.min, label: `${label} min` });
-      if (reading.max) markers.push({ ...reading.max, label: `${label} max` });
+      for (const extreme of [reading.min, reading.max])
+        if (extreme)
+          markers.push({ ...extreme, label: format(extreme.celsius), object: object.id });
     }
   }
   return { text: text.join('\n'), markers };

@@ -19,11 +19,13 @@ function correctionDraft(correction: CorrectionSettings | null) {
 export function AnalysisControls({
   value,
   onChange,
+  newId,
 }: {
   value: AnalysisSettings;
   onChange: (value: AnalysisSettings) => void;
+  /** The id of a new object; the viewer shares it with objects added on the image. */
+  newId: (objects: Measurement[]) => number;
 }) {
-  const [nextId, setNextId] = useState(1);
   const [draft, setDraft] = useState(() => correctionDraft(value.correction));
   // Synchronize fields before paint without remounting measurement state.
   useLayoutEffect(() => {
@@ -72,16 +74,20 @@ export function AnalysisControls({
         <button
           key={kind}
           onClick={() => {
+            const id = newId(value.objects);
             update({
-              objects: [...value.objects, { id: nextId, kind, x: 25, y: 25, x2: 75, y2: 75 }],
-              selected: nextId,
+              objects: [...value.objects, { id, kind, x: 25, y: 25, x2: 75, y2: 75 }],
+              selected: id,
             });
-            setNextId(nextId + 1);
           }}
         >
           Add {kind.toLowerCase()}
         </button>
       ))}
+      <p className="setting-help">
+        Click the image to add a point; hold and drag to place it. Drag a point, a line end or an
+        area corner to move it.
+      </p>
       <button onClick={() => update({ objects: [], selected: null })}>Clear measurements</button>
       <label>
         Selected object
@@ -102,7 +108,10 @@ export function AnalysisControls({
           <legend>
             Edit {selected.kind} {selected.id}
           </legend>
-          <p>Position in percent of the image. Edit both ends to move a line or resize an area.</p>
+          <p>
+            Position in percent of the image, also set by dragging on the image. Edit both ends to
+            move a line or resize an area.
+          </p>
           {(
             ['x', 'y', ...(selected.kind === 'Point' ? [] : ['x2', 'y2'])] as (keyof Pick<
               Measurement,
@@ -115,7 +124,7 @@ export function AnalysisControls({
                 type="number"
                 min="0"
                 max="100"
-                step="1"
+                step="any"
                 value={selected[key]}
                 onChange={(e) => {
                   const number = Number(e.target.value);

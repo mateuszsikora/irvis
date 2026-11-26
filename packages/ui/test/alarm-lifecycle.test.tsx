@@ -166,7 +166,8 @@ describe('alarm lifecycle', () => {
     });
     fireEvent.click(screen.getByText('Rainbow'));
     await screen.findByText('Error: Photo rendering failed');
-    expect(stop).toHaveBeenCalledOnce();
+    // The error shows on commit; the effect that stops the sound runs just after it.
+    await waitFor(() => expect(stop).toHaveBeenCalledOnce());
     expect(screen.queryByText('Camera disconnected')).toBeNull();
     act(() => alarmCallback.current(true));
     expect(start).toHaveBeenCalledOnce();

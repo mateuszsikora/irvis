@@ -1,5 +1,6 @@
 import { orientPhoto } from './photos.ts';
-import { analyze, geometry, type AnalysisSettings } from './measurements.ts';
+import { analyze, geometry, type AnalysisSettings, type Marker } from './measurements.ts';
+import { orientedPixel, type Orientation } from './pointer.ts';
 import {
   autoRange,
   exportRenderedPng,
@@ -62,6 +63,60 @@ function cameraCorrectionKnown(state: CameraStateSnapshot): boolean {
   } catch {
     return false;
   }
+}
+
+/** A rectangle in canvas pixels; `right` and `bottom` are exclusive. */
+export interface Rect {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+/** 8 px text reaches about 8 pixels above its baseline and 1 below. */
+const LABEL_ASCENT = 8;
+/** What a label at baseline `x`, `y` covers, with its 1-pixel black outline. */
+function labelRect(x: number, y: number, width: number): Rect {
+  return { left: x - 1, top: y - LABEL_ASCENT - 1, right: x + width + 1, bottom: y + 2 };
+}
+/** What a marker's 7-pixel cross covers. */
+export function crossRect(marker: { x: number; y: number }): Rect {
+  return { left: marker.x - 3, top: marker.y - 3, right: marker.x + 4, bottom: marker.y + 4 };
+}
+/**
+ * Where a marker's label goes, as the start of its baseline: right of the cross,
+ * else left of it, else below or above either side; the first spot inside the
+ * canvas that covers nothing in `taken` (crosses and labels already placed).
+ * With no free spot the first one inside the canvas is used, and when none is
+ * inside the label is pushed against the canvas edge. Its rect joins `taken`.
+ */
+export function placeLabel(
+  marker: { x: number; y: number },
+  width: number,
+  canvas: { width: number; height: number },
+  taken: Rect[],
+): { x: number; y: number } {
+  const right = marker.x + 5,
+    left = marker.x - 5 - width;
+  // One label's height with its outline, so labels stack without overlapping.
+  const step = LABEL_ASCENT + 3;
+  const spots = [0, step, -step].flatMap((dy) =>
+    [right, left].map((x) => ({ x, y: marker.y + 3 + dy })),
+  );
+  const inside = (s: { x: number; y: number }) =>
+    s.x >= 0 && s.x + width <= canvas.width && s.y - LABEL_ASCENT >= 0 && s.y < canvas.height;
+  const free = (s: { x: number; y: number }) => {
+    const r = labelRect(s.x, s.y, width);
+    return taken.every(
+      (t) => r.left >= t.right || t.left >= r.right || r.top >= t.bottom || t.top >= r.bottom,
+    );
+  };
+  const spot = spots.find((s) => inside(s) && free(s)) ??
+    spots.find(inside) ?? {
+      x: Math.max(0, Math.min(right, canvas.width - width)),
+      y: Math.min(canvas.height - 1, Math.max(LABEL_ASCENT, marker.y + 3)),
+    };
+  taken.push(labelRect(spot.x, spot.y, width));
+  return spot;
 }
 
 /** Mutable frame state belongs to the canvas subscription, never React state. */
@@ -239,7 +294,6 @@ export class FrameRenderer {
       overlay.strokeStyle = 'white';
       overlay.fillStyle = 'white';
       overlay.lineWidth = 1;
-      overlay.font = '8px sans-serif';
       for (const object of analysis.objects) {
         const { from, to, area } = geometry(object, image);
         overlay.strokeStyle = object.id === analysis.selected ? '#00ff80' : 'white';
@@ -251,22 +305,21 @@ export class FrameRenderer {
           overlay.stroke();
         }
       }
-      overlay.strokeStyle = 'white';
       for (const marker of result.markers) {
+        // A marker of the selected object is green, like its shape.
+        overlay.strokeStyle =
+          marker.object !== undefined && marker.object === analysis.selected ? '#00ff80' : 'white';
+        overlay.lineWidth = 1;
         overlay.beginPath();
         overlay.moveTo(marker.x - 3, marker.y);
         overlay.lineTo(marker.x + 3, marker.y);
         overlay.moveTo(marker.x, marker.y - 3);
         overlay.lineTo(marker.x, marker.y + 3);
         overlay.stroke();
-        overlay.fillText(
-          marker.label,
-          Math.min(marker.x + 4, Math.max(0, image.width - 60)),
-          Math.max(8, marker.y),
-        );
       }
     }
     this.present(decoded.width, decoded.height, settings);
+    if (result?.markers.length) this.drawLabels(result.markers, image, settings);
     this.scale.width = 256;
     this.scale.height = 1;
     const values = Float64Array.from(
@@ -355,6 +408,39 @@ export class FrameRenderer {
     if (this.readouts) this.readouts.textContent = '';
     this.alarmState = null;
     this.onAlarm?.(false);
+  }
+  /**
+   * Writes each marker's temperature on the visible canvas after `present`, so
+   * the text stays upright and readable at any rotation and mirroring; shapes
+   * and crosses on the source canvas turn with the image.
+   */
+  private drawLabels(
+    markers: Marker[],
+    image: { width: number; height: number },
+    orientation: Orientation,
+  ) {
+    const ctx = this.canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.font = '8px sans-serif';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'black';
+    ctx.fillStyle = 'white';
+    const at = markers.map((m) => orientedPixel(m, image, orientation));
+    const taken = at.map(crossRect);
+    const labelled = new Set<string>();
+    markers.forEach((marker, i) => {
+      // The same reading twice on one pixel (the frame's max is an area's max) gets one label.
+      const key = `${marker.x},${marker.y},${marker.label}`;
+      if (labelled.has(key)) return;
+      labelled.add(key);
+      const width = Math.ceil(ctx.measureText(marker.label).width);
+      const { x, y } = placeLabel(at[i]!, width, this.canvas, taken);
+      // Outlined in black so it reads on a hot and a cold background alike.
+      ctx.strokeText(marker.label, x, y);
+      ctx.fillText(marker.label, x, y);
+    });
   }
   /** Draws the source canvas onto the visible one, rotated, mirrored and smoothed as set. */
   private present(width: number, height: number, settings: ViewSettings) {
