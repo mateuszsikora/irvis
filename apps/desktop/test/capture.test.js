@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   inputArgs,
+  cameraAccess,
+  cameraAccessMessage,
   captureArgs,
   captureEndedMessage,
   captureReadPause,
@@ -9,6 +11,7 @@ import {
   listModes,
   modesArgs,
   modesReader,
+  noFramesMessage,
   parseCameraData,
   parseDeviceModes,
   parseV4l2CtlModes,
@@ -432,6 +435,51 @@ describe('desktop capture', () => {
     );
     expect(pixelFormatMessage('nv12', mode)).toBe(
       'Exact reference requires native yuyv422; received nv12',
+    );
+  });
+  it('reads the camera permission on macOS only, and stops Start only when it was refused', () => {
+    const preferences = { getMediaAccessStatus: vi.fn(() => 'denied') };
+    expect(cameraAccess('darwin', preferences)).toBe('denied');
+    expect(preferences.getMediaAccessStatus).toHaveBeenCalledWith('camera');
+    expect(cameraAccess('linux', preferences)).toBe('granted');
+    expect(cameraAccess('win32', preferences)).toBe('granted');
+    expect(preferences.getMediaAccessStatus).toHaveBeenCalledTimes(1);
+    expect(cameraAccessMessage('denied', true)).toBe(
+      'macOS does not let irvis use the camera. Allow irvis in System Settings → Privacy & Security → Camera, then press Start again.',
+    );
+    expect(cameraAccessMessage('denied', false)).toBe(
+      'macOS does not let irvis use the camera. Allow the app that started irvis, such as Terminal, in System Settings → Privacy & Security → Camera, then press Start again. An app missing from that list cannot be given camera access; start irvis from Terminal instead.',
+    );
+    // Not something the user can allow in System Settings.
+    expect(cameraAccessMessage('restricted', true)).toBe(
+      "macOS does not let apps use the camera on this Mac: a device management profile or Screen Time restricts it. Ask the Mac's administrator.",
+    );
+    // Not determined yet: ffmpeg starts and macOS asks.
+    expect(cameraAccessMessage('not-determined', true)).toBe('');
+    expect(cameraAccessMessage('granted', true)).toBe('');
+  });
+  it('explains a capture that sent no frame by the camera permission at that moment', () => {
+    expect(noFramesMessage('darwin', 'denied', true)).toBe(
+      'The camera sent no image within 10 s. macOS does not let irvis use the camera. Allow irvis in System Settings → Privacy & Security → Camera, then press Start again.',
+    );
+    expect(noFramesMessage('darwin', 'restricted', true)).toMatch(
+      /^The camera sent no image within 10 s\. macOS does not let apps use the camera on this Mac/,
+    );
+    expect(noFramesMessage('darwin', 'not-determined', true)).toBe(
+      'The camera sent no image within 10 s. macOS sends no image to an app without camera access. If macOS asks for camera access, allow it and press Start again; otherwise allow irvis in System Settings → Privacy & Security → Camera, then press Start again.',
+    );
+    // A package with access: the camera, not the permission.
+    expect(noFramesMessage('darwin', 'granted', true)).toBe(
+      'The camera sent no image within 10 s. Choose another camera in Source or reconnect this one, then press Start again.',
+    );
+    expect(noFramesMessage('darwin', 'granted', false)).toMatch(
+      /otherwise allow the app that started irvis, such as Terminal, in .* start irvis from Terminal instead\.$/,
+    );
+    expect(noFramesMessage('linux', 'granted', true)).toBe(
+      'The camera sent no image within 10 s. Choose another camera in Source or reconnect this one, then press Start again.',
+    );
+    expect(noFramesMessage('win32', 'granted', true)).toBe(
+      'The camera sent no image within 10 s. Choose another camera in Source or reconnect this one, then press Start again. If Windows blocks the camera, turn on Let desktop apps access your camera in Settings → Privacy & security → Camera.',
     );
   });
   it('ends other capture failures with the exit code and the last ffmpeg lines without their context', () => {

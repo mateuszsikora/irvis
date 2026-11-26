@@ -90,6 +90,71 @@ export function frameReader(size, onFrame) {
     }
   };
 }
+/** Where macOS keeps the camera permission, as System Settings names it. */
+const cameraSettings = 'System Settings → Privacy & Security → Camera';
+/**
+ * Which app to allow: the packaged irvis, or in development the app that
+ * started Electron, to which macOS attributes the camera. An app without a
+ * camera usage description, such as an agent app, cannot be allowed at all.
+ */
+const cameraAccessAdvice = (packaged) =>
+  packaged
+    ? `allow irvis in ${cameraSettings}, then press Start again.`
+    : `allow the app that started irvis, such as Terminal, in ${cameraSettings}, then press Start again. ` +
+      'An app missing from that list cannot be given camera access; start irvis from Terminal instead.';
+const capitalized = (text) => text[0].toUpperCase() + text.slice(1);
+const reconnect = 'Choose another camera in Source or reconnect this one, then press Start again.';
+/**
+ * macOS's camera permission for the app (`systemPreferences.getMediaAccessStatus`):
+ * `granted`, `denied`, `restricted` or `not-determined`. On Linux and Windows
+ * the app does not read the system's camera setting and answers `granted`.
+ */
+export function cameraAccess(platform, preferences) {
+  return platform === 'darwin' ? preferences.getMediaAccessStatus('camera') : 'granted';
+}
+/**
+ * What the viewer shows instead of starting ffmpeg, or '' when ffmpeg may start.
+ * Without access AVFoundation still lists the camera and ffmpeg opens it, but
+ * waits for ever for a first frame. `not-determined` starts ffmpeg, which makes
+ * macOS ask. `restricted` (a device management profile or Screen Time) cannot
+ * be changed in System Settings, so it gets no advice to allow the app.
+ */
+export function cameraAccessMessage(access, packaged) {
+  if (access === 'denied')
+    return 'macOS does not let irvis use the camera. ' + capitalized(cameraAccessAdvice(packaged));
+  if (access === 'restricted')
+    return (
+      'macOS does not let apps use the camera on this Mac: a device management profile or Screen Time restricts it. ' +
+      "Ask the Mac's administrator."
+    );
+  return '';
+}
+/** How long a started capture waits for its first frame before it stops. */
+export const firstFrameTimeout = 10000;
+/**
+ * What the viewer shows when no frame arrived within `firstFrameTimeout`, by
+ * the camera permission at that moment (`cameraAccess`). A package with access
+ * gets no advice about access. From the repository macOS attributes the camera
+ * to the app that started Electron, so the advice stays even with `granted`:
+ * whether Electron's status is that app's has not been checked.
+ */
+export function noFramesMessage(platform, access, packaged) {
+  const base = `The camera sent no image within ${firstFrameTimeout / 1000} s.`;
+  if (platform === 'win32')
+    return (
+      `${base} ${reconnect} If Windows blocks the camera, turn on ` +
+      'Let desktop apps access your camera in Settings → Privacy & security → Camera.'
+    );
+  if (platform !== 'darwin') return `${base} ${reconnect}`;
+  const refused = cameraAccessMessage(access, packaged);
+  if (refused) return `${base} ${refused}`;
+  if (access === 'granted' && packaged) return `${base} ${reconnect}`;
+  return (
+    base +
+    ' macOS sends no image to an app without camera access. If macOS asks for camera access, allow it and press Start again; otherwise ' +
+    cameraAccessAdvice(packaged)
+  );
+}
 /** What the viewer shows when ffmpeg delivers another pixel format than yuyv422. */
 export function pixelFormatMessage(format, mode) {
   return mode.layout
