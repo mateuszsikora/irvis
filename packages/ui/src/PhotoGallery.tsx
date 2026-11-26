@@ -77,7 +77,7 @@ export function PhotoGallery({
   }
   return (
     <section aria-label="Photo gallery" className="photo-gallery">
-      <h3>Photo gallery</h3>
+      <h4>Photo gallery</h4>
       <p>
         Saved on this device. Download photos to keep a backup. Deleting a gallery item does not
         delete downloaded files or the photo currently being analyzed.

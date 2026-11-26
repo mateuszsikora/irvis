@@ -307,6 +307,9 @@ describe('image-only view', () => {
     expect(group('Tracking shortcuts')).toBeNull();
     expect(screen.queryByText('Uncertain pixels')).toBeNull();
     expect(screen.queryByText('Alarm disabled')).toBeNull();
+    expect(
+      screen.queryByText('Turn on a tracking shortcut or add a measurement to see readings.'),
+    ).toBeNull();
     expect(group('Measurement readings')?.hasAttribute('hidden')).toBe(true);
     expect(container.querySelector('.scale-strip')?.hasAttribute('hidden')).toBe(true);
     fireEvent.click(screen.getByText('Start', { selector: 'button' }));
@@ -504,6 +507,19 @@ describe('measurement controls', () => {
     const onHandle = fireEvent.touchStart(image, { touches: [{ clientX: 101, clientY: 101 }] });
     const elsewhere = fireEvent.touchStart(image, { touches: [{ clientX: 401, clientY: 301 }] });
     expect([onHandle, elsewhere]).toEqual([false, true]);
+  });
+  it('asks for a tracking shortcut or a measurement only while neither is on', () => {
+    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={backend()} />);
+    const hint = 'Turn on a tracking shortcut or add a measurement to see readings.';
+    expect(screen.getByText(hint)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Track max' }));
+    expect(screen.queryByText(hint)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Track max' }));
+    expect(screen.getByText(hint)).toBeTruthy();
+    fireEvent.click(screen.getByText('Add point'));
+    expect(screen.queryByText(hint)).toBeNull();
+    fireEvent.click(screen.getByText('Clear measurements'));
+    expect(screen.getByText(hint)).toBeTruthy();
   });
   it('converts committed thresholds between units and validates correction edits', () => {
     render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={backend()} />);

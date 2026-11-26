@@ -319,7 +319,7 @@ try {
   await page.getByRole('button', { name: 'Start', exact: true }).click();
   await page.getByText('Demo running', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Check recording storage' }).click();
-  await page.getByLabel('Microphone (Off by default)').check();
+  await page.getByLabel('Record microphone').check();
   await page.getByRole('button', { name: 'Record .irvis', exact: true }).click();
   await page.getByText(/Recording ·/).waitFor();
   await page.waitForTimeout(1600);
@@ -364,7 +364,7 @@ try {
   await page.getByText('Photo analysis', { exact: false }).first().waitFor();
   await page.getByRole('button', { name: 'Start', exact: true }).click();
   await page.getByText('Demo running', { exact: true }).waitFor();
-  await page.getByLabel('Microphone (Off by default)').uncheck();
+  await page.getByLabel('Record microphone').uncheck();
   await page.getByRole('button', { name: 'Record .irvis', exact: true }).click();
   await page.getByText(/Recording ·/).waitFor();
   await page.waitForTimeout(1300);
@@ -401,7 +401,7 @@ try {
   await page.getByRole('button', { name: 'Start', exact: true }).click();
   await page.getByText('Demo running', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Check recording storage' }).click();
-  await page.getByLabel('Microphone (Off by default)').check();
+  await page.getByLabel('Record microphone').check();
   await page.evaluate(() => {
     navigator.mediaDevices.getUserMedia = () =>
       Promise.reject(new DOMException('Permission denied', 'NotAllowedError'));
