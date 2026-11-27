@@ -57,7 +57,7 @@ node apps/web/test/pages-smoke.mjs https://no-plan.dev/irvis/   # the published 
 Without a URL it serves `apps/web/dist` under `/irvis/` on a free port of `localhost` with no header but `Content-Type`, the way Pages serves a project site; `localhost` is a secure context as HTTPS is. Chromium's fake camera plays grey frames of the first video mode of the first camera profile (256 × 384 at 25 fps for the InfiRay P2 Pro), written to a temporary `.y4m` file, because browser diagnostics ask for that exact size. In that order, it checks:
 
 1. the heading `irvis` and `window.isSecureContext`;
-2. Demo → Start, "Check recording storage" answering with the OPFS message (`Estimated uncompressed capacity: <n> seconds`, not the memory fallback), Record .irvis for a second and Stop recording; the recording is listed, and a non-empty `.irvis` file is in the OPFS directory `irvis-recordings`, written through the storage module Worker. It then deletes the recording and stops the demo;
+2. Demo → Start, "Check recording storage" answering with the OPFS message (`Estimated uncompressed capacity: <n> seconds`), Record .irvis for a second and Stop recording; the recording is listed, and a non-empty `.irvis` file is in the OPFS directory `irvis-recordings`, written through the storage module Worker. It then deletes the recording and stops the demo;
 3. Capture diagnostics → Start diagnostics with the fake camera, until the panel counts a frame read in the diagnostics module Worker;
 4. that no request failed, no response had a status of 400 or more, and the page threw no error. A wrong `base` shows up here as missing files under the site's path.
 
@@ -110,16 +110,18 @@ Shared controls and limitations: [viewer user guide](ui-user.md) and [technical 
 The shared viewer's measurement controls use a grid with labelled coordinate and temperature inputs in `src/viewer.css`. Active tracking shortcuts (`.chip`) use the accent border and text colour. The cards below the preview use `.panel-card`, `.panel-heading`, `.action-row`, `.option-grid` (where `.switch-label` puts the switch before its text), `.inline-field`, `.export-options`, `.playback-bar` and `.recording-list`; `.file-button` styles a label around a transparent file input as a button and draws the focus ring with `:has(input:focus-visible)`; `.status-pill` shows the alarm and recording state; `.readings` keeps the renderer's line breaks and is not displayed while empty; `.recording-thumbnail` is 128 px wide, 96 px in the recording list; `.photo-gallery` lays saved photos out as cards. The shared UI owns thermal photo loading and analysis; the web app does not introduce a separate photo decoder.
 
 
-## Photo library injection
+## Host files
 
-`App.tsx` creates `createPhotoLibrary` from `src/photo-library.ts` once and injects it through `SourceViewer` to the shared viewer. IndexedDB database `irvis-photos` version 1 contains a `photos` object store keyed by `id`; records hold name, creation timestamp and temperature-bearing PNG bytes. The same host adapter runs under the browser origin and Electron's app origin, with separate data. Without IndexedDB, photo capture/gallery are disabled. This photo adapter does not implement #19 recording ByteSink storage or choose a recording backend.
+`App.tsx` creates the viewer's `HostFiles` once, with `createHostFiles(desktopBridge())` from `src/host-files.ts`, and passes it through `SourceViewer` to the shared viewer, so the same object survives source/profile remounts. In the browser: `recordings` is `createBrowserRecordingStorage()` (OPFS; left out where the browser has none, so recording is unavailable), `photos` is `createPhotoLibrary()` from `src/photo-library.ts` (IndexedDB; left out without `indexedDB`), and `saveAs` is `saveRecordingFile` from `@irvis/media` (the save picker, or a download). In the desktop app (a preload bridge): `recordings` is `createDesktopRecordingStorage(bridge)` and `photos` is `createDesktopPhotoLibrary(bridge)`, each only when the preload has its API, and `saveAs` is `desktopSaveAs(bridge)` from `@irvis/backend-electron`, so the library lives in the app's own directory and copies go through the system's save dialog ([decision](../decisions/architecture.md#the-desktop-app-keeps-its-library-in-userdata-and-saves-copies-through-the-systems-save-dialog)). `src/host-files.test.ts` covers the desktop photo library, a desktop recording copied by the main process and other bytes sent, a preload without the save dialog, and a browser without OPFS or IndexedDB.
+
+IndexedDB database `irvis-photos` version 1 contains a `photos` object store keyed by `id`; records hold name, creation timestamp and temperature-bearing PNG bytes. The desktop app does not use it.
 
 Each operation opens a connection and closes it after its transaction. Saves resolve on transaction completion, not request success; duplicate keys, quota and transaction failures propagate to the UI. Version changes close open connections. Blocked opens report `Photo storage is blocked by another window.` and close a later successful connection. Delete removes only the selected record. Browser/site data clearing and storage eviction remain possible, so the gallery recommends downloading backups.
 
 `src/photo-library.test.ts` uses `fake-indexeddb` to exercise persistence across adapter instances, duplicate-save failure and selected deletion. No live browser persistence or quota test is claimed.
 
-## Recording storage injection
+## Recording storage
 
-`App.tsx` constructs one `RecordingStorage`: the preload's recording API selects `createDesktopRecordingStorage`; otherwise `createBrowserRecordingStorage` supplies OPFS or an explicitly warned memory fallback. The same instance survives source/profile remounts. External recording files use `fileByteSource`.
+External recording files use `fileByteSource`; the stored ones come from `HostFiles.recordings` (above).
 
 The desktop live backend forwards optional numeric command values through `bridge.command(id, value)` while retaining its session-ownership check. Browser capture exposes no command dispatcher. Numeric camera controls are part of the shared viewer.

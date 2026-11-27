@@ -1,11 +1,11 @@
 import { CameraControls } from './CameraControls.tsx';
 import { recordedView } from './recorded-view.ts';
-import { exportMp4, fileByteSource, saveRecordingFile } from '@irvis/media';
+import { exportMp4 } from '@irvis/media';
 import { RecordingControls } from './RecordingControls.tsx';
-import type { RecordingStorage } from '@irvis/media';
+import type { HostFiles } from './files.ts';
 import type { ByteSource, RecordingPlayer } from '@irvis/core';
 import { PhotoGallery } from './PhotoGallery.tsx';
-import { photoCorrection, type PhotoLibrary } from './photos.ts';
+import { photoCorrection } from './photos.ts';
 import { AnalysisControls } from './AnalysisControls.tsx';
 import { initialAnalysis, type Measurement } from './measurements.ts';
 import {
@@ -43,9 +43,9 @@ import { Icon } from './Icon.tsx';
 import { FrameRenderer, type ViewSettings } from './render.ts';
 
 export interface ViewerProps {
-  photoLibrary?: PhotoLibrary;
+  /** The host's libraries and how it saves a copy for the user. */
+  files: HostFiles;
   openRecording?: (source: ByteSource) => Promise<RecordingPlayer>;
-  recordingStorage?: RecordingStorage;
   backend: CameraBackend;
   profile: CameraProfile;
   /** The backend's id of the camera that Start opens; empty disables Start. */
@@ -65,11 +65,12 @@ export function Viewer({
   modeId,
   profilePicker,
   command,
-  photoLibrary,
-  recordingStorage,
+  files,
   openRecording,
   captureError = '',
 }: ViewerProps) {
+  const photoLibrary = files.photos;
+  const recordingStorage = files.recordings;
   const [session, setSession] = useState<CameraSession | null>(null);
   const [commandSession, setCommandSession] = useState(0);
   const [cameraState, setCameraState] = useState<CameraStateSnapshot>();
@@ -808,6 +809,7 @@ export function Viewer({
             {galleryOpen && galleryFilter !== 'videos' && photoLibrary && (
               <PhotoGallery
                 library={photoLibrary}
+                saveAs={files.saveAs}
                 revision={galleryRevision}
                 onOpen={(photo) =>
                   void openPhoto({
@@ -822,6 +824,7 @@ export function Viewer({
             {...(openRecording ? { openRecording } : {})}
             showFiles={galleryFilter !== 'photos'}
             {...(recordingStorage ? { storage: recordingStorage } : {})}
+            saveAs={files.saveAs}
             profile={profile}
             live={!!session && hasFrame && !imageView}
             failure={failure}
@@ -872,10 +875,8 @@ export function Viewer({
                 },
                 audio,
               );
-              await saveRecordingFile(
-                file.name.replace(/\.irvis$/, '.mp4'),
-                fileByteSource(new Blob([bytes.slice().buffer], { type: 'video/mp4' })),
-              );
+              // Only on request, and not kept by the app: the user chooses where it goes.
+              await files.saveAs(file.name.replace(/\.irvis$/, '.mp4'), memoryByteSource(bytes));
             }}
             onPlayback={async (player) => {
               await stop();

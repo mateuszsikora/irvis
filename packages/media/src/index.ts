@@ -72,9 +72,14 @@ function workerSink(name: string): Promise<ByteSink> {
   );
 }
 
-export function createBrowserRecordingStorage(): RecordingStorage {
-  const memory = new Map<string, Uint8Array[]>();
-  const opfs = typeof navigator.storage?.getDirectory === 'function';
+/**
+ * Recordings in the origin private file system (OPFS), or undefined where the
+ * browser has none: the host then passes no recording storage and recording is
+ * unavailable, rather than kept in memory and lost with the page.
+ */
+export function createBrowserRecordingStorage(): RecordingStorage | undefined {
+  if (typeof navigator === 'undefined' || typeof navigator.storage?.getDirectory !== 'function')
+    return undefined;
   async function directory() {
     return (await navigator.storage.getDirectory()).getDirectoryHandle('irvis-recordings', {
       create: true,
@@ -82,8 +87,6 @@ export function createBrowserRecordingStorage(): RecordingStorage {
   }
   return {
     async prepare(bytesPerSecond) {
-      if (!opfs)
-        return 'Recording stays in memory. Closing this page loses it. Download it after stopping.';
       const persistent = await navigator.storage.persist().catch(() => false);
       const estimate = await navigator.storage.estimate();
       const seconds = Math.floor(
@@ -94,32 +97,9 @@ export function createBrowserRecordingStorage(): RecordingStorage {
     async create(name) {
       if (!/^[a-zA-Z0-9_.-]+\.(irvis|webm|pcm)$/.test(name))
         throw new Error('Invalid recording name.');
-      if (opfs) return workerSink(name);
-      if (memory.has(name)) throw new Error('Recording already exists.');
-      const chunks: Uint8Array[] = [];
-      memory.set(name, chunks);
-      let closed = false;
-      return {
-        append(bytes) {
-          if (closed) return Promise.reject(new Error('Storage is closed.'));
-          chunks.push(bytes.slice());
-          return Promise.resolve();
-        },
-        flush() {
-          return closed ? Promise.reject(new Error('Storage is closed.')) : Promise.resolve();
-        },
-        close() {
-          closed = true;
-          return Promise.resolve();
-        },
-      };
+      return workerSink(name);
     },
     async list() {
-      if (!opfs)
-        return [...memory].map(([name, chunks]) => ({
-          name,
-          source: fileByteSource(new Blob(chunks.map((c) => c.slice().buffer))),
-        }));
       const dir = await directory();
       const result: RecordingFile[] = [];
       const entries = dir as FileSystemDirectoryHandle & {
@@ -139,8 +119,7 @@ export function createBrowserRecordingStorage(): RecordingStorage {
       return result;
     },
     async remove(name) {
-      if (opfs) await (await directory()).removeEntry(name);
-      else memory.delete(name);
+      await (await directory()).removeEntry(name);
     },
   };
 }

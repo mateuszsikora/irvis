@@ -54,7 +54,15 @@ function backend(): CameraBackend {
 }
 describe('Viewer', () => {
   it('offers six palettes and rejects reversed manual bounds', () => {
-    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={backend()} />);
+    render(
+      <Viewer
+        files={{ saveAs: () => Promise.resolve() }}
+        device="cam"
+        modeId="yuyv-256x384"
+        profile={profile}
+        backend={backend()}
+      />,
+    );
     expect(screen.getByRole('group', { name: 'Palette' }).querySelectorAll('button')).toHaveLength(
       6,
     );
@@ -67,7 +75,15 @@ describe('Viewer', () => {
   });
   it('declares camera state without sending a command and locks orientation', () => {
     const source = backend();
-    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={source} />);
+    render(
+      <Viewer
+        files={{ saveAs: () => Promise.resolve() }}
+        device="cam"
+        modeId="yuyv-256x384"
+        profile={profile}
+        backend={source}
+      />,
+    );
     expect(screen.getByText('camera mode unknown, readings assume high gain')).toBeTruthy();
     fireEvent.click(screen.getByText('Confirm camera mode and factory settings'));
     expect(screen.getByText('Camera mode declared by user.')).toBeTruthy();
@@ -118,6 +134,7 @@ describe('Viewer', () => {
     const command = vi.fn(async () => {});
     render(
       <Viewer
+        files={{ saveAs: () => Promise.resolve() }}
         device="cam"
         modeId="yuyv-256x384"
         profile={profile}
@@ -152,6 +169,7 @@ describe('Viewer', () => {
       );
     render(
       <Viewer
+        files={{ saveAs: () => Promise.resolve() }}
         device="cam"
         modeId="yuyv-256x384"
         profile={profile}
@@ -188,7 +206,13 @@ describe('Viewer', () => {
         resolve = r;
       });
     const view = render(
-      <Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={source} />,
+      <Viewer
+        files={{ saveAs: () => Promise.resolve() }}
+        device="cam"
+        modeId="yuyv-256x384"
+        profile={profile}
+        backend={source}
+      />,
     );
     await waitFor(() => expect(screen.getByText<HTMLButtonElement>('Start').disabled).toBe(false));
     fireEvent.click(screen.getByText('Start'));
@@ -215,7 +239,15 @@ describe('Viewer', () => {
         },
         close: () => Promise.resolve(),
       });
-    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={source} />);
+    render(
+      <Viewer
+        files={{ saveAs: () => Promise.resolve() }}
+        device="cam"
+        modeId="yuyv-256x384"
+        profile={profile}
+        backend={source}
+      />,
+    );
     await act(async () => {
       await Promise.resolve();
     });
@@ -288,7 +320,13 @@ describe('image-only view', () => {
     const mode = findVideoMode(profile, 'image-1280x720@30')!;
     const live = imageBackend(mode);
     const { container } = render(
-      <Viewer device="cam" modeId={mode.id} profile={profile} backend={live} />,
+      <Viewer
+        files={{ saveAs: () => Promise.resolve() }}
+        device="cam"
+        modeId={mode.id}
+        profile={profile}
+        backend={live}
+      />,
     );
     const group = (name: string) => container.querySelector(`[aria-label="${name}"]`);
     expect(container.querySelector('.preview-meta')?.textContent).toContain(
@@ -330,7 +368,15 @@ describe('image-only view', () => {
   });
   it("keeps the camera commands for the profile's own image-only mode", () => {
     const mode = profile.videoModes.find((m) => m.layout === null)!;
-    render(<Viewer device="cam" modeId={mode.id} profile={profile} backend={imageBackend(mode)} />);
+    render(
+      <Viewer
+        files={{ saveAs: () => Promise.resolve() }}
+        device="cam"
+        modeId={mode.id}
+        profile={profile}
+        backend={imageBackend(mode)}
+      />,
+    );
     expect(screen.getByText('Image only', { selector: 'h3' })).toBeTruthy();
     expect(screen.getByText('Camera commands')).toBeTruthy();
   });
@@ -338,7 +384,15 @@ describe('image-only view', () => {
 
 describe('measurement controls', () => {
   it('keeps three of each object, edits and deletes objects, and preserves tracking on clear', () => {
-    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={backend()} />);
+    render(
+      <Viewer
+        files={{ saveAs: () => Promise.resolve() }}
+        device="cam"
+        modeId="yuyv-256x384"
+        profile={profile}
+        backend={backend()}
+      />,
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Track min' }));
     for (const kind of ['point', 'line', 'area'])
       for (let i = 0; i < 3; i++) fireEvent.click(screen.getByText(`Add ${kind}`));
@@ -357,7 +411,15 @@ describe('measurement controls', () => {
   it('adds a point where the image is clicked and drags points and area corners', () => {
     // A 256 × 192 frame drawn 512 × 384 px: two screen pixels per image pixel.
     recordingFrame.mockReturnValue({ frame: { width: 256, height: 192 } });
-    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={backend()} />);
+    render(
+      <Viewer
+        files={{ saveAs: () => Promise.resolve() }}
+        device="cam"
+        modeId="yuyv-256x384"
+        profile={profile}
+        backend={backend()}
+      />,
+    );
     const image = screen.getByLabelText('Thermal image');
     image.getBoundingClientRect = () => ({ left: 0, top: 0, width: 512, height: 384 }) as DOMRect;
     const selector = screen.getByLabelText<HTMLSelectElement>('Selected object');
@@ -395,7 +457,15 @@ describe('measurement controls', () => {
   });
   it('keeps a grabbed handle where it was until the pointer really moves', () => {
     recordingFrame.mockReturnValue({ frame: { width: 256, height: 192 } });
-    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={backend()} />);
+    render(
+      <Viewer
+        files={{ saveAs: () => Promise.resolve() }}
+        device="cam"
+        modeId="yuyv-256x384"
+        profile={profile}
+        backend={backend()}
+      />,
+    );
     const image = screen.getByLabelText('Thermal image');
     image.getBoundingClientRect = () => ({ left: 0, top: 0, width: 512, height: 384 }) as DOMRect;
     const selector = screen.getByLabelText<HTMLSelectElement>('Selected object');
@@ -426,7 +496,15 @@ describe('measurement controls', () => {
   });
   it('recovers when a drag never sees its pointer released', () => {
     recordingFrame.mockReturnValue({ frame: { width: 256, height: 192 } });
-    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={backend()} />);
+    render(
+      <Viewer
+        files={{ saveAs: () => Promise.resolve() }}
+        device="cam"
+        modeId="yuyv-256x384"
+        profile={profile}
+        backend={backend()}
+      />,
+    );
     const image = screen.getByLabelText('Thermal image');
     image.getBoundingClientRect = () => ({ left: 0, top: 0, width: 512, height: 384 }) as DOMRect;
     const selector = screen.getByLabelText<HTMLSelectElement>('Selected object');
@@ -457,7 +535,15 @@ describe('measurement controls', () => {
       },
     );
     recordingFrame.mockReturnValue({ frame: { width: 256, height: 192 } });
-    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={backend()} />);
+    render(
+      <Viewer
+        files={{ saveAs: () => Promise.resolve() }}
+        device="cam"
+        modeId="yuyv-256x384"
+        profile={profile}
+        backend={backend()}
+      />,
+    );
     // The cursor appears once a frame is shown; a photo shows one.
     fireEvent.change(screen.getByLabelText('Open thermal photo'), {
       target: { files: [{ name: 'scene.png', arrayBuffer: () => Promise.resolve(bytes.buffer) }] },
@@ -487,7 +573,15 @@ describe('measurement controls', () => {
   });
   it('adds a point for a finger only when it lifts without scrolling', () => {
     recordingFrame.mockReturnValue({ frame: { width: 256, height: 192 } });
-    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={backend()} />);
+    render(
+      <Viewer
+        files={{ saveAs: () => Promise.resolve() }}
+        device="cam"
+        modeId="yuyv-256x384"
+        profile={profile}
+        backend={backend()}
+      />,
+    );
     const image = screen.getByLabelText('Thermal image');
     image.getBoundingClientRect = () => ({ left: 0, top: 0, width: 512, height: 384 }) as DOMRect;
     const selector = screen.getByLabelText<HTMLSelectElement>('Selected object');
@@ -509,7 +603,15 @@ describe('measurement controls', () => {
     expect([onHandle, elsewhere]).toEqual([false, true]);
   });
   it('asks for a tracking shortcut or a measurement only while neither is on', () => {
-    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={backend()} />);
+    render(
+      <Viewer
+        files={{ saveAs: () => Promise.resolve() }}
+        device="cam"
+        modeId="yuyv-256x384"
+        profile={profile}
+        backend={backend()}
+      />,
+    );
     const hint = 'Turn on a tracking shortcut or add a measurement to see readings.';
     expect(screen.getByText(hint)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Track max' }));
@@ -522,7 +624,15 @@ describe('measurement controls', () => {
     expect(screen.getByText(hint)).toBeTruthy();
   });
   it('converts committed thresholds between units and validates correction edits', () => {
-    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={backend()} />);
+    render(
+      <Viewer
+        files={{ saveAs: () => Promise.resolve() }}
+        device="cam"
+        modeId="yuyv-256x384"
+        profile={profile}
+        backend={backend()}
+      />,
+    );
     fireEvent.change(screen.getByLabelText('High threshold (°C)'), { target: { value: '-10.5' } });
     fireEvent.click(screen.getByText('Apply threshold'));
     fireEvent.change(screen.getByLabelText('Temperature unit'), { target: { value: 'F' } });
@@ -572,7 +682,15 @@ describe('measurement controls', () => {
         },
         close: async () => {},
       } as unknown as CameraSession);
-    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={source} />);
+    render(
+      <Viewer
+        files={{ saveAs: () => Promise.resolve() }}
+        device="cam"
+        modeId="yuyv-256x384"
+        profile={profile}
+        backend={source}
+      />,
+    );
     await waitFor(() => expect(screen.getByText<HTMLButtonElement>('Start').disabled).toBe(false));
     fireEvent.click(screen.getByText('Start'));
     await waitFor(() => expect(screen.getByText<HTMLButtonElement>('Stop').disabled).toBe(false));
@@ -604,7 +722,15 @@ describe('measurement controls', () => {
         path: 'exact',
       },
     );
-    render(<Viewer device="cam" modeId="yuyv-256x384" profile={profile} backend={backend()} />);
+    render(
+      <Viewer
+        files={{ saveAs: () => Promise.resolve() }}
+        device="cam"
+        modeId="yuyv-256x384"
+        profile={profile}
+        backend={backend()}
+      />,
+    );
     fireEvent.click(screen.getByText('Add point'));
     fireEvent.change(screen.getByLabelText('Open thermal photo'), {
       target: { files: [{ name: 'scene.png', arrayBuffer: () => Promise.resolve(bytes.buffer) }] },

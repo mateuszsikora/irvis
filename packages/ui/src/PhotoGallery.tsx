@@ -1,14 +1,18 @@
 import { PhotoAnnotations } from './PhotoAnnotations.tsx';
 import { useEffect, useState } from 'react';
+import { memoryByteSource } from '@irvis/core';
+import type { HostFiles } from './files.ts';
 import type { PhotoLibrary, SavedPhoto } from './photos.ts';
 
 function PhotoItem({
   photo,
   onOpen,
+  onDownload,
   onDelete,
 }: {
   photo: SavedPhoto;
   onOpen: () => void;
+  onDownload: () => void;
   onDelete: () => void;
 }) {
   const [url, setUrl] = useState('');
@@ -24,19 +28,20 @@ function PhotoItem({
       <img src={url || undefined} alt={`Captured preview of ${photo.name}`} width="128" />
       <span>{photo.name}</span>
       <button onClick={onOpen}>Analyze {photo.name}</button>
-      <a href={url} download={photo.name}>
-        Download {photo.name}
-      </a>
+      <button onClick={onDownload}>Download {photo.name}</button>
       <button onClick={onDelete}>Delete {photo.name}</button>
     </li>
   );
 }
 export function PhotoGallery({
   library,
+  saveAs,
   revision,
   onOpen,
 }: {
   library: PhotoLibrary;
+  /** Saves a copy of a photo, or a flattened annotated one, where the user chooses. */
+  saveAs: HostFiles['saveAs'];
   revision: number;
   onOpen: (photo: SavedPhoto) => void;
 }) {
@@ -75,6 +80,14 @@ export function PhotoGallery({
       setError(String(e));
     }
   }
+  async function download(photo: SavedPhoto) {
+    try {
+      await saveAs(photo.name, memoryByteSource(photo.bytes));
+      setError('');
+    } catch (e) {
+      setError(String(e));
+    }
+  }
   return (
     <section aria-label="Photo gallery" className="photo-gallery">
       <h4>Photo gallery</h4>
@@ -84,7 +97,7 @@ export function PhotoGallery({
       </p>
       {error && <p role="alert">Gallery error: {error}</p>}
       {loading ? <p>Loading photos…</p> : photos.length === 0 ? <p>No saved photos.</p> : null}
-      {annotation && <PhotoAnnotations photo={annotation} />}
+      {annotation && <PhotoAnnotations photo={annotation} saveAs={saveAs} />}
       <ul>
         {photos.map((photo) => (
           <li key={photo.id}>
@@ -103,6 +116,7 @@ export function PhotoGallery({
                 key={photo.id}
                 photo={photo}
                 onOpen={() => onOpen(photo)}
+                onDownload={() => void download(photo)}
                 onDelete={() => void remove(photo)}
               />
             </ul>

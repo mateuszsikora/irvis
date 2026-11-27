@@ -1,6 +1,5 @@
-import { desktopBridge, createDesktopRecordingStorage } from '@irvis/backend-electron';
-import { createBrowserRecordingStorage, type RecordingStorage } from '@irvis/media';
-import { createPhotoLibrary } from './photo-library.ts';
+import { desktopBridge } from '@irvis/backend-electron';
+import { createHostFiles } from './host-files.ts';
 import {
   cameraProfiles,
   matchProfiles,
@@ -9,7 +8,7 @@ import {
   type DeviceVideoMode,
 } from '@irvis/core';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Icon, Viewer, type PhotoLibrary } from '@irvis/ui';
+import { Icon, Viewer, type HostFiles } from '@irvis/ui';
 import { openRecording, createReplayBackend } from '@irvis/backend-replay';
 import { liveBackend, listCameraModes, listLiveCameras } from './viewer-backend.ts';
 import { videoModeOptions } from './video-modes.ts';
@@ -40,16 +39,7 @@ function findCamera(list: readonly CameraDevice[], chosen: CameraDevice) {
   return named.length === 1 ? named[0] : undefined;
 }
 export function App({ profiles = cameraProfiles }: AppProps) {
-  const photoLibrary = useMemo(
-    () => (typeof indexedDB === 'undefined' ? undefined : createPhotoLibrary()),
-    [],
-  );
-  const recordingStorage = useMemo(() => {
-    const bridge = desktopBridge();
-    return bridge?.recordingStorage
-      ? createDesktopRecordingStorage(bridge)
-      : createBrowserRecordingStorage();
-  }, []);
+  const files = useMemo(() => createHostFiles(desktopBridge()), []);
   /** null is Demo. */
   const [camera, setCamera] = useState<CameraDevice | null>(null);
   /** Counts Source choices, so that each choice mounts a fresh viewer. */
@@ -244,8 +234,7 @@ export function App({ profiles = cameraProfiles }: AppProps) {
           modeId={mode?.id ?? ''}
           profile={profile}
           profilePicker={profilePicker}
-          recordingStorage={recordingStorage}
-          photoLibrary={photoLibrary}
+          files={files}
         />
       )}
       <details className="diagnostics">
@@ -265,16 +254,14 @@ function SourceViewer({
   modeId,
   profile,
   profilePicker,
-  photoLibrary,
-  recordingStorage,
+  files,
 }: {
-  recordingStorage: RecordingStorage;
+  files: HostFiles;
   live: boolean;
   device: string;
   modeId: string;
   profile: CameraProfile;
   profilePicker: ReactNode;
-  photoLibrary: PhotoLibrary | undefined;
 }) {
   const [error, setError] = useState('');
   const acceptsErrors = useRef(true);
@@ -296,14 +283,13 @@ function SourceViewer({
   return (
     <Viewer
       openRecording={openRecording}
-      recordingStorage={recordingStorage}
+      files={files}
       backend={backend}
       profile={profile}
       device={device}
       modeId={modeId}
       profilePicker={profilePicker}
       captureError={error}
-      {...(photoLibrary ? { photoLibrary } : {})}
     />
   );
 }

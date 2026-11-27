@@ -6,7 +6,6 @@ import {
   startMicrophone,
   type MicrophoneRecording,
   fileByteSource,
-  saveRecordingFile,
   type Recorder,
   type RecordingStorage,
   type RecordingFile,
@@ -17,7 +16,10 @@ import type { CameraProfile, PlayerViewState, SnapshotOptions, ThermalFrame } fr
 export interface RecordingControlsProps {
   openRecording?: (source: ByteSource) => Promise<RecordingPlayer>;
   showFiles: boolean;
+  /** The host's recordings; without it, recording and the recording list are unavailable. */
   storage?: RecordingStorage;
+  /** Saves a copy of a recording or its sidecar where the user chooses (`HostFiles.saveAs`). */
+  saveAs: (name: string, source: ByteSource) => Promise<void>;
   profile: CameraProfile;
   live: boolean;
   failure: string;
@@ -34,6 +36,7 @@ export function RecordingControls({
   openRecording,
   showFiles,
   storage,
+  saveAs,
   profile,
   live,
   failure,
@@ -43,8 +46,6 @@ export function RecordingControls({
 }: RecordingControlsProps) {
   const id = useId();
   const microphone = useRef<MicrophoneRecording | null>(null);
-  const [autoExport, setAutoExport] = useState(false);
-  const currentName = useRef('');
   const startedAt = useRef(0);
   const [selected, setSelected] = useState('');
   const [audioEnabled, setAudioEnabled] = useState(false);
@@ -101,13 +102,9 @@ export function RecordingControls({
     }
     setBusy(true);
     try {
+      // The recording stays in the host's library; a copy is saved only on request.
       await Promise.all([active.stop(), audioStop]);
       await refresh();
-      const file = (await storage?.list())?.find((f) => f.name === currentName.current);
-      if (file) {
-        await saveRecordingFile(file.name, file.source);
-        if (autoExport) await onExport(file, exportScale, smooth, recorded);
-      }
     } catch (e) {
       setError(String(e));
       await refresh().catch(() => {});
@@ -192,7 +189,6 @@ export function RecordingControls({
         microphone.current = null;
         return;
       }
-      currentName.current = name;
       recorder.current = active;
       started = true;
       setElapsed(0);
@@ -234,7 +230,7 @@ export function RecordingControls({
   }
   async function download(file: RecordingFile) {
     try {
-      await saveRecordingFile(file.name, file.source);
+      await saveAs(file.name, file.source);
     } catch (e) {
       setError(String(e));
     }
@@ -307,7 +303,8 @@ export function RecordingControls({
           Open recording
         </label>
       </div>
-      {!prepared && (
+      {!storage && <p className="panel-help">Recording storage is unavailable in this host.</p>}
+      {storage && !prepared && (
         <p className="panel-help">Check recording storage once before the first recording.</p>
       )}
       {notice && (
@@ -324,15 +321,6 @@ export function RecordingControls({
             onChange={(e) => setAudioEnabled(e.target.checked)}
           />
           <span>Record microphone</span>
-        </label>
-        <label className="switch-label">
-          <input
-            type="checkbox"
-            checked={autoExport}
-            disabled={recording || busy}
-            onChange={(e) => setAutoExport(e.target.checked)}
-          />
-          <span>Export MP4 after recording</span>
         </label>
         <div className="inline-field">
           <label htmlFor={`${id}-threshold`}>Recording threshold</label>

@@ -78,6 +78,7 @@ function setup(captureError = '') {
   };
   const view = render(
     <Viewer
+      files={{ saveAs: () => Promise.resolve() }}
       device="cam"
       modeId="yuyv-256x384"
       profile={profile}
@@ -125,6 +126,7 @@ describe('alarm lifecycle', () => {
     expect(start).toHaveBeenCalledOnce();
     view.rerender(
       <Viewer
+        files={{ saveAs: () => Promise.resolve() }}
         device="cam"
         modeId="yuyv-256x384"
         profile={profile}
@@ -145,6 +147,7 @@ describe('alarm lifecycle', () => {
     expect(start).toHaveBeenCalledOnce();
     view.rerender(
       <Viewer
+        files={{ saveAs: () => Promise.resolve() }}
         device="cam"
         modeId="yuyv-256x384"
         profile={profile}

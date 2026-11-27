@@ -13,8 +13,17 @@ import {
   pixelFormatMessage,
 } from './capture.js';
 import { openControl } from './control.js';
-import { installRecordingStorage } from './recordings.js';
-import { app, BrowserWindow, ipcMain, protocol, net, session, systemPreferences } from 'electron';
+import { installPhotoStorage, installRecordingStorage, installSaveAs } from './recordings.js';
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  protocol,
+  net,
+  session,
+  systemPreferences,
+} from 'electron';
 import { spawn } from 'node:child_process';
 import { resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -127,11 +136,21 @@ async function boot() {
     )
       throw new Error('Untrusted IPC sender');
   }
-  const closeRecordings = installRecordingStorage(
-    ipcMain,
-    resolve(app.getPath('userData'), 'recordings'),
+  // The library lives in the app's own directory; the user gets copies through `files:save-as`.
+  const directories = {
+    recordings: resolve(app.getPath('userData'), 'recordings'),
+    photos: resolve(app.getPath('userData'), 'photos'),
+  };
+  const closeRecordings = installRecordingStorage(ipcMain, directories.recordings, authorize);
+  installPhotoStorage(ipcMain, directories.photos, authorize);
+  installSaveAs(ipcMain, {
     authorize,
-  );
+    // The browser's save picker cannot write here (no `fileSystem` permission is
+    // granted), so copies go through the system's own save dialog.
+    showSaveDialog: (options) => dialog.showSaveDialog(window, options),
+    directories,
+    folder: app.getPath('downloads'),
+  });
   window.webContents.on('did-start-navigation', (details) => {
     if (details.isMainFrame && !details.isSameDocument) {
       stop();

@@ -3,6 +3,9 @@ contextBridge.exposeInMainWorld('irvisDesktop', {
   concurrentWith: process.platform === 'darwin' ? ['browser'] : [],
   recordingStorage: (op, name, bytes, offset, length) =>
     ipcRenderer.invoke('recording:storage', op, name, bytes, offset, length),
+  photoStorage: (op, name, bytes, createdAt) =>
+    ipcRenderer.invoke('photo:storage', op, name, bytes, createdAt),
+  saveAs: (name, what) => ipcRenderer.invoke('files:save-as', name, what),
   listDevices: () => ipcRenderer.invoke('capture:devices'),
   listModes: (device) => ipcRenderer.invoke('capture:modes', device),
   command: (id, value) => ipcRenderer.invoke('capture:command', id, value),
