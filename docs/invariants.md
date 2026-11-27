@@ -362,3 +362,20 @@ Invariants 1 to 14 belong to the documentation contract, 15 to 17 to the archite
   - `packages/ui/test/pointer.test.ts::pointer placement::stores percentages that geometry turns back into the same pixel`
   - `packages/ui/test/viewer.test.tsx::measurement controls::adds a point where the image is clicked and drags points and area corners`
   - `packages/ui/test/viewer.test.tsx::measurement controls::keeps a grabbed handle where it was until the pointer really moves`
+- **87.** A desktop photo is a file in `userData/photos` that appears whole or not at all: its bytes are written to `<name>.tmp` and renamed, a failed write leaves no file, the `.tmp` files of a crash are deleted when the storage starts, an existing name is never replaced, and the renderer reaches only PNG file names of that directory.
+  - `apps/desktop/test/files.test.js::desktop library files::saves, lists and deletes photos in userData/photos by name, with their time`
+  - `apps/desktop/test/files.test.js::desktop library files::refuses a photo name that is not a PNG file name of the directory`
+  - `apps/desktop/test/files.test.js::desktop library files::leaves no part of a photo whose write fails, and removes the parts a crash left at start`
+- **88.** A desktop copy is written only to the path the user chose in the system's save dialog: a file of the library is copied by the main process, other bytes are written as sent, a cancelled dialog writes nothing and is not an error, and only a file of the library can be copied.
+  - `apps/desktop/test/files.test.js::desktop library files::saves a copy where the save dialog says: a library file copied, bytes written, nothing when cancelled`
+  - `apps/web/src/host-files.test.ts::host files::has the main process copy a desktop recording, and sends the bytes of anything else`
+- **89.** The viewer saves a copy or an export only through `HostFiles.saveAs`, under the file's name, and only on request: Stop saves no copy and exports no MP4, and a host without a recordings or photo library gets the controls that need it disabled.
+  - `packages/ui/test/host-files.test.tsx::host files::saves a copy of a recording and of its sidecar through saveAs, under their names`
+  - `packages/ui/test/host-files.test.tsx::host files::exports an MP4 through saveAs, named after its recording`
+  - `packages/ui/test/host-files.test.tsx::host files::saves a photo and a flattened annotated copy through saveAs`
+  - `packages/ui/test/host-files.test.tsx::host files::turns recording, Capture photo and Gallery off when the host has no library for them`
+  - `packages/ui/test/host-files.test.tsx::host files::keeps a stopped recording in the library without saving a copy, and offers no automatic export`
+- **90.** A browser without OPFS has no recording storage instead of recordings kept in memory, and a cancelled save picker saves nothing and is not an error.
+  - `packages/media/test/files.test.ts::browser files::gives no recording storage without OPFS, rather than recordings kept in memory`
+  - `packages/media/test/files.test.ts::browser files::saves nothing and reports nothing when the save picker is cancelled`
+  - `apps/web/src/host-files.test.ts::host files::gives the browser no recordings without OPFS and no photos without IndexedDB`

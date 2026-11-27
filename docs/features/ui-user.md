@@ -62,9 +62,9 @@ After a frame is displayed, press `Capture photo`. The saved PNG includes the vi
 
 `Saving photo…` becomes `Saved <filename>` only after storage commits, and the photo gallery opens. Each capture creates a separate file, including captures made while analyzing another photo. The original is never overwritten. `Photo capture failed:` reports rendering or storage failures without stopping live capture. Hosts without photo storage show `Photo storage is unavailable in this host.`
 
-The photo-only gallery shows previews and `Analyze`, `Download` and `Delete` actions for each filename. Analyze starts with no added measurement objects; add new points, lines and areas as usual. Download keeps a standard PNG with temperature data, not a flattened export. Delete removes that gallery record immediately; it does not remove downloaded files or close an already open analysis. A failed deletion keeps the entry visible and reports `Gallery error:`. Close and reopen Gallery to retry a failed list operation.
+The photo-only gallery shows previews and `Analyze`, `Download` and `Delete` actions for each filename. Analyze starts with no added measurement objects; add new points, lines and areas as usual. Download saves a copy, a standard PNG with temperature data, not a flattened export: the browser asks where or downloads it, and the desktop app opens the system's save dialog. Cancelling saves nothing. Delete removes that gallery record immediately; it does not remove downloaded files or close an already open analysis. A failed deletion keeps the entry visible and reports `Gallery error:`. Close and reopen Gallery to retry a failed list operation.
 
-The app saves photos locally in this browser/site or desktop app profile. They survive reloads and camera/profile switches, but clearing app/site data or browser eviction can remove them. Download important photos for backup. Gallery contents are not synchronized between the browser and desktop app.
+The app saves photos locally: in this browser/site, or in the desktop app's own data directory. They survive reloads and camera/profile switches, but clearing app/site data or browser eviction can remove them. Download important photos for backup. Gallery contents are not synchronized between the browser and desktop app.
 
 ## Record, play and export video
 

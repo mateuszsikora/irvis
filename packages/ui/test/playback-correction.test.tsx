@@ -98,7 +98,15 @@ function setup() {
     listDevices: () => Promise.resolve([]),
     open: () => Promise.reject(new Error('Unused')),
   };
-  render(<Viewer device="" modeId="yuyv-256x384" backend={backend} profile={profile} />);
+  render(
+    <Viewer
+      files={{ saveAs: () => Promise.resolve() }}
+      device=""
+      modeId="yuyv-256x384"
+      backend={backend}
+      profile={profile}
+    />,
+  );
 }
 async function opened(p: Awaited<ReturnType<typeof player>>) {
   await act(async () => {

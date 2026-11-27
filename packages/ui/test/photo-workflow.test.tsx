@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cameraProfiles, exportPng, type CameraBackend, type RawFrame } from '@irvis/core';
-import { Viewer, type PhotoLibrary, type SavedPhoto } from '../src/index.ts';
+import { Viewer, type HostFiles, type PhotoLibrary, type SavedPhoto } from '../src/index.ts';
 const capture = vi.hoisted(() => vi.fn<() => Promise<Uint8Array>>());
 const draw = vi.hoisted(() => vi.fn());
 vi.mock('../src/render.ts', () => ({
@@ -70,13 +70,14 @@ async function setup() {
       return Promise.resolve();
     }),
   };
+  const saveAs = vi.fn<HostFiles['saveAs']>(() => Promise.resolve());
   render(
     <Viewer
       device="test"
       modeId="yuyv-256x384"
       backend={backend}
       profile={profile}
-      photoLibrary={library}
+      files={{ photos: library, saveAs }}
     />,
   );
   await waitFor(() => expect(screen.getByText<HTMLButtonElement>('Start').disabled).toBe(false));
@@ -98,11 +99,11 @@ async function setup() {
       },
     }),
   );
-  return { library, items };
+  return { library, items, saveAs };
 }
 describe('photo workflow', () => {
   it('captures into the gallery and opens fresh measurements while preserving original bytes', async () => {
-    const { items } = await setup();
+    const { items, saveAs } = await setup();
     fireEvent.click(screen.getByText('Add point'));
     fireEvent.click(screen.getByText('Capture photo'));
     // By text: a first ByRole query on this tree costs about as much as the
@@ -116,9 +117,12 @@ describe('photo workflow', () => {
     for (const kind of ['point', 'line', 'area']) fireEvent.click(screen.getByText(`Add ${kind}`));
     expect(screen.getByLabelText<HTMLSelectElement>('Selected object').options).toHaveLength(4);
     expect(items[0]!.bytes).toEqual(original);
-    expect(screen.getByRole('link', { name: /^Download irvis-/ }).getAttribute('download')).toBe(
-      items[0]!.name,
-    );
+    // Download saves a copy of the original bytes where the user chooses.
+    fireEvent.click(screen.getByText(/^Download irvis-/, { selector: 'button' }));
+    await waitFor(() => expect(saveAs).toHaveBeenCalledOnce());
+    const [name, copy] = saveAs.mock.calls[0]!;
+    expect(name).toBe(items[0]!.name);
+    expect(await copy.read(0, await copy.size())).toEqual(original);
     fireEvent.click(screen.getByRole('button', { name: /^Delete irvis-/ }));
     await screen.findByText('No saved photos.');
     expect(screen.getByLabelText<HTMLSelectElement>('Selected object').options).toHaveLength(4);

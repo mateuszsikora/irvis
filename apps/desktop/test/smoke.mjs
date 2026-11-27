@@ -134,6 +134,41 @@ try {
     return { audioListed, size, bytes: [...bytes], rejected };
   });
   assert.deepEqual(storageResult, { audioListed: true, size: 3, bytes: [2, 3], rejected: true });
+  // Photos in the app's directory, and copies through the system's save dialog,
+  // answered here without a person.
+  const copies = [resolve(scratch, 'copy.irvis'), resolve(scratch, 'copy.png')];
+  await app.evaluate(({ dialog }, paths) => {
+    dialog.showSaveDialog = () => Promise.resolve({ canceled: false, filePath: paths.shift() });
+  }, copies);
+  const filesResult = await page.evaluate(async () => {
+    const desktop = window.irvisDesktop;
+    const photo = `irvis-smoke-${crypto.randomUUID()}.png`;
+    await desktop.photoStorage('save', photo, new Uint8Array([5, 6]), 1_000_000_000_000);
+    const listed = (await desktop.photoStorage('list')).find((item) => item.name === photo);
+    const recording = `smoke-${crypto.randomUUID()}.irvis`;
+    await desktop.recordingStorage('open', recording);
+    await desktop.recordingStorage('append', recording, new Uint8Array([7, 8, 9]));
+    await desktop.recordingStorage('close', recording);
+    const copied = await desktop.saveAs('copy.irvis', { kind: 'recordings', name: recording });
+    const written = await desktop.saveAs('copy.png', new Uint8Array([1]));
+    await desktop.recordingStorage('remove', recording);
+    await desktop.photoStorage('remove', photo);
+    const gone = !(await desktop.photoStorage('list')).some((item) => item.name === photo);
+    return {
+      photo: listed && { createdAt: listed.createdAt, bytes: [...listed.bytes] },
+      copied,
+      written,
+      gone,
+    };
+  });
+  assert.deepEqual(filesResult, {
+    photo: { createdAt: 1_000_000_000_000, bytes: [5, 6] },
+    copied: true,
+    written: true,
+    gone: true,
+  });
+  assert.deepEqual([...readFileSync(resolve(scratch, 'copy.irvis'))], [7, 8, 9]);
+  assert.deepEqual([...readFileSync(resolve(scratch, 'copy.png'))], [1]);
 
   const sink = new MemoryByteSink();
   const profile = cameraProfiles[0];

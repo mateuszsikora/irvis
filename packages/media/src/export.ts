@@ -78,6 +78,11 @@ export async function exportMp4(
   }
 }
 
+/**
+ * Saves a copy of `source` as `name`: through the browser's save picker during
+ * a click, where the browser has one, otherwise as a download. A cancelled
+ * picker resolves without saving: it is not an error.
+ */
 export async function saveRecordingFile(name: string, source: ByteSource): Promise<void> {
   const picker = (
     window as unknown as {
@@ -91,7 +96,13 @@ export async function saveRecordingFile(name: string, source: ByteSource): Promi
     }
   ).showSaveFilePicker;
   if (picker && navigator.userActivation?.isActive) {
-    const file = await picker({ suggestedName: name });
+    let file;
+    try {
+      file = await picker({ suggestedName: name });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      throw error;
+    }
     const writable = await file.createWritable();
     try {
       const size = await source.size();

@@ -1,12 +1,19 @@
 import type { ByteSink, ByteSource } from '@irvis/core';
 import type { DesktopBridge } from './index.ts';
+
+/**
+ * The library file each source of the desktop storage reads, so that a copy of
+ * it is made by the main process instead of being read through the renderer.
+ */
+export const libraryFiles = new WeakMap<ByteSource, { kind: 'recordings'; name: string }>();
+
 export function createDesktopRecordingStorage(bridge: DesktopBridge) {
   const invoke = bridge.recordingStorage;
   if (!invoke) throw new Error('Desktop recording storage is unavailable.');
   const call = invoke;
   return {
     prepare: () =>
-      Promise.resolve('Recordings are saved locally. Download backups before deleting them.'),
+      Promise.resolve('Recordings are kept by the app. Download a copy to keep it elsewhere.'),
     async create(name: string): Promise<ByteSink> {
       await call('open', name);
       let busy = false;
@@ -64,6 +71,7 @@ export function createDesktopRecordingStorage(bridge: DesktopBridge) {
             return out;
           },
         };
+        libraryFiles.set(source, { kind: 'recordings', name });
         return { name, source };
       });
     },

@@ -30,9 +30,15 @@ The web panel stores the first 100 measurement records per start, then stops app
 
 ## Recording byte storage
 
-`createDesktopRecordingStorage` adapts the optional preload `recordingStorage` function to recording storage and core ByteSink/ByteSource. Append and flush allow one outstanding operation; calls resolve only after the main-process operation finishes. Reads are split into at most 4 MiB IPC requests. The main process owns paths and files. Close is idempotent after a successful close.
+`createDesktopRecordingStorage` adapts the optional preload `recordingStorage` function to recording storage and core ByteSink/ByteSource. Its `prepare` answers `Recordings are kept by the app. Download a copy to keep it elsewhere.` Each source it lists is registered in `libraryFiles`, so that `desktopSaveAs` has the main process copy that file. Append and flush allow one outstanding operation; calls resolve only after the main-process operation finishes. Reads are split into at most 4 MiB IPC requests. The main process owns paths and files. Close is idempotent after a successful close.
 
 Large appends (including a final index) are split into sequential 4 MiB IPC chunks while the sink remains busy. `apps/web/src/recording-storage.test.ts` checks chunking, overlapping-call rejection and idempotent close.
+
+## Photos and copies
+
+`createDesktopPhotoLibrary(bridge)` is the desktop `PhotoLibrary`, through the preload's `photoStorage`: `list` maps each file to a photo whose `id` and `name` are the file name and whose `createdAt` is its time, `save` sends the name, bytes and `createdAt`, and `remove(id)` deletes the file. Its record type `DesktopPhoto` has the shape of `SavedPhoto` from `@irvis/ui`, which this package does not depend on.
+
+`desktopSaveAs(bridge)` is the desktop `HostFiles.saveAs`: it calls the preload's `saveAs(name, what)` with `{ kind: 'recordings', name }` for a source of the recording storage (`libraryFiles`), so the main process copies the file, and with the bytes it reads otherwise (a photo, an MP4, a flattened PNG). A cancelled dialog resolves without saving. A preload without `saveAs` rejects with `Saving a copy is unavailable in this desktop app.` `apps/web/src/host-files.test.ts` covers both.
 
 ## Live backend integration
 

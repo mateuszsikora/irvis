@@ -25,6 +25,21 @@ export interface DesktopBridge {
     offset?: number,
     length?: number,
   ) => Promise<unknown>;
+  /** Photos in the app's directory: `list`, `save` (with the photo's time) and `remove`. */
+  photoStorage?: (
+    op: string,
+    name?: string,
+    bytes?: Uint8Array,
+    createdAt?: number,
+  ) => Promise<unknown>;
+  /**
+   * Shows the system's save dialog for `name` and writes there a file of the
+   * library or the bytes given; true once written, false when cancelled.
+   */
+  saveAs?: (
+    name: string,
+    what: { kind: 'recordings' | 'photos'; name: string } | Uint8Array,
+  ) => Promise<boolean>;
   start(options: { profileId: string; modeId: string; device: number | string }): Promise<void>;
   stop(): Promise<void>;
   subscribe(frame: (value: ReferenceFrame) => void, error: (message: string) => void): () => void;
@@ -96,3 +111,5 @@ export function compare(
 }
 
 export { createDesktopRecordingStorage } from './recordings.ts';
+export { createDesktopPhotoLibrary, type DesktopPhoto } from './photos.ts';
+export { desktopSaveAs } from './save.ts';

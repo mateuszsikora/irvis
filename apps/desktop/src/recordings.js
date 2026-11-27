@@ -1,5 +1,21 @@
-import { mkdir, open, readdir, stat, unlink } from 'node:fs/promises';
-import { join } from 'node:path';
+import {
+  copyFile,
+  mkdir,
+  open,
+  readdir,
+  readFile,
+  rename,
+  stat,
+  unlink,
+  utimes,
+  writeFile,
+} from 'node:fs/promises';
+import { basename, join } from 'node:path';
+
+/** The names a recording or its microphone sidecar may have. */
+export const RECORDING_NAME = /^[a-zA-Z0-9_.-]+\.(irvis|webm|pcm)$/;
+/** The names a photo may have; the viewer names them by time and a UUID. */
+export const PHOTO_NAME = /^[a-zA-Z0-9_.-]+\.png$/;
 
 /** All paths stay inside the app-owned directory. One operation per open sink. */
 export function installRecordingStorage(ipcMain, directory, authorize) {
@@ -20,7 +36,7 @@ export function installRecordingStorage(ipcMain, directory, authorize) {
     }
   }
   function path(name) {
-    if (typeof name !== 'string' || !/^[a-zA-Z0-9_.-]+\.(irvis|webm|pcm)$/.test(name))
+    if (typeof name !== 'string' || !RECORDING_NAME.test(name))
       throw new Error('Invalid recording name.');
     return join(directory, name);
   }
@@ -116,4 +132,101 @@ export function installRecordingStorage(ipcMain, directory, authorize) {
     ]).then(() => {});
     return cleanup;
   };
+}
+
+/**
+ * Photos as PNG files in the app-owned `directory`: the renderer names a file,
+ * never a path. A photo is written to `<name>.tmp` and renamed once complete,
+ * so the list never shows part of one; the `.tmp` files a crash left are
+ * deleted when the storage is installed. A photo's time is its file's
+ * modification time.
+ */
+export function installPhotoStorage(ipcMain, directory, authorize) {
+  function path(name) {
+    if (typeof name !== 'string' || !PHOTO_NAME.test(name)) throw new Error('Invalid photo name.');
+    return join(directory, name);
+  }
+  const tidied = readdir(directory)
+    .then((names) =>
+      Promise.all(
+        names
+          .filter((name) => name.endsWith('.tmp'))
+          .map((name) => unlink(join(directory, name)).catch(() => {})),
+      ),
+    )
+    .catch(() => {});
+  ipcMain.handle('photo:storage', async (event, op, name, bytes, createdAt) => {
+    authorize(event);
+    await tidied;
+    await mkdir(directory, { recursive: true });
+    if (op === 'list') {
+      const names = (await readdir(directory)).filter((file) => PHOTO_NAME.test(file));
+      const photos = await Promise.all(
+        names.map(async (file) => {
+          try {
+            const [bytes, info] = await Promise.all([
+              readFile(join(directory, file)),
+              stat(join(directory, file)),
+            ]);
+            return { name: file, createdAt: info.mtimeMs, bytes };
+          } catch {
+            // Deleted since the listing.
+            return null;
+          }
+        }),
+      );
+      return photos.filter((photo) => photo !== null);
+    }
+    const filename = path(name);
+    if (op === 'remove') {
+      await unlink(filename);
+      return;
+    }
+    if (op === 'save') {
+      if (!(bytes instanceof Uint8Array)) throw new Error('Invalid photo.');
+      if (!Number.isFinite(createdAt) || createdAt < 0) throw new Error('Invalid photo time.');
+      if (await stat(filename).catch(() => null)) throw new Error(`${name} already exists.`);
+      const temporary = filename + '.tmp';
+      try {
+        await writeFile(temporary, bytes);
+        const time = new Date(createdAt);
+        await utimes(temporary, time, time);
+        await rename(temporary, filename);
+      } catch (error) {
+        await unlink(temporary).catch(() => {});
+        throw error;
+      }
+      return;
+    }
+    throw new Error('Invalid photo operation.');
+  });
+}
+
+/**
+ * `files:save-as`: a copy or an export saved where the user chooses in the
+ * system's save dialog (`showSaveDialog`, given the options, answering like
+ * Electron's `dialog.showSaveDialog`). `what` is a file of the library
+ * (`{ kind: 'recordings' | 'photos', name }`, copied in the main process) or
+ * the bytes to write. The dialog opens in `folder` (Downloads in the app) with
+ * the suggested name. Answers true once the file is written, false when the
+ * user cancels; the renderer never learns the path.
+ */
+export function installSaveAs(ipcMain, { authorize, showSaveDialog, directories, folder }) {
+  ipcMain.handle('files:save-as', async (event, suggestedName, what) => {
+    authorize(event);
+    if (typeof suggestedName !== 'string' || !suggestedName) throw new Error('Invalid file name.');
+    let source;
+    if (what instanceof Uint8Array) source = null;
+    else if (what?.kind === 'recordings' && RECORDING_NAME.test(what.name))
+      source = join(directories.recordings, what.name);
+    else if (what?.kind === 'photos' && PHOTO_NAME.test(what.name))
+      source = join(directories.photos, what.name);
+    else throw new Error('Invalid file to save.');
+    // Only the name is taken from the renderer, never a folder.
+    const result = await showSaveDialog({ defaultPath: join(folder, basename(suggestedName)) });
+    if (result.canceled || !result.filePath) return false;
+    if (source) await copyFile(source, result.filePath);
+    else await writeFile(result.filePath, what);
+    return true;
+  });
 }

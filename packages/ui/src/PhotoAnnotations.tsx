@@ -1,8 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { fileByteSource, saveRecordingFile } from '@irvis/media';
+import { fileByteSource } from '@irvis/media';
+import type { HostFiles } from './files.ts';
 import type { SavedPhoto } from './photos.ts';
 type Mark = { color: string; size: number; points: { x: number; y: number }[]; text: string };
-export function PhotoAnnotations({ photo }: { photo: SavedPhoto }) {
+export function PhotoAnnotations({
+  photo,
+  saveAs,
+}: {
+  photo: SavedPhoto;
+  /** Saves the flattened PNG where the user chooses. */
+  saveAs: HostFiles['saveAs'];
+}) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const original = useRef<HTMLImageElement | null>(null);
   const [marks, setMarks] = useState<Mark[]>([]);
@@ -142,7 +150,7 @@ export function PhotoAnnotations({ photo }: { photo: SavedPhoto }) {
         onClick={() => {
           canvas.current?.toBlob((blob) => {
             if (blob)
-              void saveRecordingFile(
+              void saveAs(
                 photo.name.replace(/\.png$/, '-annotated-flat.png'),
                 fileByteSource(blob),
               ).catch((e) => setError(String(e)));

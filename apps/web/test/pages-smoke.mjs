@@ -91,8 +91,8 @@ try {
   assert.equal((await page.locator('h1').textContent()).trim(), 'irvis');
   assert.equal(await page.evaluate(() => globalThis.isSecureContext), true, 'not a secure context');
 
-  // Recording storage: the OPFS path (not the memory fallback), written by
-  // the storage module Worker, and listed again after the recording stops.
+  // Recording storage: OPFS, written by the storage module Worker, and listed
+  // again after the recording stops.
   await page.getByRole('button', { name: 'Start', exact: true }).click();
   await page.getByText('Demo running', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Check recording storage' }).click();
